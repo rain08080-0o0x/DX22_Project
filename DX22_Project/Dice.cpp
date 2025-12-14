@@ -3,6 +3,8 @@
 // 必要なら描画用のヘッダも include する
  #include "Geometory.h"
 // #include "Renderer.h"
+#include "ShaderList.h"
+#include "Sprite.h"
 
 using namespace DirectX;
 
@@ -16,6 +18,13 @@ Dice::Dice()
 {
     m_box.center = m_pos;
     m_box.size = XMFLOAT3(m_size, m_size, m_size);
+    m_pModel = new Model();
+    // 略可
+    if (!m_pModel->Load("Assets/Model/Dice/dice.fbx", 1.0f,Model::ZFlip)) { // 倍率と反転は省略可
+        MessageBox(NULL, "Not found Dice", "Error", MB_OK); // エラーメッセージの表示
+    }
+
+    m_pCamera = nullptr;
 }
 
 void Dice::Init(const XMFLOAT3& pos, float size)
@@ -99,12 +108,49 @@ void Dice::Draw()
     XMStoreFloat4x4(&world, XMMatrixTranspose(W));
 
     Geometory::SetWorld(world);
-    Geometory::DrawBox();  // 立方体を描画する関数
+    //Geometory::DrawBox();  // 立方体を描画する関数
+
+    XMFLOAT4X4 fWVP[3];
+
+    fWVP[0] = world;
+    fWVP[1] = m_pCamera->GetViewMatrix();
+    fWVP[2] = m_pCamera->GetProjectionMatrix();
+
+	// シェーダーへ変換行列を設定 
+    ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
+
+    Geometory::SetView(m_pCamera->GetViewMatrix(true));
+    Geometory::SetProjection(m_pCamera->GetProjectionMatrix(true));
+
+    // Spriteへの設定
+    Sprite::SetView(m_pCamera->GetViewMatrix(true));
+    Sprite::SetProjection(m_pCamera->GetProjectionMatrix(true));
+
+    //　モデルに使用する頂点シェーダー、ピクセルシェーダーを設定
+    m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+    m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_TOON));
+
+    // マテリアル別にメッシュを表示 
+    for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
+        // モデルのメッシュを取得 
+        const Model::Mesh* mesh = m_pModel->GetMesh(i);
+        // メッシュに割り当てられているマテリアルを取得 
+        Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
+        // シェーダーへマテリアルを設定 
+        ShaderList::SetMaterial(material);
+        // モデルの描画 
+        m_pModel->Draw(i);
+    }
 }
 
 void Dice::Uninit()
 {
     // 今は特に解放するものはないが、将来テクスチャやモデルを持たせるならここで解放
+}
+
+void Dice::SetCamera(Camera *set)
+{
+    m_pCamera = set;
 }
 
 const DirectX::XMFLOAT3 Dice::GetPos()
@@ -129,3 +175,4 @@ void Dice::AddPos(const DirectX::XMFLOAT3 dp)
     m_pos.z += dp.z;
     m_box.center = m_pos; // 追従
 }
+

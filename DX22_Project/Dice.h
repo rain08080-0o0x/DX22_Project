@@ -2,6 +2,8 @@
 #pragma once
 #include <DirectXMath.h>
 #include "Collision.h"
+#include "Model.h"
+#include "Camera.h"
 
 class Dice
 {
@@ -22,6 +24,8 @@ public:
     void Uninit();
 
     const Collision::Box GetCollision(){ return m_box; }
+
+    void SetCamera(Camera *set);
 public:
     const DirectX::XMFLOAT3 GetPos();
     const DirectX::XMFLOAT3 GetVel();
@@ -40,4 +44,7 @@ private:
     float m_friction;    // 地面との摩擦の強さ
 
     Collision::Box m_box; // 当たり判定用（AABB）
+
+    Model *m_pModel;
+    Camera* m_pCamera;
 };

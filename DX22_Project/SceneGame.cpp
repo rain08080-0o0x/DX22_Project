@@ -7,6 +7,12 @@
 
 SceneGame::SceneGame()
 {
+	//--- モデルの描画
+	RenderTarget* pRTV = GetDefaultRTV();
+	DepthStencil* pDSV = GetDefaultDSV();
+	SetRenderTargets(1, &pRTV, pDSV);
+	SetDepthTest(true);
+
 	m_pModel = new Model();
 
 	//if (!m_pModel->Load("Assets/Model/Furina/furina.pmx", 0.1f,Model::None)) { // 倍率と反転は省
@@ -15,12 +21,7 @@ SceneGame::SceneGame()
 	if (!m_pModel->Load("Assets/Model/KayKit/Assets/fbx/green/platform_1x1x1_green.fbx", 1.f,Model::ZFlip)) { // 倍率と反転は省略可
 		MessageBox(NULL, "Branch_01","Error", MB_OK); // エラーメッセージの表示
 	}
-	//--- モデルの描画
-	RenderTarget* pRTV = GetDefaultRTV(); // デフォルトのRenderTargetViewを取得
-	DepthStencil* pDSV = GetDefaultDSV(); // デフォルトのDepthStencilViewを取得
-	SetRenderTargets(1, &pRTV, pDSV); // 第3引数がnullの場合、2D表示となる
 
-	SetDepthTest(true);
 	m_pPlayer = new Player();
 	m_pPlayer->SetCamera(m_pCamera);
 	m_pBlock = new Block();
@@ -33,12 +34,17 @@ SceneGame::SceneGame()
 	DirectX::XMFLOAT3 pos = { 0.0f,0.0f,0.0f };
 	m_pDice = new Dice();
 	m_pDice->Init(pos,1.0f);
+	m_pDice->SetCamera(m_pCamera);
 	m_diceCount = 3;
 	m_dice = new Dice[m_diceCount];
 
 	m_dice[0].Init({ 0.0f, 2.0f,  0.0f }, 1.0f);
 	m_dice[1].Init({ 0.0f, 8.0f,  0.0f }, 1.0f);
 	m_dice[2].Init({ 0.0f, 15.0f, 0.0f }, 1.0f);
+	for (int i = 0; i < m_diceCount; ++i)
+	{
+		m_dice[i].SetCamera(m_pCamera);
+	}
 
 }
 

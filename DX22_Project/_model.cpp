@@ -3,17 +3,26 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-
 void Model::MakeMesh(const void* ptr, float scale, Flip flip)
 {
 	// 事前準備
 	aiVector3D zero3(0.0f, 0.0f, 0.0f);
 	aiColor4D one4(1.0f, 1.0f, 1.0f, 1.0f);
 	const aiScene* pScene = reinterpret_cast<const aiScene*>(ptr);
-	float xFlip = flip == Flip::XFlip ? -1.0f : 1.0f;
+
+	// 反転係数
+	float xFlip = (flip == Flip::XFlip) ? -1.0f : 1.0f;
 	float zFlip = (flip == Flip::ZFlip || flip == Flip::ZFlipUseAnime) ? -1.0f : 1.0f;
-	int idx1 = (flip == Flip::XFlip || flip == Flip::ZFlip) ? 2 : 1;
-	int idx2 = (flip == Flip::XFlip || flip == Flip::ZFlip) ? 1 : 2;
+
+	// 片軸だけ反転 = 鏡映（winding が反転する）
+	// xFlip,zFlip は ±1 なので積が -1 のとき鏡映
+	bool isMirror = ((xFlip * zFlip) < 0.0f);
+
+	// インデックスの並び（winding）を入れ替えるかどうか
+	// いままでのコードは XFlip / ZFlip だけ入れ替えだったが ZFlipUseAnime が漏れるので
+	// 「鏡映かどうか」で一意に決める
+	int idx1 = isMirror ? 2 : 1;
+	int idx2 = isMirror ? 1 : 2;
 
 	// メッシュの作成
 	m_meshes.resize(pScene->mNumMeshes);
@@ -23,7 +32,8 @@ void Model::MakeMesh(const void* ptr, float scale, Flip flip)
 		m_meshes[i].vertices.resize(pScene->mMeshes[i]->mNumVertices);
 
 		// 頂点データの書き込み
-		for (unsigned int j = 0; j < m_meshes[i].vertices.size(); ++j) {
+		for (unsigned int j = 0; j < m_meshes[i].vertices.size(); ++j)
+		{
 			// ☆モデルデータから値の取得
 			aiVector3D pos = pScene->mMeshes[i]->mVertices[j];
 			aiVector3D normal = pScene->mMeshes[i]->HasNormals() ?
@@ -33,10 +43,24 @@ void Model::MakeMesh(const void* ptr, float scale, Flip flip)
 			aiColor4D color = pScene->mMeshes[i]->HasVertexColors(0) ?
 				pScene->mMeshes[i]->mColors[0][j] : one4;
 
+			// ★重要：位置と同じ反転を法線にも適用
+			DirectX::XMFLOAT3 n(
+				normal.x * xFlip,
+				normal.y,
+				normal.z * zFlip
+			);
+
+			// ★保険：法線を正規化（長さ0は潰す）
+			DirectX::XMVECTOR vn = DirectX::XMVectorSet(n.x, n.y, n.z, 0.0f);
+			vn = DirectX::XMVector3LengthSq(vn).m128_f32[0] > 0.0f
+				? DirectX::XMVector3Normalize(vn)
+				: DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			DirectX::XMStoreFloat3(&n, vn);
+
 			// ☆値を設定
 			m_meshes[i].vertices[j] = {
 				DirectX::XMFLOAT3(pos.x * scale * xFlip, pos.y * scale, pos.z * scale * zFlip),
-				DirectX::XMFLOAT3(normal.x, normal.y, normal.z),
+				n,
 				DirectX::XMFLOAT2(uv.x, uv.y),
 				DirectX::XMFLOAT4(color.r, color.g, color.b, color.a)
 			};
@@ -46,15 +70,26 @@ void Model::MakeMesh(const void* ptr, float scale, Flip flip)
 		MakeWeight(pScene, i);
 
 		// インデックスの書き込み先の用意
-		// mNumFacesはポリゴンの数を表す(１ポリゴンで3インデックス
+		// mNumFacesはポリゴンの数を表す(１ポリゴンで3インデックス)
 		m_meshes[i].indices.resize(pScene->mMeshes[i]->mNumFaces * 3);
 
 		// インデックスの書き込み
-		for (unsigned int j = 0; j < pScene->mMeshes[i]->mNumFaces; ++j) {
+		for (unsigned int j = 0; j < pScene->mMeshes[i]->mNumFaces; ++j)
+		{
 			// ☆モデルデータから値の取得
 			aiFace face = pScene->mMeshes[i]->mFaces[j];
-			// ☆値の設定
+
+			// 念のため（三角形以外が来たら無視／ゼロ埋め）
 			int idx = j * 3;
+			if (face.mNumIndices < 3)
+			{
+				m_meshes[i].indices[idx + 0] = 0;
+				m_meshes[i].indices[idx + 1] = 0;
+				m_meshes[i].indices[idx + 2] = 0;
+				continue;
+			}
+
+			// ☆値の設定（鏡映なら 1 と 2 を入れ替える）
 			m_meshes[i].indices[idx + 0] = face.mIndices[0];
 			m_meshes[i].indices[idx + 1] = face.mIndices[idx1];
 			m_meshes[i].indices[idx + 2] = face.mIndices[idx2];
@@ -72,7 +107,7 @@ void Model::MakeMesh(const void* ptr, float scale, Flip flip)
 		desc.idxSize = sizeof(unsigned long);
 		desc.idxCount = m_meshes[i].indices.size();
 		desc.topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-				
+
 		// ☆頂点バッファ作成
 		m_meshes[i].pMesh = new MeshBuffer();
 		m_meshes[i].pMesh->Create(desc);
