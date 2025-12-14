@@ -78,7 +78,7 @@ void Draw()
 		ImGui::DragFloat("Y",&posY);
 		ImGui::DragFloat("Z",&posZ);
 		ImGui::DragFloat("Power",&power);
-		ImGui::DragFloat("MAx Power",&max);
+		ImGui::DragFloat("Max Power",&max);
 
 		tran.m_posX= posX;
 		tran.m_posY= posY;
