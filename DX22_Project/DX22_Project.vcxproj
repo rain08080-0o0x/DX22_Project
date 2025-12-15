@@ -149,6 +149,7 @@
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="DirectX.cpp" />
     <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="GaugeUI.cpp" />
     <ClCompile Include="Geometory.cpp" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
@@ -181,6 +182,7 @@
     <ClInclude Include="Defines.h" />
     <ClInclude Include="DirectX.h" />
     <ClInclude Include="GameObject.h" />
+    <ClInclude Include="GaugeUI.h" />
     <ClInclude Include="Geometory.h" />
     <ClInclude Include="imconfig.h" />
     <ClInclude Include="imgui.h" />

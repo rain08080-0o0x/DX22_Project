@@ -2,6 +2,8 @@
 #include "GameObject.h"
 #include "Camera.h"
 #include "Collision.h"
+#include "Sprite.h"
+#include "Texture.h"
 
 class Player :
     public GameObject
@@ -33,7 +35,9 @@ public:
         // カメラの設定 
     void SetCamera(Camera* pCamera);
     Collision::Box GetCollision();
+    void SetShadowPos(DirectX::XMFLOAT3 pos);
 
+    Collision::Box GetShadowCollision();
     //--- 以下の関数の処理は後述 
 public:
     void Bound(BoundAxis axis);
@@ -51,7 +55,11 @@ private:
     float    m_shotPower;  // ボールの打ち出し強さ 
     eShotStep m_shotstep;
 
-        Collision::Box m_collision;
+    Collision::Box m_collision;
+
+    Texture* m_pShadowTex; // 影の見た目 
+    DirectX::XMFLOAT3 m_shadowPos;  // 影の位置 
+    Collision::Box  m_shadowCollision; //  
 
 };
 

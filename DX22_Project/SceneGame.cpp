@@ -28,7 +28,7 @@ SceneGame::SceneGame()
 
 	TRAN_INS;
 
-	tran.m_maxPower = 100.0f;
+	tran.m_maxPower = 1.0f;
 
 }
 
@@ -73,7 +73,14 @@ void SceneGame::Update()
 		if (result.dir.y != 0.0f)m_pPlayer->Bound(Player::BoundY);
 		if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
 	}
-
+	DirectX::XMFLOAT3 shadowPos = m_pPlayer->GetPos();
+	Collision::Box s = m_pPlayer->GetShadowCollision();
+	result = Collision::Hit(b, s);
+	if (result.isHit)
+		shadowPos.y = b.center.y + b.size.y * 0.5f;
+	else
+		shadowPos.y = 0.0f;
+	m_pPlayer->SetShadowPos(shadowPos);
 }
 
 void SceneGame::Draw()
@@ -116,17 +123,22 @@ void SceneGame::Draw()
 	// シェーダーへ変換行列を設定 
 	ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
 
+
 	// モデルに使用する頂点シェーダー、ピクセルシェーダーを設定 
 	m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
 	m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
 	// 仮置きしているボックスにカメラを設定
-	//Geometory::SetView(fWVP[1]);
-	//Geometory::SetProjection(fWVP[2]);
+	Geometory::SetView(fWVP[1]);
+	Geometory::SetProjection(fWVP[2]);
 
 	//// 仮置きしているボックスにカメラを設定 
 	//Geometory::SetView(m_pCamera->GetViewMatrix());
 	//Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
+
+	// Spriteへカメラの行列を設定 
+	Sprite::SetView(m_pCamera->GetViewMatrix());
+	Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
 
 	if(false)
 	// マテリアル別にメッシュを表示 
@@ -161,8 +173,8 @@ void SceneGame::Draw()
 	Geometory::SetWorld(fMat); // ボックスに変換行列を設定
 	//Geometory::DrawCylinder();
 
-	if(m_pPlayer)
-		m_pPlayer->Draw();
 	if(m_pBlock)
 		m_pBlock->Draw();
+	if(m_pPlayer)
+		m_pPlayer->Draw();
 }
