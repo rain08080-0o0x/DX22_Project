@@ -5,6 +5,7 @@
 // #include "Renderer.h"
 #include "ShaderList.h"
 #include "Sprite.h"
+#include "Transfer.h"
 
 using namespace DirectX;
 
@@ -25,6 +26,11 @@ Dice::Dice()
     }
 
     m_pCamera = nullptr;
+    TRAN_INS;
+    tran.WallSize = { 10.0f,10.0f };
+
+    m_angVel = { 0.0f,0.0f,0.0f };
+    m_rot = { 0.0f,0.0f,0.0f,1.0f };
 }
 
 void Dice::Init(const XMFLOAT3& pos, float size)
@@ -39,10 +45,14 @@ void Dice::Init(const XMFLOAT3& pos, float size)
 
     m_box.center = m_pos;
     m_box.size = XMFLOAT3(m_size, m_size, m_size);
+
+    m_angVel = { 0.0f,0.0f,0.0f };
+    m_rot = { 0.0f,0.0f,0.0f,1.0f };
 }
 
 void Dice::Update(float dt)
 {
+    TRAN_INS;
     // 1. èdóÕ
     const float gravity = -9.8f;
     m_vel.y += gravity * dt;
@@ -66,8 +76,8 @@ void Dice::Update(float dt)
     }
 
     // 4. ï«Ç∆ÇÃè’ìÀ (ä»à’ìIÇ… x,z ÇÃîÕàÕÇåàÇﬂÇÈ)
-    const float limitX = 10.0f;
-    const float limitZ = 10.0f;
+    const float limitX = tran.WallSize.x;
+    const float limitZ = tran.WallSize.y;
 
     if (m_pos.x - half < -limitX)
     {

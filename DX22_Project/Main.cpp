@@ -79,17 +79,24 @@ void Draw()
 		float posZ = tran.m_posZ;
 		float power = tran.m_power;
 		float max = tran.m_maxPower;
+		float wall_size[2] = { tran.WallSize.x,tran.WallSize.y };
+
 		ImGui::DragFloat("X",&posX);
 		ImGui::DragFloat("Y",&posY);
 		ImGui::DragFloat("Z",&posZ);
 		ImGui::DragFloat("Power",&power);
 		ImGui::DragFloat("Max Power",&max);
 
+		ImGui::DragFloat2("Wall Size", wall_size);
+
 		tran.m_posX= posX;
 		tran.m_posY= posY;
 		tran.m_posZ= posZ;
 		tran.m_power = power;
 		tran.m_maxPower = max;
+
+		tran.WallSize.x = wall_size[0];
+		tran.WallSize.y = wall_size[1];
 
 		ImGui::End();
 	}

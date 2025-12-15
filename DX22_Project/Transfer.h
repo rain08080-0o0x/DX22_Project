@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <DirectXMath.h>
 #define TRAN_INS Transfer &tran = Transfer::GetInstance();
 #define TRAN_INS_G Transfer &tran = Transfer::GetInstance();tran
 
@@ -21,5 +21,6 @@ public:
 	float m_posZ;
 	float m_power;
 	float m_maxPower;
+	DirectX::XMFLOAT2 WallSize;
 };
 

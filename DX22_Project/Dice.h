@@ -34,6 +34,9 @@ public:
     void AddPos(const DirectX::XMFLOAT3 dp);
 
     float GetSize() const { return m_size; }
+
+    DirectX::XMFLOAT4 GetRot() { return m_rot; }
+    void SetAngVel(DirectX::XMFLOAT3 w) { m_angVel = w; }
 private:
     DirectX::XMFLOAT3 m_pos;   // 中心位置
     DirectX::XMFLOAT3 m_vel;   // 速度
@@ -44,6 +47,8 @@ private:
     float m_friction;    // 地面との摩擦の強さ
 
     Collision::Box m_box; // 当たり判定用（AABB）
+    DirectX::XMFLOAT4 m_rot;
+    DirectX::XMFLOAT3 m_angVel;
 
     Model *m_pModel;
     Camera* m_pCamera;

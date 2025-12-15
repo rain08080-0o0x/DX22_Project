@@ -36,12 +36,13 @@ SceneGame::SceneGame()
 	m_dice = new Dice[m_diceCount];
 
 	m_dice[0].Init({ 0.0f, 2.0f,  0.0f }, 1.0f);
-	m_dice[1].Init({ 0.90f, 8.0f,  0.0f }, 1.0f);
-	m_dice[2].Init({ 1.5f, 15.0f, 0.0f }, 1.0f);
+	m_dice[1].Init({ 1.0f, 2.0f,  0.0f }, 1.0f);
+	m_dice[2].Init({ -1.0f, 2.0f, 0.0f }, 1.0f);
 	for (int i = 0; i < m_diceCount; ++i)
 	{
 		m_dice[i].SetCamera(m_pCamera);
 	}
+	RollAll();
 
 }
 
@@ -86,6 +87,7 @@ void SceneGame::Update()
 	}
 
 	DiceCollisionUpdate();
+	if (IsKeyTrigger('R') || IsKeyRelease('R'))RollAll();
 }
 
 void SceneGame::Draw()
@@ -261,5 +263,60 @@ void SceneGame::DiceCollisionUpdate()
 			m_dice[i].SetVel(vi);
 			m_dice[j].SetVel(vj);
 		}
+	}
+}
+
+void SceneGame::RollAll()
+{
+	// 速度の強さ（調整ポイント）
+	const float speedMin = 4.0f;
+	const float speedMax = 8.0f;
+
+	// 少し浮かせる（床にめり込んだ状態から開始しないため）
+	const float lift = 0.2f;
+
+	for (int i = 0; i < m_diceCount; ++i)
+	{
+		// すでに止まってる時だけ振り直したいならここで制御
+		// if (!m_dice[i].IsSleeping()) continue;
+
+		// 0〜1 の乱数
+		auto frand01 = []() -> float {
+			return (float)std::rand() / (float)RAND_MAX;
+			};
+
+		// -1〜1 の乱数
+		auto frandN11 = [&]() -> float {
+			return frand01() * 2.0f - 1.0f;
+			};
+
+		// 水平成分：適当にばらけさせる
+		float vx = frandN11();
+		float vz = frandN11();
+
+		// 方向ベクトルが小さすぎるときの保険
+		const float len2 = vx * vx + vz * vz;
+		if (len2 < 0.0001f)
+		{
+			vx = 1.0f;
+			vz = 0.0f;
+		}
+
+		// 正規化
+		const float invLen = 1.0f / sqrt(vx * vx + vz * vz);
+		vx *= invLen;
+		vz *= invLen;
+
+		// 速度の大きさ
+		const float spd = speedMin + (speedMax - speedMin) * frand01();
+
+		// 上向きも少し（バウンドさせて散る）
+		const float vy = 2.0f + 2.0f * frand01();
+
+		DirectX::XMFLOAT3 v(vx * spd, vy, vz * spd);
+		m_dice[i].SetVel(v);
+
+		// 少し持ち上げる（任意）
+		m_dice[i].AddPos(DirectX::XMFLOAT3(0.0f, lift, 0.0f));
 	}
 }

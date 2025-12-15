@@ -98,6 +98,8 @@ StyleCopReport.xml
 *.svclog
 *.scc
 
+
+imgui.ini
 # Chutzpah Test files
 _Chutzpah*
 

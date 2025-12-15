@@ -17,6 +17,7 @@ public:
 	void Draw() final;
 
 	void DiceCollisionUpdate();
+	void RollAll();
 private:
 	Model* m_pModel;
 	Camera* m_pCamera;
