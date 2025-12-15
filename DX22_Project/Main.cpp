@@ -61,7 +61,9 @@ void Draw()
 
 
 	// ImGui‚Ì•`‰æ
-	static bool show_main_window = true;
+	static bool show_main_window;
+
+	if(IsKeyTrigger('P'))show_main_window = !show_main_window;
 
 	if (show_main_window)
 	{
@@ -78,7 +80,7 @@ void Draw()
 		ImGui::DragFloat("Y",&posY);
 		ImGui::DragFloat("Z",&posZ);
 		ImGui::DragFloat("Power",&power);
-		ImGui::DragFloat("MAx Power",&max);
+		ImGui::DragFloat("Max Power",&max);
 
 		tran.m_posX= posX;
 		tran.m_posY= posY;
