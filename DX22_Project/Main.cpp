@@ -61,7 +61,12 @@ void Draw()
 
 
 	// ImGui‚Ì•`‰æ
-	static bool show_main_window = true;
+	static bool show_main_window;
+
+	if (IsKeyTrigger('P'))
+	{
+		show_main_window = !show_main_window;
+	}
 
 	if (show_main_window)
 	{

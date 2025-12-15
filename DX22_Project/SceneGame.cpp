@@ -29,18 +29,15 @@ SceneGame::SceneGame()
 
 	TRAN_INS;
 
-	tran.m_maxPower = 100.0f;
+	tran.m_maxPower = 1.0f;
 
 	DirectX::XMFLOAT3 pos = { 0.0f,0.0f,0.0f };
-	m_pDice = new Dice();
-	m_pDice->Init(pos,1.0f);
-	m_pDice->SetCamera(m_pCamera);
 	m_diceCount = 3;
 	m_dice = new Dice[m_diceCount];
 
 	m_dice[0].Init({ 0.0f, 2.0f,  0.0f }, 1.0f);
-	m_dice[1].Init({ 0.0f, 8.0f,  0.0f }, 1.0f);
-	m_dice[2].Init({ 0.0f, 15.0f, 0.0f }, 1.0f);
+	m_dice[1].Init({ 0.90f, 8.0f,  0.0f }, 1.0f);
+	m_dice[2].Init({ 1.5f, 15.0f, 0.0f }, 1.0f);
 	for (int i = 0; i < m_diceCount; ++i)
 	{
 		m_dice[i].SetCamera(m_pCamera);
@@ -66,11 +63,6 @@ SceneGame::~SceneGame()
 		delete m_pBlock;
 		m_pBlock = nullptr;
 	}
-	if (m_pDice)
-	{
-		delete m_pDice;
-		m_pDice = nullptr;
-	}
 }
 
 void SceneGame::Update()
@@ -80,7 +72,6 @@ void SceneGame::Update()
 	m_pBlock->Update();
 	m_pPlayer->SetCamera(m_pCamera);
 	m_pCamera->SetLook(m_pPlayer->GetPos());
-	m_pDice->Update(1.0f / 60.0f);
 	Collision::Box a = m_pPlayer->GetCollision();
 	Collision::Box b = m_pBlock->GetCollision();
 
@@ -94,84 +85,7 @@ void SceneGame::Update()
 		if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
 	}
 
-	for (int i = 0; i < m_diceCount; ++i)
-	{
-		m_dice[i].Update(1.0f / 60.0f);
-	}
-
-	// 2個以上ある前提
-	for (int i = 0; i < m_diceCount; ++i)
-	{
-		for (int j = i + 1; j < m_diceCount; ++j)
-		{
-			Collision::Box a = m_dice[i].GetCollision();
-			Collision::Box b = m_dice[j].GetCollision();
-
-			Collision::Result r = Collision::Hit(a, b);
-			if (!r.isHit) continue;
-
-			// r.dir は「押し戻す方向（どの軸で当たったか）」のつもりで使う
-			// （あなたの Hit 実装に合わせて dir が (±1,0,0) みたいに入ってる前提）
-			const float ax = (a.size.x + b.size.x) * 0.5f;
-			const float ay = (a.size.y + b.size.y) * 0.5f;
-			const float az = (a.size.z + b.size.z) * 0.5f;
-
-			const float dx = (a.center.x - b.center.x);
-			const float dy = (a.center.y - b.center.y);
-			const float dz = (a.center.z - b.center.z);
-
-			// めり込み量（どの軸で押し戻すかは r.dir に従う）
-			float push = 0.0f;
-			DirectX::XMFLOAT3 sep(0, 0, 0);
-
-			if (r.dir.x != 0.0f)
-			{
-				push = ax - fabsf(dx);
-				sep.x = (dx >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
-			}
-			else if (r.dir.y != 0.0f)
-			{
-				push = ay - fabsf(dy);
-				sep.y = (dy >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
-			}
-			else if (r.dir.z != 0.0f)
-			{
-				push = az - fabsf(dz);
-				sep.z = (dz >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
-			}
-
-			// ①位置を少し離す（半分ずつ押し戻し）
-			m_dice[i].AddPos(sep);
-			m_dice[j].AddPos(DirectX::XMFLOAT3(-sep.x, -sep.y, -sep.z));
-
-			// ②速度を入れ替える（衝突した軸成分だけ）
-			DirectX::XMFLOAT3 vi = m_dice[i].GetVel();
-			DirectX::XMFLOAT3 vj = m_dice[j].GetVel();
-
-			// 反発を少し入れたいなら係数（0.8とか）
-			const float e = 0.8f;
-
-			if (r.dir.x != 0.0f)
-			{
-				std::swap(vi.x, vj.x);
-				vi.x *= e; vj.x *= e;
-			}
-			if (r.dir.y != 0.0f)
-			{
-				std::swap(vi.y, vj.y);
-				vi.y *= e; vj.y *= e;
-			}
-			if (r.dir.z != 0.0f)
-			{
-				std::swap(vi.z, vj.z);
-				vi.z *= e; vj.z *= e;
-			}
-
-			m_dice[i].SetVel(vi);
-			m_dice[j].SetVel(vj);
-		}
-	}
-
+	DiceCollisionUpdate();
 }
 
 void SceneGame::Draw()
@@ -263,11 +177,89 @@ void SceneGame::Draw()
 		m_pPlayer->Draw();
 	if(m_pBlock)
 		m_pBlock->Draw();
-	if (m_pDice)
-		m_pDice->Draw();
-	m_pDice->GetCollision();
 	for (int i = 0; i < m_diceCount; ++i)
 	{
 		m_dice[i].Draw();
+	}
+}
+
+void SceneGame::DiceCollisionUpdate()
+{
+	for (int i = 0; i < m_diceCount; ++i)
+	{
+		m_dice[i].Update(1.0f / 60.0f);
+	}
+
+	// 2個以上ある前提
+	for (int i = 0; i < m_diceCount; ++i)
+	{
+		for (int j = i + 1; j < m_diceCount; ++j)
+		{
+			Collision::Box a = m_dice[i].GetCollision();
+			Collision::Box b = m_dice[j].GetCollision();
+
+			Collision::Result r = Collision::Hit(a, b);
+			if (!r.isHit) continue;
+
+			// r.dir は「押し戻す方向（どの軸で当たったか）」のつもりで使う
+			// （あなたの Hit 実装に合わせて dir が (±1,0,0) みたいに入ってる前提）
+			const float ax = (a.size.x + b.size.x) * 0.5f;
+			const float ay = (a.size.y + b.size.y) * 0.5f;
+			const float az = (a.size.z + b.size.z) * 0.5f;
+
+			const float dx = (a.center.x - b.center.x);
+			const float dy = (a.center.y - b.center.y);
+			const float dz = (a.center.z - b.center.z);
+
+			// めり込み量（どの軸で押し戻すかは r.dir に従う）
+			float push = 0.0f;
+			DirectX::XMFLOAT3 sep(0, 0, 0);
+
+			if (r.dir.x != 0.0f)
+			{
+				push = ax - fabsf(dx);
+				sep.x = (dx >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
+			}
+			else if (r.dir.y != 0.0f)
+			{
+				push = ay - fabsf(dy);
+				sep.y = (dy >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
+			}
+			else if (r.dir.z != 0.0f)
+			{
+				push = az - fabsf(dz);
+				sep.z = (dz >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
+			}
+
+			// ①位置を少し離す（半分ずつ押し戻し）
+			m_dice[i].AddPos(sep);
+			m_dice[j].AddPos(DirectX::XMFLOAT3(-sep.x, -sep.y, -sep.z));
+
+			// ②速度を入れ替える（衝突した軸成分だけ）
+			DirectX::XMFLOAT3 vi = m_dice[i].GetVel();
+			DirectX::XMFLOAT3 vj = m_dice[j].GetVel();
+
+			// 反発を少し入れたいなら係数（0.8とか）
+			const float e = 0.8f;
+
+			if (r.dir.x != 0.0f)
+			{
+				std::swap(vi.x, vj.x);
+				vi.x *= e; vj.x *= e;
+			}
+			if (r.dir.y != 0.0f)
+			{
+				std::swap(vi.y, vj.y);
+				vi.y *= e; vj.y *= e;
+			}
+			if (r.dir.z != 0.0f)
+			{
+				std::swap(vi.z, vj.z);
+				vi.z *= e; vj.z *= e;
+			}
+
+			m_dice[i].SetVel(vi);
+			m_dice[j].SetVel(vj);
+		}
 	}
 }

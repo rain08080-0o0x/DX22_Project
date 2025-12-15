@@ -118,20 +118,30 @@ void Dice::Draw()
 
 	// シェーダーへ変換行列を設定 
     ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
+    if(false)
+    {
+        Geometory::SetView(m_pCamera->GetViewMatrix(true));
+        Geometory::SetProjection(m_pCamera->GetProjectionMatrix(true));
 
-    Geometory::SetView(m_pCamera->GetViewMatrix(true));
-    Geometory::SetProjection(m_pCamera->GetProjectionMatrix(true));
-
-    // Spriteへの設定
-    Sprite::SetView(m_pCamera->GetViewMatrix(true));
-    Sprite::SetProjection(m_pCamera->GetProjectionMatrix(true));
+        // Spriteへの設定
+        Sprite::SetView(m_pCamera->GetViewMatrix(true));
+        Sprite::SetProjection(m_pCamera->GetProjectionMatrix(true));
+    }
+    if(true)
+    {
+        //Geometory::SetView(fWVP[1]);
+        //Geometory::SetProjection(fWVP[2]);
+        Sprite::SetView(fWVP[1]);
+        Sprite::SetProjection(fWVP[2]);
+    }
 
     //　モデルに使用する頂点シェーダー、ピクセルシェーダーを設定
     m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
-    m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_TOON));
+    m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
     // マテリアル別にメッシュを表示 
-    for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
+    for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i)
+    {
         // モデルのメッシュを取得 
         const Model::Mesh* mesh = m_pModel->GetMesh(i);
         // メッシュに割り当てられているマテリアルを取得 

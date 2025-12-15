@@ -15,7 +15,8 @@ Player::Player()
     m_pos.x = 0.0f;
     m_pos.y = 0.0f;
     m_pos.z = 0.0f;
-    m_collision.size = DirectX::XMFLOAT3(1.0f,1.0f,1.0f);
+    float size = .20f;
+    m_collision.size = DirectX::XMFLOAT3(size,size,size);
     m_collision.center = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 }
 
@@ -29,6 +30,7 @@ void Player::Update()
     m_pos.x = tran.m_posX;
     m_pos.y = tran.m_posY;
     m_pos.z = tran.m_posZ;
+
     tran.m_power = m_shotPower;
     // ƒJƒƒ‰‚ªİ’è‚³‚ê‚Ä‚È‚¢ê‡‚Íˆ—‚µ‚È‚¢ 
     if (!m_pCamera) { return; }
@@ -38,6 +40,7 @@ void Player::Update()
     else
         UpdateMove(); // ‘Å‚Á‚½‹…‚ÌˆÚ“®ˆ— 
     m_collision.center = m_pos;
+
     tran.m_posX = m_pos.x;
     tran.m_posY = m_pos.y;
     tran.m_posZ = m_pos.z;

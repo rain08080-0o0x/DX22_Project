@@ -16,12 +16,12 @@ public:
 	void Update() final;
 	void Draw() final;
 
+	void DiceCollisionUpdate();
 private:
 	Model* m_pModel;
 	Camera* m_pCamera;
 	Player* m_pPlayer;
 	Block* m_pBlock;
-	Dice* m_pDice;
 	int m_diceCount;
 	Dice *m_dice;
 };
