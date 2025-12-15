@@ -37,6 +37,8 @@ public:
 
     DirectX::XMFLOAT4 GetRot() { return m_rot; }
     void SetAngVel(DirectX::XMFLOAT3 w) { m_angVel = w; }
+    void SnapToGround();
+
 private:
     DirectX::XMFLOAT3 m_pos;   // 中心位置
     DirectX::XMFLOAT3 m_vel;   // 速度
@@ -52,4 +54,7 @@ private:
 
     Model *m_pModel;
     Camera* m_pCamera;
+    int  m_sleepFrames = 0;
+    bool m_onGround = false;
+
 };

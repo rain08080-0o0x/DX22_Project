@@ -87,6 +87,7 @@ void SceneGame::Update()
 	}
 
 	DiceCollisionUpdate();
+
 	if (IsKeyTrigger('R') || IsKeyRelease('R'))RollAll();
 }
 
@@ -318,5 +319,21 @@ void SceneGame::RollAll()
 
 		// 少し持ち上げる（任意）
 		m_dice[i].AddPos(DirectX::XMFLOAT3(0.0f, lift, 0.0f));
+		
+		// 角速度の強さ（調整ポイント）
+		const float spinMin = 6.0f;
+		const float spinMax = 14.0f;
+
+		float sx = frandN11();
+		float sy = frandN11();
+		float sz = frandN11();
+		float sLen = sqrt(sx * sx + sy * sy + sz * sz);
+		if (sLen < 0.0001f) { sx = 0; sy = 1; sz = 0; sLen = 1; }
+		sx /= sLen; sy /= sLen; sz /= sLen;
+
+		float spin = spinMin + (spinMax - spinMin) * frand01();
+
+		m_dice[i].SetAngVel(DirectX::XMFLOAT3(sx * spin, sy * spin, sz * spin));
+
 	}
 }
