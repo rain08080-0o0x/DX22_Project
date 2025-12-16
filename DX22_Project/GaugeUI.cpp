@@ -51,18 +51,17 @@ void GaugeUI::Draw()
 		1,
 		100
 	);
-	DirectX::XMStoreFloat4x4(&view, mView);
-	DirectX::XMStoreFloat4x4(&proj, mProj);
+    DirectX::XMStoreFloat4x4(&view, DirectX::XMMatrixTranspose(mView));
+    DirectX::XMStoreFloat4x4(&proj, DirectX::XMMatrixTranspose(mProj));
 
-	//ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
 	//  
 	Sprite::SetView(view);
 	Sprite::SetProjection(proj);
 
 	// (0) (1) 
 	DirectX::XMFLOAT2 pos = { SCREEN_WIDTH * 0.5f,SCREEN_HEIGHT * 0.5f };
-	DirectX::XMFLOAT2 size[] = { {256,66},{258,64} };
-	Texture* pTexture[] = { m_pFrameTex,m_pGaugeTex };
+	DirectX::XMFLOAT2 size[2] = { {256,66},{258,64} };
+	Texture* pTexture[2] = { m_pFrameTex,m_pGaugeTex };
 
 	// (0) (1) 
 	for (int i = 0; i < 2; ++i) {
@@ -74,11 +73,10 @@ void GaugeUI::Draw()
 			S = DirectX::XMMatrixScaling(1.0f, -1.0f, 1.0f);
 		else   // m_rate 
 			S = DirectX::XMMatrixScaling(m_rate, -1.0f, 1.0f);
-		DirectX::XMMATRIX mWorld = T * S;
+		DirectX::XMMATRIX mWorld = S * T;
 		DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranspose(mWorld));
 
-			//  
-			Sprite::SetWorld(world);      //  
+		Sprite::SetWorld(world);      //  
 		Sprite::SetSize(size[i]);      //  
 		Sprite::SetOffset({ size[i].x * 0.5f, 0.0f }); //  
 		Sprite::SetColor({ 1.0f,1.0f,1.0f,1.0f });

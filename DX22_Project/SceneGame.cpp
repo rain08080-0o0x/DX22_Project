@@ -183,7 +183,7 @@ void SceneGame::Draw()
 	if(m_pPlayer)
 		m_pPlayer->Draw();
 	SetDepthTest(false);
-	//if (m_pGaugeUI)
-	//	m_pGaugeUI->Draw();
+	if (m_pGaugeUI)
+		m_pGaugeUI->Draw();
 	SetDepthTest(true);
 }
