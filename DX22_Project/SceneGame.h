@@ -16,7 +16,16 @@ public:
 	void Update() final;
 	void Draw() final;
 
-	void MoveAllDice();
+	void MoveAllDice(); 
+private:
+	void ResolveDiceCollisions();
+	void ResolveDicePair(Dice& a, Dice& b);
+
+	void ResolveDicePosition(Dice& a, Dice& b, const Collision::Manifold& m);
+	void ResolveDiceVelocity(Dice& a, Dice& b, const Collision::Manifold& m);
+	void ResolveDiceAngular(Dice& a, Dice& b, const Collision::Manifold& m);
+
+
 private:
 	Model* m_pModel;
 	Camera* m_pCamera;

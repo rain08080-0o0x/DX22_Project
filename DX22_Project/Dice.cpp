@@ -29,8 +29,8 @@ Dice::Dice()
         MessageBox(NULL, "Not Found", "Error", MB_OK); // エラーメッセージの表示
     }
     TRAN_INS;
-    tran.WallSize.x = 10.0f;
-    tran.WallSize.y = 10.0f;
+    tran.WallSize.x = 5.0f;
+    tran.WallSize.y = 5.0f;
     WALL_LIMIT_Y = 5.0f;
 }
 
@@ -54,7 +54,12 @@ void Dice::Update(float dt)
     TRAN_INS;
     WALL_LIMIT_X = tran.WallSize.x;
     WALL_LIMIT_Z = tran.WallSize.y;
-
+    if (m_sleeping)
+    {
+        // 位置は固定、当たり判定だけ同期
+        m_box.center = m_pos;
+        return;
+    }
     const float half = m_size * 0.5f;
 
     // ---------- 1) 重力 ----------
@@ -107,11 +112,43 @@ void Dice::Update(float dt)
     m_vel.y -= m_vel.y * m_linearDamping * dt;
     m_vel.z -= m_vel.z * m_linearDamping * dt;
 
+    m_angVel.x *= 0.96f;
+    m_angVel.y *= 0.96f;
+    m_angVel.z *= 0.96f;
     // ---------- 7) 回転 ----------
     IntegrateRotation(dt);
 
     // ---------- 8) 当たり判定同期 ----------
     m_box.center = m_pos;
+
+    // ---------- 9) スリープ判定（止まる処理） ----------
+    const float LIN_SLEEP = 0.05f;  // m/s
+    const float ANG_SLEEP = 0.10f;  // rad/s
+    const int   NEED_FRAMES = 30;   // 0.5秒くらい（60fps想定）
+
+    float v2 =
+        m_vel.x * m_vel.x + m_vel.y * m_vel.y + m_vel.z * m_vel.z;
+    float w2 =
+        m_angVel.x * m_angVel.x + m_angVel.y * m_angVel.y + m_angVel.z * m_angVel.z;
+
+    bool onGround = (m_pos.y <= m_size * 0.5f + 0.001f);
+
+    if (onGround && v2 < LIN_SLEEP * LIN_SLEEP && w2 < ANG_SLEEP * ANG_SLEEP)
+    {
+        m_sleepFrames++;
+        if (m_sleepFrames >= NEED_FRAMES)
+        {
+            m_sleeping = true;
+            m_vel = { 0,0,0 };
+            m_angVel = { 0,0,0 };
+        }
+    }
+    else
+    {
+        m_sleepFrames = 0;
+        //m_sleeping = false;
+    }
+
 }
 
 
@@ -178,4 +215,53 @@ void Dice::Draw()
         // モデルの描画 
         m_pModel->Draw(i);
     }
+}
+
+Collision::OBB Dice::GetOBB()
+{
+    using namespace DirectX;
+
+    Collision::OBB obb;
+
+    // ---- 中心 ----
+    obb.center = m_pos;
+
+    // ---- 半サイズ ----
+    obb.halfSize =
+    {
+        m_size * 0.5f,
+        m_size * 0.5f,
+        m_size * 0.5f
+    };
+
+    // ---- 回転行列を作る ----
+    XMMATRIX R = XMMatrixRotationQuaternion(
+        XMLoadFloat4(&m_rot)
+    );
+
+    // 3x3 行列として取り出す
+    XMFLOAT3X3 m;
+    XMStoreFloat3x3(&m, R);
+
+    // ---- 回転後のローカル軸 ----
+    // 行列の「行」をそのまま使う
+    obb.axis[0] = { m._11, m._12, m._13 }; // X軸
+    obb.axis[1] = { m._21, m._22, m._23 }; // Y軸
+    obb.axis[2] = { m._31, m._32, m._33 }; // Z軸
+
+    // 念のため正規化（DirectXMath的にはほぼ不要だが安全）
+    for (int i = 0; i < 3; ++i)
+    {
+        XMVECTOR a = XMLoadFloat3(&obb.axis[i]);
+        a = XMVector3Normalize(a);
+        XMStoreFloat3(&obb.axis[i], a);
+    }
+
+    return obb;
+}
+
+void Dice::WakeUp()
+{
+    m_sleeping = false;
+    m_sleepFrames = 0;
 }

@@ -25,13 +25,35 @@ public:
     const Collision::Box& GetCollision() const { return m_box; }
 
     // 外から制御したい時用（RollAllで使う）
-    void SetVel(const DirectX::XMFLOAT3& v) { m_vel = v; }
     void SetAngVel(const DirectX::XMFLOAT3& w) { m_angVel = w; }
     void SetRotation(const DirectX::XMFLOAT4& q) { m_rot = q; }
 
     const DirectX::XMFLOAT3& GetPos() const { return m_pos; }
     const DirectX::XMFLOAT4& GetRot() const { return m_rot; }
     void SetCamera(Camera* set) { m_pCamera = set; }
+public:
+    void ResetIsSleeping() { m_sleeping = false; m_sleepFrames = 0; }
+    bool IsSleeping() const { return m_sleeping; }
+
+    void WakeUp(); // MoveAllDice 等で呼ぶ
+public:
+    Collision::OBB GetOBB();
+public:
+    const DirectX::XMFLOAT3& GetVel() const { return m_vel; }
+    void SetVel(const DirectX::XMFLOAT3& v) { m_vel = v; }
+
+    void AddPos(const DirectX::XMFLOAT3& dp)
+    {
+        m_pos.x += dp.x;
+        m_pos.y += dp.y;
+        m_pos.z += dp.z;
+    }
+    void AddAngVel(const DirectX::XMFLOAT3& dw)
+    {
+        m_angVel.x += dw.x;
+        m_angVel.y += dw.y;
+        m_angVel.z += dw.z;
+    }
 
 private:
     // 状態（最小）
@@ -51,6 +73,10 @@ private:
     Model* m_pModel;
     // カメラ
     Camera* m_pCamera;
+private:
+    bool m_sleeping = false;
+    int  m_sleepFrames = 0;
+
 private:
     static constexpr float GRAVITY = -9.8f;
 

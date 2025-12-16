@@ -67,12 +67,16 @@ SceneGame::SceneGame()
 	tran.m_maxPower = 1.0f;
 
 	DirectX::XMFLOAT3 pos = { 0.0f,0.0f,0.0f };
-	m_diceCount = 3;
+	m_diceCount = 7;
 	m_dice = new Dice[m_diceCount];
 
 	m_dice[0].Init({ 0.0f, 2.0f,  0.0f }, 1.0f);
 	m_dice[1].Init({ 1.0f, 2.0f,  0.0f }, 1.0f);
 	m_dice[2].Init({ -1.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[3].Init({  2.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[4].Init({ -2.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[5].Init({  3.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[6].Init({ -3.0f, 2.0f, 0.0f }, 1.0f);
 	for (int i = 0; i < m_diceCount; ++i)
 	{
 		m_dice[i].SetCamera(m_pCamera);
@@ -121,12 +125,23 @@ void SceneGame::Update()
 		if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
 	}
 
-	for (int i = 0; i < 3; i++)
+	if (IsKeyTrigger('R') || IsKeyRelease('R'))
+	{
+		for (int i = 0; i < m_diceCount; i++)
+		{
+			m_dice[i].ResetIsSleeping();
+		}
+		MoveAllDice();
+	}
+
+	for (int i = 0; i < m_diceCount; i++)
 	{
 		m_dice[i].Update(1.0f / 60.0f);
 	}
 
-	if (IsKeyTrigger('R') || IsKeyRelease('R'))MoveAllDice();
+	// ★ サイコロ同士の衝突
+	ResolveDiceCollisions();
+
 }
 
 void SceneGame::Draw()
@@ -280,6 +295,236 @@ void SceneGame::MoveAllDice()
 		DirectX::XMStoreFloat4(&qf,
 			DirectX::XMQuaternionNormalize(q));
 
-		m_dice[i].SetRotation(qf);
+		m_dice[i].SetRotation(qf); 
+
+		m_dice[i].WakeUp();
+	}
+
+}
+
+void SceneGame::ResolveDiceCollisions()
+{
+	for (int i = 0; i < m_diceCount; ++i)
+	{
+		for (int j = i + 1; j < m_diceCount; ++j)
+		{
+			ResolveDicePair(m_dice[i], m_dice[j]);
+		}
+	}
+	for (int i = 0; i < m_diceCount; ++i)
+	{
+		for (int j = i + 1; j < m_diceCount; ++j)
+		{
+			Collision::OBB a = m_dice[i].GetOBB();
+			Collision::OBB b = m_dice[j].GetOBB();
+			Collision::Manifold m;
+			if (Collision::HitOBB(a, b))
+			{
+				// とりあえず確認用
+				printf("Dice %d and %d hit!\n", i, j);
+			}
+			if (Collision::HitOBB_Full(a, b, m))
+			{
+				// ① 位置を引き離す
+				ResolveDicePosition(m_dice[i], m_dice[j], m);
+				// ② 速度を反射
+				ResolveDiceVelocity(m_dice[i], m_dice[j], m);
+				// ③ 角度を反射
+				ResolveDiceAngular(m_dice[i], m_dice[j], m);
+			}
+		}
+	}
+
+}void SceneGame::ResolveDicePosition(Dice& a, Dice& b, const Collision::Manifold& m)
+{
+	// 数値誤差対策（ほんの少し）
+	const float SLOP = 0.001f;
+
+	float depth = m.penetration + SLOP;
+
+	// 押し戻し量（半分ずつ）
+	DirectX::XMFLOAT3 correction =
+	{
+		m.normal.x * depth * 0.5f,
+		m.normal.y * depth * 0.5f,
+		m.normal.z * depth * 0.5f
+	};
+
+	// A を -normal 側へ
+	a.AddPos({
+		-correction.x,
+		-correction.y,
+		-correction.z
+		});
+
+	// B を +normal 側へ
+	b.AddPos(correction);
+}
+
+
+void SceneGame::ResolveDicePair(Dice& a, Dice& b)
+{
+	Collision::Box boxA = a.GetCollision();
+	Collision::Box boxB = b.GetCollision();
+
+	Collision::Result r = Collision::Hit(boxA, boxB);
+	if (!r.isHit)
+		return;
+
+	// ---- 中心差 ----
+	DirectX::XMFLOAT3 d =
+	{
+		boxA.center.x - boxB.center.x,
+		boxA.center.y - boxB.center.y,
+		boxA.center.z - boxB.center.z
+	};
+
+	// ---- 半サイズ合計 ----
+	const float hx = (boxA.size.x + boxB.size.x) * 0.5f;
+	const float hy = (boxA.size.y + boxB.size.y) * 0.5f;
+	const float hz = (boxA.size.z + boxB.size.z) * 0.5f;
+
+	// ---- めり込み量 ----
+	const float px = hx - fabsf(d.x);
+	const float py = hy - fabsf(d.y);
+	const float pz = hz - fabsf(d.z);
+
+	// ---- 最小の軸で処理 ----
+	DirectX::XMFLOAT3 sep = { 0,0,0 };
+
+	if (px <= py && px <= pz)
+	{
+		sep.x = (d.x >= 0.0f ? px : -px);
+	}
+	else if (py <= px && py <= pz)
+	{
+		sep.y = (d.y >= 0.0f ? py : -py);
+	}
+	else
+	{
+		sep.z = (d.z >= 0.0f ? pz : -pz);
+	}
+
+	// ---- 位置補正（半分ずつ押し戻す）----
+	a.AddPos({ sep.x * 0.5f,  sep.y * 0.5f,  sep.z * 0.5f });
+	b.AddPos({ -sep.x * 0.5f, -sep.y * 0.5f, -sep.z * 0.5f });
+
+	// ---- 速度交換（衝突軸のみ）----
+	DirectX::XMFLOAT3 va = a.GetVel();
+	DirectX::XMFLOAT3 vb = b.GetVel();
+
+	const float restitution = 0.8f;
+
+	if (sep.x != 0.0f)
+	{
+		std::swap(va.x, vb.x);
+		va.x *= restitution;
+		vb.x *= restitution;
+	}
+	if (sep.y != 0.0f)
+	{
+		std::swap(va.y, vb.y);
+		va.y *= restitution;
+		vb.y *= restitution;
+	}
+	if (sep.z != 0.0f)
+	{
+		std::swap(va.z, vb.z);
+		va.z *= restitution;
+		vb.z *= restitution;
+	}
+
+	a.SetVel(va);
+	b.SetVel(vb);
+}
+
+void SceneGame::ResolveDiceVelocity(Dice& a, Dice& b, const Collision::Manifold& m)
+{
+	using namespace DirectX;
+
+	const float restitution = 0.6f; // 反発係数（調整用）
+
+	// A の速度
+	XMFLOAT3 va = a.GetVel();
+	XMFLOAT3 vb = b.GetVel();
+
+	XMVECTOR n = XMLoadFloat3(&m.normal); // A → B
+
+	// A 側（法線の逆向きに当たる）
+	{
+		XMVECTOR v = XMLoadFloat3(&va);
+		float vn = XMVectorGetX(XMVector3Dot(v, n));
+
+		if (vn > 0.0f) // A が B に向かって動いている時だけ
+		{
+			XMVECTOR vr =
+				XMVectorSubtract(
+					v,
+					XMVectorScale(n, (1.0f + restitution) * vn)
+				);
+
+			XMStoreFloat3(&va, vr);
+		}
+	}
+
+	// B 側（法線向きに当たる）
+	{
+		XMVECTOR v = XMLoadFloat3(&vb);
+		float vn = XMVectorGetX(XMVector3Dot(v, n));
+
+		if (vn < 0.0f) // B が A に向かって動いている時だけ
+		{
+			XMVECTOR vr =
+				XMVectorSubtract(
+					v,
+					XMVectorScale(n, (1.0f + restitution) * vn)
+				);
+
+			XMStoreFloat3(&vb, vr);
+		}
+	}
+
+	a.SetVel(va);
+	b.SetVel(vb);
+}
+
+void SceneGame::ResolveDiceAngular(Dice& a, Dice& b, const Collision::Manifold& m)
+{
+	using namespace DirectX;
+
+	// 調整用（回りやすさ）
+	const float ANGULAR_IMPULSE = 0.3f;
+
+	XMVECTOR n = XMLoadFloat3(&m.normal); // A → B
+
+	// ---- A 側 ----
+	{
+		XMFLOAT3 va = a.GetVel();
+		XMVECTOR v = XMLoadFloat3(&va);
+
+		// 回転方向 = v × n
+		XMVECTOR spin = XMVector3Cross(v, n);
+
+		spin = XMVectorScale(spin, ANGULAR_IMPULSE);
+
+		XMFLOAT3 dw;
+		XMStoreFloat3(&dw, spin);
+
+		a.AddAngVel(dw);
+	}
+
+	// ---- B 側（逆向き）----
+	{
+		XMFLOAT3 vb = b.GetVel();
+		XMVECTOR v = XMLoadFloat3(&vb);
+
+		XMVECTOR spin = XMVector3Cross(v, n);
+
+		spin = XMVectorScale(spin, -ANGULAR_IMPULSE);
+
+		XMFLOAT3 dw;
+		XMStoreFloat3(&dw, spin);
+
+		b.AddAngVel(dw);
 	}
 }
