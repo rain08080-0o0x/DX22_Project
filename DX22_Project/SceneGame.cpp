@@ -65,18 +65,22 @@ SceneGame::SceneGame()
 	TRAN_INS;
 
 	tran.m_maxPower = 1.0f;
-
 	DirectX::XMFLOAT3 pos = { 0.0f,0.0f,0.0f };
-	m_diceCount = 7;
+	m_diceCount = 1;
 	m_dice = new Dice[m_diceCount];
 
+	for(int i = 0;i < 10;i++)
+	{
+		tran.deme[i] = 0;
+	}
+
 	m_dice[0].Init({ 0.0f, 2.0f,  0.0f }, 1.0f);
-	m_dice[1].Init({ 1.0f, 2.0f,  0.0f }, 1.0f);
-	m_dice[2].Init({ -1.0f, 2.0f, 0.0f }, 1.0f);
-	m_dice[3].Init({  2.0f, 2.0f, 0.0f }, 1.0f);
-	m_dice[4].Init({ -2.0f, 2.0f, 0.0f }, 1.0f);
-	m_dice[5].Init({  3.0f, 2.0f, 0.0f }, 1.0f);
-	m_dice[6].Init({ -3.0f, 2.0f, 0.0f }, 1.0f);
+	//m_dice[1].Init({ 1.0f, 2.0f,  0.0f }, 1.0f);
+	//m_dice[2].Init({ -1.0f, 2.0f, 0.0f }, 1.0f);
+	//m_dice[3].Init({  2.0f, 2.0f, 0.0f }, 1.0f);
+	//m_dice[4].Init({ -2.0f, 2.0f, 0.0f }, 1.0f);
+	//m_dice[5].Init({  3.0f, 2.0f, 0.0f }, 1.0f);
+	//m_dice[6].Init({ -3.0f, 2.0f, 0.0f }, 1.0f);
 	for (int i = 0; i < m_diceCount; ++i)
 	{
 		m_dice[i].SetCamera(m_pCamera);
@@ -107,6 +111,7 @@ SceneGame::~SceneGame()
 
 void SceneGame::Update()
 {
+	TRAN_INS;
 	m_pCamera->Update();
 	m_pPlayer->Update();
 	m_pBlock->Update();
@@ -125,20 +130,56 @@ void SceneGame::Update()
 		if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
 	}
 
+	static bool isPressed[3];
 	if (IsKeyTrigger('R') || IsKeyRelease('R'))
 	{
 		for (int i = 0; i < m_diceCount; i++)
 		{
 			m_dice[i].ResetIsSleeping();
 		}
+
 		MoveAllDice();
+		for(int i = 0;i < 3;i++)
+			isPressed[i] = true;
 	}
+
 
 	for (int i = 0; i < m_diceCount; i++)
 	{
 		m_dice[i].Update(1.0f / 60.0f);
-	}
 
+		if (m_dice[i].IsSleeping())
+		{
+			int face = m_dice[i].GetTopFace();
+			// スコア計算、UI表示、ログなど
+			if (isPressed[i] && false)
+			{
+				switch (face)
+				{
+				case 1:
+					m_dice[i].SetFaceUp(1);
+					break;
+				case 2:
+					m_dice[i].SetFaceUp(6);
+					break;
+				case 3:
+					m_dice[i].SetFaceUp(4);
+					break;
+				case 4:
+					m_dice[i].SetFaceUp(3);
+					break;
+				case 5:
+					m_dice[i].SetFaceUp(5);
+					break;
+				case 6:
+					m_dice[i].SetFaceUp(2);
+					break;
+				}
+				tran.deme[i] = face;
+				isPressed[i] = false;
+			}
+		}
+	}
 	// ★ サイコロ同士の衝突
 	ResolveDiceCollisions();
 

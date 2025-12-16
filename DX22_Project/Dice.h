@@ -55,6 +55,15 @@ public:
         m_angVel.z += dw.z;
     }
 
+    int  GetTopFace() const;   // 上面の目（1〜6）
+    int  GetBottomFace() const; // 床に接している面
+
+    int FaceIndexToValue(int faceIndex) const;
+    int GetTopValue() const;
+
+    // 指定した面ID（0～5）を上(+Y)にする
+    void SetFaceUp(int faceIndex);
+
 private:
     // 状態（最小）
     DirectX::XMFLOAT3 m_pos;     // 中心位置
@@ -87,6 +96,9 @@ private:
     int WALL_LIMIT_X;
     int WALL_LIMIT_Y;
     int WALL_LIMIT_Z;
+private:
+    bool m_faceFixed = false;
+    int  m_resultFace = 0;
 
 private:
     // 内部ヘルパー：角速度で姿勢を積分

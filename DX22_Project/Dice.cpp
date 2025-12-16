@@ -1,11 +1,23 @@
-// Dice.cpp
+ï»¿// Dice.cpp
 #include "Dice.h"
 #include <cmath>
 #include "ShaderList.h"
 #include "Sprite.h"
 #include "Texture.h"
 #include "Transfer.h"
+
 using namespace DirectX;
+// ãƒ­ãƒ¼ã‚«ãƒ«ç©ºé–“ã§ã®å„é¢ã®æ³•ç·šï¼ˆã‚µã‚¤ã‚³ãƒ­ã®å®šç¾©ï¼‰
+// â€» ç›®ã®å¯¾å¿œã¯è‡ªç”±ã€‚ã“ã“ã§ã¯ä¾‹ã¨ã—ã¦å®šç¾©ã€‚
+static const DirectX::XMFLOAT3 FACE_NORMALS[6] =
+{
+    { 0,  1,  0}, // ä¸Š  -> 1
+    { 0, -1,  0}, // ä¸‹  -> 6
+    { 1,  0,  0}, // å³  -> 2
+    {-1,  0,  0}, // å·¦  -> 5
+    { 0,  0,  1}, // å‰  -> 3
+    { 0,  0, -1}, // å¾Œ  -> 4
+};
 
 Dice::Dice()
     : m_pos(0, 0, 0)
@@ -14,23 +26,23 @@ Dice::Dice()
     , m_angVel(0, 0, 0)
     , m_size(1.0f)
     , m_mass(1.0f)
-    , m_restitution(0.4f)   // ’e‚İ‹ï‡
-    , m_linearDamping(0.1f) // ‹ó’†’ïR
-    , m_friction(3.0f)      // °–€C
+    , m_restitution(0.4f)   // å¼¾ã¿å…·åˆ
+    , m_linearDamping(0.1f) // ç©ºä¸­æŠµæŠ—
+    , m_friction(3.0f)      // åºŠæ‘©æ“¦
     , m_pCamera(nullptr)
 {
-    // AABB ‰Šú‰»
+    // AABB åˆæœŸåŒ–
     m_box.center = m_pos;
     m_box.size = XMFLOAT3(m_size, m_size, m_size);
 
     m_pModel = new Model();
     if (!m_pModel->Load("Assets/Model/Dice/dice.fbx")) 
-    { // ”{—¦‚Æ”½“]‚ÍÈ—ª‰Â
-        MessageBox(NULL, "Not Found", "Error", MB_OK); // ƒGƒ‰[ƒƒbƒZ[ƒW‚Ì•\¦
+    { // å€ç‡ã¨åè»¢ã¯çœç•¥å¯
+        MessageBox(NULL, "Not Found", "Error", MB_OK); // ã‚¨ãƒ©ãƒ¼ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã®è¡¨ç¤º
     }
     TRAN_INS;
-    tran.WallSize.x = 5.0f;
-    tran.WallSize.y = 5.0f;
+    tran.WallSize.x = 2.0f;
+    tran.WallSize.y = 2.0f;
     WALL_LIMIT_Y = 5.0f;
 }
 
@@ -39,13 +51,13 @@ void Dice::Init(const XMFLOAT3& pos, float size)
     m_pos = pos;
     m_vel = XMFLOAT3(0, 0, 0);
 
-    // ‰Šú‰ñ“]‚Íu–³‰ñ“]v‚©‚çn‚ß‚éiRollAll‚Åƒ‰ƒ“ƒ_ƒ€‚É‚µ‚Ä‚àOKj
+    // åˆæœŸå›è»¢ã¯ã€Œç„¡å›è»¢ã€ã‹ã‚‰å§‹ã‚ã‚‹ï¼ˆRollAllã§ãƒ©ãƒ³ãƒ€ãƒ ã«ã—ã¦ã‚‚OKï¼‰
     m_rot = XMFLOAT4(0, 0, 0, 1);
     m_angVel = XMFLOAT3(0, 0, 0);
 
     m_size = size;
 
-    // AABB ‚ğˆÊ’u‚É“¯Šú
+    // AABB ã‚’ä½ç½®ã«åŒæœŸ
     m_box.center = m_pos;
     m_box.size = XMFLOAT3(m_size, m_size, m_size);
 }
@@ -54,23 +66,24 @@ void Dice::Update(float dt)
     TRAN_INS;
     WALL_LIMIT_X = tran.WallSize.x;
     WALL_LIMIT_Z = tran.WallSize.y;
+
     if (m_sleeping)
     {
-        // ˆÊ’u‚ÍŒÅ’èA“–‚½‚è”»’è‚¾‚¯“¯Šú
+        // ä½ç½®ã¯å›ºå®šã€å½“ãŸã‚Šåˆ¤å®šã ã‘åŒæœŸ
         m_box.center = m_pos;
         return;
     }
     const float half = m_size * 0.5f;
 
-    // ---------- 1) d—Í ----------
+    // ---------- 1) é‡åŠ› ----------
     m_vel.y += GRAVITY * dt;
 
-    // ---------- 2) ˆÚ“® ----------
+    // ---------- 2) ç§»å‹• ----------
     m_pos.x += m_vel.x * dt;
     m_pos.y += m_vel.y * dt;
     m_pos.z += m_vel.z * dt;
 
-    // ---------- 3) °‚Æ‚ÌÕ“Ë ----------
+    // ---------- 3) åºŠã¨ã®è¡çª ----------
     if (m_pos.y < half)
     {
         m_pos.y = half;
@@ -78,12 +91,12 @@ void Dice::Update(float dt)
         if (m_vel.y < 0.0f)
             m_vel.y = -m_vel.y * m_restitution;
 
-        // Ú’n‚Ì–€C
+        // æ¥åœ°æ™‚ã®æ‘©æ“¦
         m_vel.x -= m_vel.x * m_friction * dt;
         m_vel.z -= m_vel.z * m_friction * dt;
     }
 
-    // ---------- 4) •Ç‚Æ‚ÌÕ“ËiX•ûŒüj ----------
+    // ---------- 4) å£ã¨ã®è¡çªï¼ˆXæ–¹å‘ï¼‰ ----------
     if (m_pos.x < -WALL_LIMIT_X + half)
     {
         m_pos.x = -WALL_LIMIT_X + half;
@@ -95,7 +108,7 @@ void Dice::Update(float dt)
         m_vel.x = -m_vel.x * m_restitution;
     }
 
-    // ---------- 5) •Ç‚Æ‚ÌÕ“ËiZ•ûŒüj ----------
+    // ---------- 5) å£ã¨ã®è¡çªï¼ˆZæ–¹å‘ï¼‰ ----------
     if (m_pos.z < -WALL_LIMIT_Z + half)
     {
         m_pos.z = -WALL_LIMIT_Z + half;
@@ -107,7 +120,7 @@ void Dice::Update(float dt)
         m_vel.z = -m_vel.z * m_restitution;
     }
 
-    // ---------- 6) ‹ó‹C’ïR ----------
+    // ---------- 6) ç©ºæ°—æŠµæŠ— ----------
     m_vel.x -= m_vel.x * m_linearDamping * dt;
     m_vel.y -= m_vel.y * m_linearDamping * dt;
     m_vel.z -= m_vel.z * m_linearDamping * dt;
@@ -115,16 +128,16 @@ void Dice::Update(float dt)
     m_angVel.x *= 0.96f;
     m_angVel.y *= 0.96f;
     m_angVel.z *= 0.96f;
-    // ---------- 7) ‰ñ“] ----------
+    // ---------- 7) å›è»¢ ----------
     IntegrateRotation(dt);
 
-    // ---------- 8) “–‚½‚è”»’è“¯Šú ----------
+    // ---------- 8) å½“ãŸã‚Šåˆ¤å®šåŒæœŸ ----------
     m_box.center = m_pos;
 
-    // ---------- 9) ƒXƒŠ[ƒv”»’èi~‚Ü‚éˆ—j ----------
+    // ---------- 9) ã‚¹ãƒªãƒ¼ãƒ—åˆ¤å®šï¼ˆæ­¢ã¾ã‚‹å‡¦ç†ï¼‰ ----------
     const float LIN_SLEEP = 0.05f;  // m/s
     const float ANG_SLEEP = 0.10f;  // rad/s
-    const int   NEED_FRAMES = 30;   // 0.5•b‚­‚ç‚¢i60fps‘z’èj
+    const int   NEED_FRAMES = 30;   // 0.5ç§’ãã‚‰ã„ï¼ˆ60fpsæƒ³å®šï¼‰
 
     float v2 =
         m_vel.x * m_vel.x + m_vel.y * m_vel.y + m_vel.z * m_vel.z;
@@ -141,6 +154,21 @@ void Dice::Update(float dt)
             m_sleeping = true;
             m_vel = { 0,0,0 };
             m_angVel = { 0,0,0 };
+
+            if (m_sleepFrames >= NEED_FRAMES)
+            {
+                m_sleeping = true;
+                m_vel = { 0,0,0 };
+                m_angVel = { 0,0,0 };
+
+                // ã“ã“ã§1å›ã ã‘ç›®ç¢ºå®š
+                if (!m_faceFixed)
+                {
+                    m_resultFace = GetTopFace(); // or GetBottomFace()
+                    m_faceFixed = true;
+                }
+            }
+
         }
     }
     else
@@ -154,25 +182,25 @@ void Dice::Update(float dt)
 
 void Dice::IntegrateRotation(float dt)
 {
-    // Šp‘¬“xƒxƒNƒgƒ‹ w = (wx, wy, wz)
-    // |w| ‚ğŠp‘¬“x‚Ì‘å‚«‚³‚Æ‚µ‚ÄA² = w/|w|AŠp“x = |w|*dt ‚ÅƒNƒH[ƒ^ƒjƒIƒ“XV
+    // è§’é€Ÿåº¦ãƒ™ã‚¯ãƒˆãƒ« w = (wx, wy, wz)
+    // |w| ã‚’è§’é€Ÿåº¦ã®å¤§ãã•ã¨ã—ã¦ã€è»¸ = w/|w|ã€è§’åº¦ = |w|*dt ã§ã‚¯ã‚©ãƒ¼ã‚¿ãƒ‹ã‚ªãƒ³æ›´æ–°
     const float wx = m_angVel.x;
     const float wy = m_angVel.y;
     const float wz = m_angVel.z;
 
     const float wlen = std::sqrt(wx * wx + wy * wy + wz * wz);
     if (wlen < 1e-6f)
-        return; // Šp‘¬“xƒ[ƒ‚È‚ç‰ñ“]‚µ‚È‚¢
+        return; // è§’é€Ÿåº¦ã‚¼ãƒ­ãªã‚‰å›è»¢ã—ãªã„
 
     XMVECTOR q = XMLoadFloat4(&m_rot);
 
     XMVECTOR axis = XMVectorSet(wx / wlen, wy / wlen, wz / wlen, 0.0f);
     const float angle = wlen * dt;
 
-    // dt•ª‚¾‚¯‰ñ‚·‰ñ“]dq‚ğì‚é
+    // dtåˆ†ã ã‘å›ã™å›è»¢dqã‚’ä½œã‚‹
     XMVECTOR dq = XMQuaternionRotationAxis(axis, angle);
 
-    // dq * q ‚Åp¨XVi¶Š|‚¯j
+    // dq * q ã§å§¿å‹¢æ›´æ–°ï¼ˆå·¦æ›ã‘ï¼‰
     q = XMQuaternionNormalize(XMQuaternionMultiply(dq, q));
 
     XMStoreFloat4(&m_rot, q);
@@ -181,7 +209,7 @@ void Dice::IntegrateRotation(float dt)
 void Dice::Draw()
 {
     DirectX::XMFLOAT4X4 fWVP[3];
-    // ‚ ‚È‚½‚Ì•`‰æƒVƒXƒeƒ€‚É‡‚í‚¹‚Ä SetWorld/DrawBox ‚ğŒÄ‚Ô‘z’è
+    // ã‚ãªãŸã®æç”»ã‚·ã‚¹ãƒ†ãƒ ã«åˆã‚ã›ã¦ SetWorld/DrawBox ã‚’å‘¼ã¶æƒ³å®š
 
     XMVECTOR q = XMLoadFloat4(&m_rot);
 
@@ -198,21 +226,21 @@ void Dice::Draw()
     fWVP[1] = m_pCamera->GetViewMatrix(true);
     fWVP[2] = m_pCamera->GetProjectionMatrix(true);
 
-    // ƒVƒF[ƒ_[‚Ö•ÏŠ·s—ñ‚ğİ’è 
-    ShaderList::SetWVP(fWVP); // SetWVPŠÖ”‚Ìˆø”‚É‚ÍXMFLOAT4X4Œ^‚Å—v‘f”‚R‚Ì”z—ñ‚ÌƒAƒhƒŒƒX‚ğ“n‚· 
+    // ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¸å¤‰æ›è¡Œåˆ—ã‚’è¨­å®š 
+    ShaderList::SetWVP(fWVP); // SetWVPé–¢æ•°ã®å¼•æ•°ã«ã¯XMFLOAT4X4å‹ã§è¦ç´ æ•°ï¼“ã®é…åˆ—ã®ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’æ¸¡ã™ 
 
-    // ƒ‚ƒfƒ‹‚Ég—p‚·‚é’¸“_ƒVƒF[ƒ_[AƒsƒNƒZƒ‹ƒVƒF[ƒ_[‚ğİ’è 
+    // ãƒ¢ãƒ‡ãƒ«ã«ä½¿ç”¨ã™ã‚‹é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã€ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’è¨­å®š 
     m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
     m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
     for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
-        // ƒ‚ƒfƒ‹‚ÌƒƒbƒVƒ…‚ğæ“¾ 
+        // ãƒ¢ãƒ‡ãƒ«ã®ãƒ¡ãƒƒã‚·ãƒ¥ã‚’å–å¾— 
         const Model::Mesh* mesh = m_pModel->GetMesh(i);
-        // ƒƒbƒVƒ…‚ÉŠ„‚è“–‚Ä‚ç‚ê‚Ä‚¢‚éƒ}ƒeƒŠƒAƒ‹‚ğæ“¾ 
+        // ãƒ¡ãƒƒã‚·ãƒ¥ã«å‰²ã‚Šå½“ã¦ã‚‰ã‚Œã¦ã„ã‚‹ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å–å¾— 
         Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
-        // ƒVƒF[ƒ_[‚Öƒ}ƒeƒŠƒAƒ‹‚ğİ’è 
+        // ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¸ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’è¨­å®š 
         ShaderList::SetMaterial(material);
-        // ƒ‚ƒfƒ‹‚Ì•`‰æ 
+        // ãƒ¢ãƒ‡ãƒ«ã®æç”» 
         m_pModel->Draw(i);
     }
 }
@@ -223,10 +251,10 @@ Collision::OBB Dice::GetOBB()
 
     Collision::OBB obb;
 
-    // ---- ’†S ----
+    // ---- ä¸­å¿ƒ ----
     obb.center = m_pos;
 
-    // ---- ”¼ƒTƒCƒY ----
+    // ---- åŠã‚µã‚¤ã‚º ----
     obb.halfSize =
     {
         m_size * 0.5f,
@@ -234,22 +262,22 @@ Collision::OBB Dice::GetOBB()
         m_size * 0.5f
     };
 
-    // ---- ‰ñ“]s—ñ‚ğì‚é ----
+    // ---- å›è»¢è¡Œåˆ—ã‚’ä½œã‚‹ ----
     XMMATRIX R = XMMatrixRotationQuaternion(
         XMLoadFloat4(&m_rot)
     );
 
-    // 3x3 s—ñ‚Æ‚µ‚Äæ‚èo‚·
+    // 3x3 è¡Œåˆ—ã¨ã—ã¦å–ã‚Šå‡ºã™
     XMFLOAT3X3 m;
     XMStoreFloat3x3(&m, R);
 
-    // ---- ‰ñ“]Œã‚Ìƒ[ƒJƒ‹² ----
-    // s—ñ‚Ìusv‚ğ‚»‚Ì‚Ü‚Üg‚¤
-    obb.axis[0] = { m._11, m._12, m._13 }; // X²
-    obb.axis[1] = { m._21, m._22, m._23 }; // Y²
-    obb.axis[2] = { m._31, m._32, m._33 }; // Z²
+    // ---- å›è»¢å¾Œã®ãƒ­ãƒ¼ã‚«ãƒ«è»¸ ----
+    // è¡Œåˆ—ã®ã€Œè¡Œã€ã‚’ãã®ã¾ã¾ä½¿ã†
+    obb.axis[0] = { m._11, m._12, m._13 }; // Xè»¸
+    obb.axis[1] = { m._21, m._22, m._23 }; // Yè»¸
+    obb.axis[2] = { m._31, m._32, m._33 }; // Zè»¸
 
-    // ”O‚Ì‚½‚ß³‹K‰»iDirectXMath“I‚É‚Í‚Ù‚Ú•s—v‚¾‚ªˆÀ‘Sj
+    // å¿µã®ãŸã‚æ­£è¦åŒ–ï¼ˆDirectXMathçš„ã«ã¯ã»ã¼ä¸è¦ã ãŒå®‰å…¨ï¼‰
     for (int i = 0; i < 3; ++i)
     {
         XMVECTOR a = XMLoadFloat3(&obb.axis[i]);
@@ -264,4 +292,180 @@ void Dice::WakeUp()
 {
     m_sleeping = false;
     m_sleepFrames = 0;
+}
+
+int Dice::GetTopFace() const
+{
+    using namespace DirectX;
+
+    // å›è»¢è¡Œåˆ—
+    XMMATRIX R = XMMatrixRotationQuaternion(XMLoadFloat4(&m_rot));
+
+    // ãƒ¯ãƒ¼ãƒ«ãƒ‰ä¸Šæ–¹å‘
+    XMVECTOR up = XMVectorSet(0, 1, 0, 0);
+
+    float bestDot = -1.0f;
+    int bestFace = 0;
+
+    for (int i = 0; i < 6; ++i)
+    {
+        XMVECTOR localN = XMLoadFloat3(&FACE_NORMALS[i]);
+        XMVECTOR worldN =
+            XMVector3Normalize(XMVector3TransformNormal(localN, R));
+
+        float dot = XMVectorGetX(XMVector3Dot(worldN, up));
+
+        if (dot > bestDot)
+        {
+            bestDot = dot;
+            bestFace = i;
+        }
+    }
+
+    // é¢ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ â†’ ç›®ï¼ˆ1ã€œ6ï¼‰
+    return bestFace + 1;
+}
+
+int Dice::GetBottomFace() const
+{
+    using namespace DirectX;
+
+    XMMATRIX R = XMMatrixRotationQuaternion(XMLoadFloat4(&m_rot));
+    XMVECTOR down = XMVectorSet(0, -1, 0, 0);
+
+    float bestDot = -1.0f;
+    int bestFace = 0;
+
+    for (int i = 0; i < 6; ++i)
+    {
+        XMVECTOR localN = XMLoadFloat3(&FACE_NORMALS[i]);
+        XMVECTOR worldN =
+            XMVector3Normalize(XMVector3TransformNormal(localN, R));
+
+        float dot = XMVectorGetX(XMVector3Dot(worldN, down));
+
+        if (dot > bestDot)
+        {
+            bestDot = dot;
+            bestFace = i;
+        }
+    }
+
+    return bestFace + 1;
+}
+
+int Dice::FaceIndexToValue(int faceIndex) const
+{
+    // é¢ID â†’ å‡ºç›®ï¼ˆã‚ãªãŸã®å®šç¾©ï¼‰
+    static const int FACE_TO_VALUE[6] =
+    {
+        1, // 0 : Y+ -> 1
+        6, // 1 : Y- -> 6
+        3, // 2 : X+ -> 3
+        4, // 3 : X- -> 4
+        5, // 4 : Z+ -> 5
+        2  // 5 : Z- -> 2
+    };
+
+    if (faceIndex < 0 || faceIndex >= 6)
+        return 0;
+
+    return FACE_TO_VALUE[faceIndex];
+}
+
+int Dice::GetTopValue() const
+{
+    using namespace DirectX;
+
+    XMMATRIX R = XMMatrixRotationQuaternion(XMLoadFloat4(&m_rot));
+    XMVECTOR up = XMVectorSet(0, 1, 0, 0);
+
+    float bestDot = -1.0f;
+    int bestFace = 0;
+
+    for (int i = 0; i < 6; ++i)
+    {
+        XMVECTOR localN = XMLoadFloat3(&FACE_NORMALS[i]);
+        XMVECTOR worldN =
+            XMVector3Normalize(XMVector3TransformNormal(localN, R));
+
+        float dot = XMVectorGetX(XMVector3Dot(worldN, up));
+        if (dot > bestDot)
+        {
+            bestDot = dot;
+            bestFace = i;
+        }
+    }
+
+    return FaceIndexToValue(bestFace);
+}
+
+
+static DirectX::XMVECTOR QuaternionFromTo(
+    DirectX::XMVECTOR from,
+    DirectX::XMVECTOR to)
+{
+    using namespace DirectX;
+
+    from = XMVector3Normalize(from);
+    to = XMVector3Normalize(to);
+
+    float dot = XMVectorGetX(XMVector3Dot(from, to));
+
+    // åŒæ–¹å‘
+    if (dot > 0.9999f)
+        return XMQuaternionIdentity();
+
+    // é€†æ–¹å‘ï¼ˆ180åº¦å›è»¢ï¼‰
+    if (dot < -0.9999f)
+    {
+        XMVECTOR axis = XMVector3Cross(from, XMVectorSet(1, 0, 0, 0));
+        if (XMVectorGetX(XMVector3LengthSq(axis)) < 1e-6f)
+            axis = XMVector3Cross(from, XMVectorSet(0, 1, 0, 0));
+
+        axis = XMVector3Normalize(axis);
+        return XMQuaternionRotationAxis(axis, XM_PI);
+    }
+
+    // é€šå¸¸ã‚±ãƒ¼ã‚¹
+    XMVECTOR axis = XMVector3Cross(from, to);
+    XMVECTOR q = XMVectorSet(
+        XMVectorGetX(axis),
+        XMVectorGetY(axis),
+        XMVectorGetZ(axis),
+        1.0f + dot
+    );
+
+    return XMQuaternionNormalize(q);
+}
+
+void Dice::SetFaceUp(int faceIndex)
+{
+    using namespace DirectX;
+
+    if (faceIndex < 0 || faceIndex >= 6)
+        return;
+
+    // ç¾åœ¨ã®å›è»¢
+    XMVECTOR q = XMLoadFloat4(&m_rot);
+
+    // å›è»¢è¡Œåˆ—
+    XMMATRIX R = XMMatrixRotationQuaternion(q);
+
+    // ---- æŒ‡å®šé¢ã®ã€Œç¾åœ¨ã®ãƒ¯ãƒ¼ãƒ«ãƒ‰æ³•ç·šã€ ----
+    XMVECTOR localN = XMLoadFloat3(&FACE_NORMALS[faceIndex]);
+    XMVECTOR worldN =
+        XMVector3Normalize(XMVector3TransformNormal(localN, R));
+
+    // ---- ç›®æ¨™æ–¹å‘ï¼ˆä¸Šï¼‰----
+    XMVECTOR up = XMVectorSet(0, 1, 0, 0);
+
+    // ---- worldN â†’ up ã¸ã®å›è»¢ ----
+    XMVECTOR snapQ = QuaternionFromTo(worldN, up);
+
+    // ---- å›è»¢ã‚’é©ç”¨ ----
+    q = XMQuaternionMultiply(snapQ, q);
+    q = XMQuaternionNormalize(q);
+
+    XMStoreFloat4(&m_rot, q);
 }

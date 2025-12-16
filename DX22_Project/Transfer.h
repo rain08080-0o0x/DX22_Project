@@ -15,6 +15,10 @@ public:
 		static Transfer instance;
 		return instance;
 	}
+	struct Deme
+	{
+		float deme;
+	};
 public:
 	float m_posX;
 	float m_posY;
@@ -22,5 +26,6 @@ public:
 	float m_power;
 	float m_maxPower;
 	DirectX::XMFLOAT2 WallSize;
+	float deme[10];
 };
 

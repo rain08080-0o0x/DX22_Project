@@ -14,6 +14,7 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 
+#include <string>
 //--- ƒOƒ[ƒoƒ‹•Ï”
 Scene* g_pScene;
 
@@ -88,6 +89,14 @@ void Draw()
 		ImGui::DragFloat("Max Power",&max);
 
 		ImGui::DragFloat2("Wall Size", wall_size);
+
+		for (int i = 0; i < 10; i++)
+		{
+			float deme = tran.deme[i];
+			if (deme == 0)continue;
+			std::string szName = "Demo No." + std::to_string(i);
+			ImGui::DragFloat(szName.c_str(), &deme);
+		}
 
 		tran.m_posX= posX;
 		tran.m_posY= posY;
