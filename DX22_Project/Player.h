@@ -38,7 +38,8 @@ public:
     void SetShadowPos(DirectX::XMFLOAT3 pos);
 
     Collision::Box GetShadowCollision();
-    //--- ˆÈ‰º‚ÌŠÖ”‚Ìˆ—‚ÍŒãq 
+
+    float GetPower();
 public:
     void Bound(BoundAxis axis);
 private:

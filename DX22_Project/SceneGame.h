@@ -6,6 +6,7 @@
 #include"Camera.h"
 #include "Player.h"
 #include "Block.h"
+#include "GaugeUI.h"
 
 class SceneGame : public Scene
 {
@@ -20,6 +21,7 @@ private:
 	Camera* m_pCamera;
 	Player* m_pPlayer;
 	Block* m_pBlock;
+	GaugeUI* m_pGaugeUI;
 };
 
 #endif // __SCENE_GAME_H__

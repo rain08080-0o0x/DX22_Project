@@ -1,6 +1,7 @@
 ﻿#include "GaugeUI.h"
 #include "DirectXMath.h"
 #include "Defines.h"
+#include "ShaderList.h"
 
 GaugeUI::GaugeUI()
 	: m_pFrameTex(nullptr)
@@ -30,6 +31,11 @@ GaugeUI::~GaugeUI()
 	}
 }
 
+void GaugeUI::Update()
+{
+
+}
+
 void GaugeUI::Draw()
 {
 	// 2D 
@@ -48,6 +54,7 @@ void GaugeUI::Draw()
 	DirectX::XMStoreFloat4x4(&view, mView);
 	DirectX::XMStoreFloat4x4(&proj, mProj);
 
+	//ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
 	//  
 	Sprite::SetView(view);
 	Sprite::SetProjection(proj);
@@ -74,6 +81,7 @@ void GaugeUI::Draw()
 			Sprite::SetWorld(world);      //  
 		Sprite::SetSize(size[i]);      //  
 		Sprite::SetOffset({ size[i].x * 0.5f, 0.0f }); //  
+		Sprite::SetColor({ 1.0f,1.0f,1.0f,1.0f });
 		Sprite::SetTexture(pTexture[i]);    //  
 		Sprite::Draw();
 	}

@@ -25,6 +25,7 @@ SceneGame::SceneGame()
 	m_pPlayer->SetCamera(m_pCamera);
 	m_pBlock = new Block();
 	m_pBlock->SetPos(DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f));
+	m_pGaugeUI = new GaugeUI();
 
 	TRAN_INS;
 
@@ -55,10 +56,11 @@ SceneGame::~SceneGame()
 void SceneGame::Update()
 {
 	m_pCamera->Update();
-	m_pPlayer->Update();
 	m_pBlock->Update();
 	m_pPlayer->SetCamera(m_pCamera);
+	m_pPlayer->Update();
 	m_pCamera->SetLook(m_pPlayer->GetPos());
+
 
 	Collision::Box a = m_pPlayer->GetCollision();
 	Collision::Box b = m_pBlock->GetCollision();
@@ -66,13 +68,13 @@ void SceneGame::Update()
 	Collision::Result result;
 	result = Collision::Hit(a, b);
 
-
 	if (result.isHit)
 	{
 		if (result.dir.x != 0.0f)m_pPlayer->Bound(Player::BoundX);
 		if (result.dir.y != 0.0f)m_pPlayer->Bound(Player::BoundY);
 		if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
 	}
+
 	DirectX::XMFLOAT3 shadowPos = m_pPlayer->GetPos();
 	Collision::Box s = m_pPlayer->GetShadowCollision();
 	result = Collision::Hit(b, s);
@@ -81,6 +83,9 @@ void SceneGame::Update()
 	else
 		shadowPos.y = 0.0f;
 	m_pPlayer->SetShadowPos(shadowPos);
+
+	m_pGaugeUI->SetGauge(m_pPlayer->GetPower());
+	m_pGaugeUI->Update();
 }
 
 void SceneGame::Draw()
@@ -132,9 +137,9 @@ void SceneGame::Draw()
 	Geometory::SetView(fWVP[1]);
 	Geometory::SetProjection(fWVP[2]);
 
-	//// 仮置きしているボックスにカメラを設定 
-	//Geometory::SetView(m_pCamera->GetViewMatrix());
-	//Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
+	// 仮置きしているボックスにカメラを設定 
+	Geometory::SetView(m_pCamera->GetViewMatrix());
+	Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
 
 	// Spriteへカメラの行列を設定 
 	Sprite::SetView(m_pCamera->GetViewMatrix());
@@ -177,4 +182,8 @@ void SceneGame::Draw()
 		m_pBlock->Draw();
 	if(m_pPlayer)
 		m_pPlayer->Draw();
+	SetDepthTest(false);
+	//if (m_pGaugeUI)
+	//	m_pGaugeUI->Draw();
+	SetDepthTest(true);
 }

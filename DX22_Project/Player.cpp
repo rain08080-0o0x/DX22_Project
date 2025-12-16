@@ -77,7 +77,7 @@ void Player::Draw()
     DirectX::XMMATRIX mWorld = S * R * T;
     DirectX::XMFLOAT4X4 fMat;
     DirectX::XMStoreFloat4x4(&fMat, DirectX::XMMatrixTranspose(mWorld));
-    
+
     // 影の表示     
     Sprite::SetWorld(fMat);
     Sprite::SetSize({ 3.0f,3.0f });
@@ -104,6 +104,11 @@ void Player::SetShadowPos(DirectX::XMFLOAT3 pos)
 Collision::Box Player::GetShadowCollision()
 {
     return m_shadowCollision;
+}
+
+float Player::GetPower()
+{
+    return m_shotPower;
 }
 
 void Player::Bound(BoundAxis axis)
