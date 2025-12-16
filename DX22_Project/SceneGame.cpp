@@ -5,8 +5,43 @@
 #include"CameraDebug.h"
 #include "Transfer.h"
 
+#include <cstdlib>
+#include <ctime>
+#include <cmath>
+
+// 0.0 ～ 1.0
+static float Rand01()
+{
+	return (float)std::rand() / (float)RAND_MAX;
+}
+
+// -1.0 ～ 1.0
+static float RandN11()
+{
+	return Rand01() * 2.0f - 1.0f;
+}
+
+// ランダムな単位ベクトル（方向）
+static DirectX::XMFLOAT3 RandomUnitVector()
+{
+	float x = RandN11();
+	float y = RandN11();
+	float z = RandN11();
+
+	float len = std::sqrt(x * x + y * y + z * z);
+	if (len < 0.0001f)
+	{
+		return { 0.0f, 1.0f, 0.0f };
+	}
+
+	return { x / len, y / len, z / len };
+}
+
 SceneGame::SceneGame()
 {
+	// 乱数初期化（1回だけ）
+	std::srand((unsigned)time(nullptr));
+
 	//--- モデルの描画
 	RenderTarget* pRTV = GetDefaultRTV();
 	DepthStencil* pDSV = GetDefaultDSV();
@@ -42,7 +77,7 @@ SceneGame::SceneGame()
 	{
 		m_dice[i].SetCamera(m_pCamera);
 	}
-	RollAll();
+	//RollAll();
 
 }
 
@@ -86,9 +121,12 @@ void SceneGame::Update()
 		if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
 	}
 
-	DiceCollisionUpdate();
+	for (int i = 0; i < 3; i++)
+	{
+		m_dice[i].Update(1.0f / 60.0f);
+	}
 
-	if (IsKeyTrigger('R') || IsKeyRelease('R'))RollAll();
+	if (IsKeyTrigger('R') || IsKeyRelease('R'))MoveAllDice();
 }
 
 void SceneGame::Draw()
@@ -186,154 +224,62 @@ void SceneGame::Draw()
 	}
 }
 
-void SceneGame::DiceCollisionUpdate()
+void SceneGame::MoveAllDice()
 {
-	for (int i = 0; i < m_diceCount; ++i)
-	{
-		m_dice[i].Update(1.0f / 60.0f);
-	}
+	// ===== 調整用パラメータ =====
+	const float MOVE_SPEED_MIN = 4.0f;
+	const float MOVE_SPEED_MAX = 8.0f;
 
-	// 2個以上ある前提
-	for (int i = 0; i < m_diceCount; ++i)
-	{
-		for (int j = i + 1; j < m_diceCount; ++j)
-		{
-			Collision::Box a = m_dice[i].GetCollision();
-			Collision::Box b = m_dice[j].GetCollision();
-
-			Collision::Result r = Collision::Hit(a, b);
-			if (!r.isHit) continue;
-
-			// r.dir は「押し戻す方向（どの軸で当たったか）」のつもりで使う
-			// （あなたの Hit 実装に合わせて dir が (±1,0,0) みたいに入ってる前提）
-			const float ax = (a.size.x + b.size.x) * 0.5f;
-			const float ay = (a.size.y + b.size.y) * 0.5f;
-			const float az = (a.size.z + b.size.z) * 0.5f;
-
-			const float dx = (a.center.x - b.center.x);
-			const float dy = (a.center.y - b.center.y);
-			const float dz = (a.center.z - b.center.z);
-
-			// めり込み量（どの軸で押し戻すかは r.dir に従う）
-			float push = 0.0f;
-			DirectX::XMFLOAT3 sep(0, 0, 0);
-
-			if (r.dir.x != 0.0f)
-			{
-				push = ax - fabsf(dx);
-				sep.x = (dx >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
-			}
-			else if (r.dir.y != 0.0f)
-			{
-				push = ay - fabsf(dy);
-				sep.y = (dy >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
-			}
-			else if (r.dir.z != 0.0f)
-			{
-				push = az - fabsf(dz);
-				sep.z = (dz >= 0.0f ? 1.0f : -1.0f) * (push * 0.5f);
-			}
-
-			// ①位置を少し離す（半分ずつ押し戻し）
-			m_dice[i].AddPos(sep);
-			m_dice[j].AddPos(DirectX::XMFLOAT3(-sep.x, -sep.y, -sep.z));
-
-			// ②速度を入れ替える（衝突した軸成分だけ）
-			DirectX::XMFLOAT3 vi = m_dice[i].GetVel();
-			DirectX::XMFLOAT3 vj = m_dice[j].GetVel();
-
-			// 反発を少し入れたいなら係数（0.8とか）
-			const float e = 0.8f;
-
-			if (r.dir.x != 0.0f)
-			{
-				std::swap(vi.x, vj.x);
-				vi.x *= e; vj.x *= e;
-			}
-			if (r.dir.y != 0.0f)
-			{
-				std::swap(vi.y, vj.y);
-				vi.y *= e; vj.y *= e;
-			}
-			if (r.dir.z != 0.0f)
-			{
-				std::swap(vi.z, vj.z);
-				vi.z *= e; vj.z *= e;
-			}
-
-			m_dice[i].SetVel(vi);
-			m_dice[j].SetVel(vj);
-		}
-	}
-}
-
-void SceneGame::RollAll()
-{
-	// 速度の強さ（調整ポイント）
-	const float speedMin = 4.0f;
-	const float speedMax = 8.0f;
-
-	// 少し浮かせる（床にめり込んだ状態から開始しないため）
-	const float lift = 0.2f;
+	const float SPIN_SPEED_MIN = 5.0f;   // rad/s
+	const float SPIN_SPEED_MAX = 15.0f;
 
 	for (int i = 0; i < m_diceCount; ++i)
 	{
-		// すでに止まってる時だけ振り直したいならここで制御
-		// if (!m_dice[i].IsSleeping()) continue;
+		// ---------- 1) 移動方向 ----------
+		// 水平方向をメインにしたいので Y は少しだけ
+		DirectX::XMFLOAT3 dir = RandomUnitVector();
+		dir.y = 0.3f + 0.7f * Rand01();
 
-		// 0〜1 の乱数
-		auto frand01 = []() -> float {
-			return (float)std::rand() / (float)RAND_MAX;
-			};
+		// 再正規化
+		float len = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+		if (len < 0.0001f) len = 1.0f;
+		dir.x /= len;
+		dir.y /= len;
+		dir.z /= len;
 
-		// -1〜1 の乱数
-		auto frandN11 = [&]() -> float {
-			return frand01() * 2.0f - 1.0f;
-			};
+		// ---------- 2) 移動速度 ----------
+		float speed = MOVE_SPEED_MIN +
+			(MOVE_SPEED_MAX - MOVE_SPEED_MIN) * Rand01();
 
-		// 水平成分：適当にばらけさせる
-		float vx = frandN11();
-		float vz = frandN11();
+		m_dice[i].SetVel({
+			dir.x * speed,
+			dir.y * speed,
+			dir.z * speed
+			});
 
-		// 方向ベクトルが小さすぎるときの保険
-		const float len2 = vx * vx + vz * vz;
-		if (len2 < 0.0001f)
-		{
-			vx = 1.0f;
-			vz = 0.0f;
-		}
+		// ---------- 3) 回転（角速度） ----------
+		DirectX::XMFLOAT3 spinAxis = RandomUnitVector();
+		float spinSpeed = SPIN_SPEED_MIN +
+			(SPIN_SPEED_MAX - SPIN_SPEED_MIN) * Rand01();
 
-		// 正規化
-		const float invLen = 1.0f / sqrt(vx * vx + vz * vz);
-		vx *= invLen;
-		vz *= invLen;
+		m_dice[i].SetAngVel({
+			spinAxis.x * spinSpeed,
+			spinAxis.y * spinSpeed,
+			spinAxis.z * spinSpeed
+			});
 
-		// 速度の大きさ
-		const float spd = speedMin + (speedMax - speedMin) * frand01();
+		// ---------- 4) 初期姿勢をランダムに ----------
+		float angle = Rand01() * DirectX::XM_2PI;
+		DirectX::XMVECTOR axis =
+			DirectX::XMVectorSet(spinAxis.x, spinAxis.y, spinAxis.z, 0.0f);
 
-		// 上向きも少し（バウンドさせて散る）
-		const float vy = 2.0f + 2.0f * frand01();
+		DirectX::XMVECTOR q =
+			DirectX::XMQuaternionRotationAxis(axis, angle);
 
-		DirectX::XMFLOAT3 v(vx * spd, vy, vz * spd);
-		m_dice[i].SetVel(v);
+		DirectX::XMFLOAT4 qf;
+		DirectX::XMStoreFloat4(&qf,
+			DirectX::XMQuaternionNormalize(q));
 
-		// 少し持ち上げる（任意）
-		m_dice[i].AddPos(DirectX::XMFLOAT3(0.0f, lift, 0.0f));
-		
-		// 角速度の強さ（調整ポイント）
-		const float spinMin = 6.0f;
-		const float spinMax = 14.0f;
-
-		float sx = frandN11();
-		float sy = frandN11();
-		float sz = frandN11();
-		float sLen = sqrt(sx * sx + sy * sy + sz * sz);
-		if (sLen < 0.0001f) { sx = 0; sy = 1; sz = 0; sLen = 1; }
-		sx /= sLen; sy /= sLen; sz /= sLen;
-
-		float spin = spinMin + (spinMax - spinMin) * frand01();
-
-		m_dice[i].SetAngVel(DirectX::XMFLOAT3(sx * spin, sy * spin, sz * spin));
-
+		m_dice[i].SetRotation(qf);
 	}
 }

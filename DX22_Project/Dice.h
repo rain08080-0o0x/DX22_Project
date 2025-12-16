@@ -9,52 +9,60 @@ class Dice
 {
 public:
     Dice();
-    ~Dice() {}
 
-    // 一個分の初期化
+    // 初期化：位置とサイズだけ決める
     void Init(const DirectX::XMFLOAT3& pos, float size);
 
-    // 毎フレーム処理
+    // 更新：移動と回転（止める処理は一切しない）
     void Update(float dt);
 
-    // 描画
+    // 描画：S * R * T
     void Draw();
 
-    // 終了処理（今は何もしないが形だけ用意）
-    void Uninit();
+    void Uninit() {}
 
-    const Collision::Box GetCollision(){ return m_box; }
+    // 当たり判定（AABB）
+    const Collision::Box& GetCollision() const { return m_box; }
 
-    void SetCamera(Camera *set);
-public:
-    const DirectX::XMFLOAT3 GetPos();
-    const DirectX::XMFLOAT3 GetVel();
-    void SetVel(const DirectX::XMFLOAT3 v);
+    // 外から制御したい時用（RollAllで使う）
+    void SetVel(const DirectX::XMFLOAT3& v) { m_vel = v; }
+    void SetAngVel(const DirectX::XMFLOAT3& w) { m_angVel = w; }
+    void SetRotation(const DirectX::XMFLOAT4& q) { m_rot = q; }
 
-    void AddPos(const DirectX::XMFLOAT3 dp);
-
-    float GetSize() const { return m_size; }
-
-    DirectX::XMFLOAT4 GetRot() { return m_rot; }
-    void SetAngVel(DirectX::XMFLOAT3 w) { m_angVel = w; }
-    void SnapToGround();
+    const DirectX::XMFLOAT3& GetPos() const { return m_pos; }
+    const DirectX::XMFLOAT4& GetRot() const { return m_rot; }
+    void SetCamera(Camera* set) { m_pCamera = set; }
 
 private:
-    DirectX::XMFLOAT3 m_pos;   // 中心位置
-    DirectX::XMFLOAT3 m_vel;   // 速度
-    float             m_size;  // 一辺の長さ
+    // 状態（最小）
+    DirectX::XMFLOAT3 m_pos;     // 中心位置
+    DirectX::XMFLOAT3 m_vel;     // 速度（m/s）
+    DirectX::XMFLOAT4 m_rot;     // 姿勢（クォータニオン）
+    DirectX::XMFLOAT3 m_angVel;  // 角速度（rad/s）
+    float m_size;                // 一辺
 
+    // パラメータ（最小）
     float m_mass;
-    float m_restitution; // 反発係数 (0〜1)
-    float m_friction;    // 地面との摩擦の強さ
 
-    Collision::Box m_box; // 当たり判定用（AABB）
-    DirectX::XMFLOAT4 m_rot;
-    DirectX::XMFLOAT3 m_angVel;
+    // 当たり判定（AABB）
+    Collision::Box m_box;
 
-    Model *m_pModel;
+    // モデル
+    Model* m_pModel;
+    // カメラ
     Camera* m_pCamera;
-    int  m_sleepFrames = 0;
-    bool m_onGround = false;
+private:
+    static constexpr float GRAVITY = -9.8f;
 
+    float m_restitution;   // 反発係数（0〜1）
+    float m_linearDamping; // 空気抵抗（速度減衰）
+    float m_friction;      // 接地時の摩擦
+
+    int WALL_LIMIT_X;
+    int WALL_LIMIT_Y;
+    int WALL_LIMIT_Z;
+
+private:
+    // 内部ヘルパー：角速度で姿勢を積分
+    void IntegrateRotation(float dt);
 };
