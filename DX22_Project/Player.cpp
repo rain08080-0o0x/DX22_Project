@@ -171,10 +171,10 @@ void Player::UpdateShot()
         }
         break;
     case Player::SHOT_KEEP:
-        m_shotPower += 0.02f; // パワーを溜め続ける 
+        m_shotPower += tran.m_maxPower * 0.01f;; // パワーを溜め続ける 
 
         // パワーが上限を超えないように判定 
-        if (m_shotPower > 1.0f)
+        if (m_shotPower > tran.m_maxPower)
             m_shotPower = tran.m_maxPower;
 
         // キー入力を止めたら球を打つ手順に変更 
@@ -196,6 +196,7 @@ void Player::UpdateShot()
         m_isStop = false;			// 移動するので停止にしない 
         m_isGround = false;         // 飛ぶので一旦地面から離れたとみなす
         m_shotstep = SHOT_WAIT;		// キー入力待ちの手順に戻す
+        m_shotPower = 0.0f;
         break;
     }
 }

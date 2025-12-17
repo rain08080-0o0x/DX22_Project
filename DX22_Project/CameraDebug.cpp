@@ -22,7 +22,7 @@ void CameraDebug::Update()
 	if(true)
 	{
 		// æ¶‚Ì‚â‚Â
-		//--- ’‹“_‚ÌˆÚ“® 
+		//--- ’‹“_‚ÌˆÚ“®
 		// ª(+z)‚ÉˆÚ“® 
 		if (IsKeyPress(VK_UP)) { m_look.z += sinf(atan2f(m_look.z - m_pos.z, m_look.x - m_pos.x)) * CameraSpeed; ; }
 		if (IsKeyPress(VK_DOWN)) { m_look.z -= sinf(atan2f(m_look.z - m_pos.z, m_look.x - m_pos.x)) * CameraSpeed; }
