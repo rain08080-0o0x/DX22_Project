@@ -23,6 +23,12 @@ Dice::Dice()
 {
 	m_pos = { 0.0f,0.0f,0.0f };
 	m_size = {1.0f,1.0f,1.0f};
+
+	for (int i = 0; i < 10; i++)
+	{
+		m_pModel[i] = new Model;
+		m_pModel[i]->Load("");
+	}
 }
 Dice::~Dice()
 {

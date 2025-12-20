@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include "Model.h"
 
 class GameObject 
 {
@@ -17,5 +18,5 @@ public:
 	//--- ç¿ïWëÄçÏ 
 	DirectX::XMFLOAT3 GetPos();
 	void SetPos(DirectX::XMFLOAT3 pos);
-};
 
+};
