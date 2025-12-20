@@ -26,6 +26,7 @@ private:
 		DirectX::XMFLOAT3 velocity;
 		DirectX::XMFLOAT4 color;
 		DirectX::XMFLOAT2 lcokColor;
+		const float ground = 0.0f;
 	};
 public:
 	static Transfer& GetInstance()

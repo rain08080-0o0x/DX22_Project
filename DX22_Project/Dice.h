@@ -2,6 +2,7 @@
 #include "GameObject.h"
 #include "Camera.h"
 #include "Collision.h"
+#include "Transfer.h"
 
 class Dice
     :public GameObject
@@ -37,5 +38,15 @@ private:
     DirectX::XMFLOAT3 m_size;
 
     Collision::Box m_collision;
+
+    // Transferのgroundを使うためのインスタンス
+    Transfer& tran;
+private:    // 物理演算用変数宣言
+    DirectX::XMFLOAT4 m_rot;        // 回転（クォータニオン） (x,y,z,w)
+    DirectX::XMFLOAT3 m_angVel;     // 角速度（rad/frame想定）
+    float m_mass;                   // 質量（とりあえず 1.0）
+    float m_restitution;            // 反発係数
+    float m_mu;                     // 動摩擦係数
+
 };
 
