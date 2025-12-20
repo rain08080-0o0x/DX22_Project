@@ -66,7 +66,7 @@ SceneGame::SceneGame()
 
 	tran.m_maxPower = 1.0f;
 	DirectX::XMFLOAT3 pos = { 0.0f,0.0f,0.0f };
-	m_diceCount = 1;
+	m_diceCount = 7;
 	m_dice = new Dice[m_diceCount];
 
 	for(int i = 0;i < 10;i++)
@@ -75,12 +75,12 @@ SceneGame::SceneGame()
 	}
 
 	m_dice[0].Init({ 0.0f, 2.0f,  0.0f }, 1.0f);
-	//m_dice[1].Init({ 1.0f, 2.0f,  0.0f }, 1.0f);
-	//m_dice[2].Init({ -1.0f, 2.0f, 0.0f }, 1.0f);
-	//m_dice[3].Init({  2.0f, 2.0f, 0.0f }, 1.0f);
-	//m_dice[4].Init({ -2.0f, 2.0f, 0.0f }, 1.0f);
-	//m_dice[5].Init({  3.0f, 2.0f, 0.0f }, 1.0f);
-	//m_dice[6].Init({ -3.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[1].Init({ 1.0f, 2.0f,  0.0f }, 1.0f);
+	m_dice[2].Init({ -1.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[3].Init({  2.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[4].Init({ -2.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[5].Init({  3.0f, 2.0f, 0.0f }, 1.0f);
+	m_dice[6].Init({ -3.0f, 2.0f, 0.0f }, 1.0f);
 	for (int i = 0; i < m_diceCount; ++i)
 	{
 		m_dice[i].SetCamera(m_pCamera);
