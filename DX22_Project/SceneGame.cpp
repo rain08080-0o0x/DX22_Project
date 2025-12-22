@@ -6,6 +6,7 @@
 #include "Transfer.h"
 
 SceneGame::SceneGame()
+	:OnlyDice(true)
 {
 	m_pModel = new Model();
 
@@ -27,9 +28,11 @@ SceneGame::SceneGame()
 	m_pBlock->SetPos(DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f));
 	m_pGaugeUI = new GaugeUI();
 
+	// 一つだけ
+	m_pDice = new Dice();
+	m_pDice->SetCamera(m_pCamera);
 	TRAN_INS;
 
-	tran.m_maxPower = 1.0f;
 
 }
 
@@ -51,41 +54,54 @@ SceneGame::~SceneGame()
 		delete m_pBlock;
 		m_pBlock= nullptr;
 	}
+	if (m_pDice)
+	{
+		delete m_pDice;
+		m_pDice = nullptr;
+	}
 }
 
 void SceneGame::Update()
 {
 	m_pCamera->Update();
-	m_pBlock->Update();
-	m_pPlayer->SetCamera(m_pCamera);
-	m_pPlayer->Update();
-	m_pCamera->SetLook(m_pPlayer->GetPos());
-
-
-	Collision::Box a = m_pPlayer->GetCollision();
-	Collision::Box b = m_pBlock->GetCollision();
-
-	Collision::Result result;
-	result = Collision::Hit(a, b);
-
-	if (result.isHit)
+	if(!OnlyDice)
 	{
-		if (result.dir.x != 0.0f)m_pPlayer->Bound(Player::BoundX);
-		if (result.dir.y != 0.0f)m_pPlayer->Bound(Player::BoundY);
-		if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
+		m_pBlock->Update();
+		m_pPlayer->SetCamera(m_pCamera);
+		m_pPlayer->Update();
+		m_pCamera->SetLook(m_pPlayer->GetPos());
+		m_pDice->Update();
+
+		Collision::Box a = m_pPlayer->GetCollision();
+		Collision::Box b = m_pBlock->GetCollision();
+
+		Collision::Result result;
+		result = Collision::Hit(a, b);
+
+		if (result.isHit)
+		{
+			if (result.dir.x != 0.0f)m_pPlayer->Bound(Player::BoundX);
+			if (result.dir.y != 0.0f)m_pPlayer->Bound(Player::BoundY);
+			if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
+		}
+
+		DirectX::XMFLOAT3 shadowPos = m_pPlayer->GetPos();
+		Collision::Box s = m_pPlayer->GetShadowCollision();
+		result = Collision::Hit(b, s);
+		if (result.isHit)
+			shadowPos.y = b.center.y + b.size.y * 0.5f;
+		else
+			shadowPos.y = 0.0f;
+		m_pPlayer->SetShadowPos(shadowPos);
+
+		m_pGaugeUI->SetGauge(m_pPlayer->GetPower());
+		m_pGaugeUI->Update();
 	}
-
-	DirectX::XMFLOAT3 shadowPos = m_pPlayer->GetPos();
-	Collision::Box s = m_pPlayer->GetShadowCollision();
-	result = Collision::Hit(b, s);
-	if (result.isHit)
-		shadowPos.y = b.center.y + b.size.y * 0.5f;
 	else
-		shadowPos.y = 0.0f;
-	m_pPlayer->SetShadowPos(shadowPos);
-
-	m_pGaugeUI->SetGauge(m_pPlayer->GetPower());
-	m_pGaugeUI->Update();
+	{
+		m_pDice->Update();
+		//m_pCamera->SetLook(m_pDice->GetPos());
+	}
 }
 
 void SceneGame::Draw()
@@ -158,32 +174,22 @@ void SceneGame::Draw()
 		m_pModel->Draw(i);
 	}
 
-	Geometory::SetView(fWVP[1]);
-	Geometory::SetProjection(fWVP[2]);
-
-	DirectX::XMMATRIX T;
-	DirectX::XMMATRIX S;
-	DirectX::XMMATRIX mat;
-	DirectX::XMFLOAT4X4 fMat;
-
-	static float rad;
-
-	//--- 地面
-	T = DirectX::XMMatrixTranslation(cosf(rad) * tanf(rad), 0.0f, sinf(rad) * tanf(rad));
-	S = DirectX::XMMatrixScaling(1.0f, 1.0f, 1.0f);
-	mat = S * T;
-	mat = DirectX::XMMatrixTranspose(mat);
-	fMat; // 行列の格納先
-	DirectX::XMStoreFloat4x4(&fMat, mat);
-	Geometory::SetWorld(fMat); // ボックスに変換行列を設定
-	//Geometory::DrawCylinder();
-
-	if(m_pBlock)
-		m_pBlock->Draw();
-	if(m_pPlayer)
-		m_pPlayer->Draw();
-	SetDepthTest(false);
-	if (m_pGaugeUI)
-		m_pGaugeUI->Draw();
-	SetDepthTest(true);
+	if(!OnlyDice)
+	{
+		if (m_pBlock)
+			m_pBlock->Draw();
+		if (m_pPlayer)
+			m_pPlayer->Draw();
+		SetDepthTest(false);
+		if (m_pGaugeUI)
+			m_pGaugeUI->Draw();
+		SetDepthTest(true);
+	}
+	else
+	{
+		if (m_pDice)
+		{
+			m_pDice->Draw();
+		}
+	}
 }

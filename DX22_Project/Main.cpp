@@ -8,6 +8,9 @@
 #include "Defines.h"
 #include "ShaderList.h"
 #include "Transfer.h"
+// randèâä˙âªóp
+#include <cstdlib>
+#include <ctime>
 
 // ImGui
 #include "imgui.h"
@@ -23,6 +26,8 @@ HRESULT Init(HWND hWnd, UINT width, UINT height)
 	// DirectXèâä˙âª
 	hr = InitDirectX(hWnd, width, height, false);
 	if (FAILED(hr)) { return hr; }
+
+	std::srand(static_cast<unsigned int>(std::time(NULL)));
 
 	// ëºã@î\èâä˙âª
 	Geometory::Init();
@@ -58,7 +63,7 @@ void Draw()
 	BeginDrawDirectX();
 
 #ifdef _DEBUG
-
+	TRAN_INS;
 
 	// ImGuiÇÃï`âÊ
 	static bool show_main_window;
@@ -67,26 +72,15 @@ void Draw()
 
 	if (show_main_window)
 	{
-		ImGui::Begin("Main Window");
+		ImGui::Begin("Main Window" ,&show_main_window);
 
-		ImGui::Text("Position");
-		TRAN_INS;
-		float posX = tran.m_posX;
-		float posY = tran.m_posY;
-		float posZ = tran.m_posZ;
-		float power = tran.m_power;
-		float max = tran.m_maxPower;
-		ImGui::DragFloat("X",&posX);
-		ImGui::DragFloat("Y",&posY);
-		ImGui::DragFloat("Z",&posZ);
-		ImGui::DragFloat("Power",&power);
-		ImGui::DragFloat("Max Power",&max);
+		float pos[3] = {tran.dice.pos.x,tran.dice.pos.y,tran.dice.pos.z};
+		ImGui::DragFloat3("Dice Pos",pos);
+		tran.dice.pos = {pos[0],pos[1],pos[2]};
 
-		tran.m_posX= posX;
-		tran.m_posY= posY;
-		tran.m_posZ= posZ;
-		tran.m_power = power;
-		tran.m_maxPower = max;
+		float vel[3] = { tran.dice.velocity.x,tran.dice.velocity.y,tran.dice.velocity.z };
+		ImGui::DragFloat3("Dice Velocity",vel);
+		tran.dice.velocity = { vel[0],vel[1],vel[2] };
 
 		ImGui::End();
 	}

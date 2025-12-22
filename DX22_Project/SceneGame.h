@@ -7,6 +7,7 @@
 #include "Player.h"
 #include "Block.h"
 #include "GaugeUI.h"
+#include "Dice.h"
 
 class SceneGame : public Scene
 {
@@ -22,6 +23,10 @@ private:
 	Player* m_pPlayer;
 	Block* m_pBlock;
 	GaugeUI* m_pGaugeUI;
+
+	Dice* m_pDice;
+
+	bool OnlyDice;
 };
 
 #endif // __SCENE_GAME_H__

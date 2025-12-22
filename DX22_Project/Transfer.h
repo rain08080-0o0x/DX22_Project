@@ -1,14 +1,33 @@
 #pragma once
 
+#include <DirectXMath.h>
 
 #define TRAN_INS Transfer &tran = Transfer::GetInstance();
-#define TRAN_INS_G Transfer &tran = Transfer::GetInstance();tran
+#define TRAN_INS_Get Transfer &tran = Transfer::GetInstance();tran
 
 class Transfer
 {
 private:
 	Transfer() = default;
 	~Transfer() = default;
+
+	struct PlayerInfo
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 size;
+		DirectX::XMFLOAT3 velocity;
+		DirectX::XMFLOAT4 color;
+		DirectX::XMFLOAT2 lcokColor;
+	};
+	struct DiceInfo
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 size;
+		DirectX::XMFLOAT3 velocity;
+		DirectX::XMFLOAT4 color;
+		DirectX::XMFLOAT2 lcokColor;
+		const float ground = 0.0f;
+	};
 public:
 	static Transfer& GetInstance()
 	{
@@ -16,10 +35,7 @@ public:
 		return instance;
 	}
 public:
-	float m_posX;
-	float m_posY;
-	float m_posZ;
-	float m_power;
-	float m_maxPower;
+	PlayerInfo player;
+	DiceInfo dice;
 };
 

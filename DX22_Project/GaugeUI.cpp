@@ -64,7 +64,7 @@ void GaugeUI::Draw()
 	Texture* pTexture[2] = { m_pFrameTex,m_pGaugeTex };
 
 	// (0) (1) 
-	for (int i = 0; i < 2; ++i) {
+	for (int i = 1; i >= 0; --i) {
 		//  
 		DirectX::XMMATRIX T =
 			DirectX::XMMatrixTranslation(pos.x - size[i].x * 0.5f, pos.y, 0.0f);
@@ -72,7 +72,7 @@ void GaugeUI::Draw()
 		if (i == 0) //  
 			S = DirectX::XMMatrixScaling(1.0f, -1.0f, 1.0f);
 		else   // m_rate 
-			S = DirectX::XMMatrixScaling(m_rate, -1.0f, 1.0f);
+			S = DirectX::XMMatrixScaling(m_rate, -0.6f, 1.0f);
 		DirectX::XMMATRIX mWorld = S * T;
 		DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranspose(mWorld));
 

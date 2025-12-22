@@ -3,6 +3,7 @@
 #include "Input.h"
 #include "Transfer.h"
 
+
 Player::Player()
     : m_pCamera(nullptr)
     , m_move()
@@ -35,11 +36,6 @@ Player::~Player()
 
 void Player::Update()
 {
-    TRAN_INS;
-    m_pos.x = tran.m_posX;
-    m_pos.y = tran.m_posY;
-    m_pos.z = tran.m_posZ;
-    tran.m_power = m_shotPower;
     // カメラが設定されてない場合は処理しない 
     if (!m_pCamera) { return; }
     // ボールが停止しているかどうかによって処理を変える 
@@ -48,9 +44,6 @@ void Player::Update()
     else
         UpdateMove(); // 打った球の移動処理 
     m_collision.center = m_pos;
-    tran.m_posX = m_pos.x;
-    tran.m_posY = m_pos.y;
-    tran.m_posZ = m_pos.z;
 }
 
 void Player::Draw() 
@@ -175,7 +168,7 @@ void Player::UpdateShot()
 
         // パワーが上限を超えないように判定 
         if (m_shotPower > 1.0f)
-            m_shotPower = tran.m_maxPower;
+            m_shotPower = 1.0f;
 
         // キー入力を止めたら球を打つ手順に変更 
         if (IsKeyRelease('Z')) {
@@ -196,6 +189,7 @@ void Player::UpdateShot()
         m_isStop = false;			// 移動するので停止にしない 
         m_isGround = false;         // 飛ぶので一旦地面から離れたとみなす
         m_shotstep = SHOT_WAIT;		// キー入力待ちの手順に戻す
+        m_shotPower = 0.0f;
         break;
     }
 }
