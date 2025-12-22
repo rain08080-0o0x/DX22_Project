@@ -1,4 +1,5 @@
 #include "CameraDebug.h"
+#include "Transfer.h"
 
 const float CameraSpeed = 0.1f;
 const float CameraDebugRotate = 0.1f;
@@ -9,7 +10,14 @@ CameraDebug::CameraDebug()
 	, m_radY(0.50f)
 	, m_radius(5.0f)
 {
+    TRAN_INS;
+    m_look = { 0.0f,0.0f,0.0f };
+    m_pos.x = m_look.x + m_radius * cosf(m_radY) * sinf(m_radXZ);
+    m_pos.y = m_look.y + m_radius * sinf(m_radY);
+    m_pos.z = m_look.z + m_radius * cosf(m_radY) * cosf(m_radXZ);
 
+    tran.camera.eye = m_pos;
+    tran.camera.look = m_look;
 }
 
 CameraDebug::~CameraDebug()
@@ -19,12 +27,15 @@ CameraDebug::~CameraDebug()
 
 void CameraDebug::Update()
 {
-	if(true)
-	{
+    TRAN_INS;
+    if (true)
+    {
         using namespace DirectX;
-		// 先生のやつ
-		//--- 注視点の移動
-		// ↑(+z)に移動 
+        m_pos = tran.camera.eye;
+        m_look = tran.camera.look;
+        // 先生のやつ
+        //--- 注視点の移動
+        // ↑(+z)に移動 
         XMVECTOR pos = XMLoadFloat3(&m_pos);
         XMVECTOR look = XMLoadFloat3(&m_look);
 
@@ -64,22 +75,25 @@ void CameraDebug::Update()
         // m_posについては後でlook基準に動かすので消す
         //XMStoreFloat3(&m_pos, pos);
         XMStoreFloat3(&m_look, look);
-		//--- カメラ位置の移動 
-		// 回り込み
-		if (IsKeyPress('A')) { m_radXZ += CameraDebugRotate; }
-		if (IsKeyPress('D')) { m_radXZ -= CameraDebugRotate; }
-		if (IsKeyPress('W')) { m_radY -= CameraDebugRotate; }
-		if (IsKeyPress('S')) { m_radY += CameraDebugRotate; }
+        //--- カメラ位置の移動 
+        // 回り込み
+        if (IsKeyPress('A')) { m_radXZ += CameraDebugRotate; }
+        if (IsKeyPress('D')) { m_radXZ -= CameraDebugRotate; }
+        if (IsKeyPress('W')) { m_radY -= CameraDebugRotate; }
+        if (IsKeyPress('S')) { m_radY += CameraDebugRotate; }
 
-		// --- カメラの距離
-		if (IsKeyPress('E')) { m_radius += CameraSpeed; }
-		if (IsKeyPress('Q')) { m_radius -= CameraSpeed; }
+        // --- カメラの距離
+        if (IsKeyPress('E')) { m_radius += CameraSpeed; }
+        if (IsKeyPress('Q')) { m_radius -= CameraSpeed; }
 
-		// カメラの位置の計算
-		m_pos.x = m_look.x + m_radius * cosf(m_radY) * sinf(m_radXZ);
-		m_pos.y = m_look.y + m_radius * sinf(m_radY);
-		m_pos.z = m_look.z + m_radius * cosf(m_radY) * cosf(m_radXZ);
-	}
+        // カメラの位置の計算
+        m_pos.x = m_look.x + m_radius * cosf(m_radY) * sinf(m_radXZ);
+        m_pos.y = m_look.y + m_radius * sinf(m_radY);
+        m_pos.z = m_look.z + m_radius * cosf(m_radY) * cosf(m_radXZ);
+        // Transferの更新
+        tran.camera.eye = m_pos;
+        tran.camera.look = m_look;
+    }
 }
 
 void CameraDebug::SetLook(DirectX::XMFLOAT3 set)

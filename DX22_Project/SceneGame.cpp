@@ -101,6 +101,7 @@ void SceneGame::Update()
 	{
 		m_pDice->Update();
 		//m_pCamera->SetLook(m_pDice->GetPos());
+		m_pDice->TestUpdate();
 	}
 }
 
@@ -190,6 +191,7 @@ void SceneGame::Draw()
 		if (m_pDice)
 		{
 			m_pDice->Draw();
+			m_pDice->TestDraw();
 		}
 	}
 }

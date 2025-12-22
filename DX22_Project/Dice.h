@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "Collision.h"
 #include "Transfer.h"
+#include "Model.h"
 
 class Dice
     :public GameObject
@@ -17,6 +18,8 @@ public:
 
     // 描画処理 
     void Draw()override;
+    void TestUpdate();
+    void TestDraw();
 
     // カメラの設定 
     void SetCamera(Camera* pCamera);
@@ -41,12 +44,17 @@ private:
 
     // Transferのgroundを使うためのインスタンス
     Transfer& tran;
+
+    Model* m_pModel;
 private:    // 物理演算用変数宣言
     DirectX::XMFLOAT4 m_rot;        // 回転（クォータニオン） (x,y,z,w)
     DirectX::XMFLOAT3 m_angVel;     // 角速度（rad/frame想定）
     float m_mass;                   // 質量（とりあえず 1.0）
     float m_restitution;            // 反発係数
     float m_mu;                     // 動摩擦係数
-
+private: //テスト用行列配列
+    DirectX::XMFLOAT4X4 world;
+    DirectX::XMFLOAT4X4 obj;
+    DirectX::XMFLOAT3 vertex[8];
 };
 
