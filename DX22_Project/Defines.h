@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-static const int FPS = 60;
+static const int FPS = 120;
 static const float fFPS = static_cast<float>(FPS);
 
 // リソースパス

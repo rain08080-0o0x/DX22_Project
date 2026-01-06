@@ -69,7 +69,7 @@ void Draw()
 	static bool show_main_window = true;
 	static bool show_camera_window;
 	static bool show_dice_window;
-	static bool show_dice4x4_window;
+	static bool show_dice4x4_window = true;
 
 	if(IsKeyTrigger('P'))show_main_window = !show_main_window;
 
@@ -97,12 +97,16 @@ void Draw()
 	{
 		Begin("Dice",&show_dice_window);
 
-		//float pos[3] = {tran.dice.pos.x,tran.dice.pos.y,tran.dice.pos.z};
-
-		DragFloat3("Position", reinterpret_cast<float*>(&tran.dice.pos));
+		DragFloat3("Position", reinterpret_cast<float*>(&tran.dice.pos), 0.1f);
 		DragFloat3("Velocity", reinterpret_cast<float*>(&tran.dice.velocity));
-
-		//tran.dice.pos = {pos[0],pos[1],pos[2]};
+		DragFloat4("Color", reinterpret_cast<float*>(&tran.dice.color),0.01f,0.0f,1.0f);
+		DragFloat4("Set Velocity", reinterpret_cast<float*>(&tran.dice.virtualVelocity), 0.01f);
+		Text("rot %f:%f:%f:%f",tran.dice.rot.x,tran.dice.rot.y,tran.dice.rot.z,tran.dice.rot.w);
+		if (Button("Set"))
+		{
+			tran.dice.velocity = tran.dice.virtualVelocity;
+			tran.dice.virtualVelocity = DirectX::XMFLOAT3(0.0f,0.0f,0.0f);
+		}
 
 		End();
 	}
@@ -119,13 +123,22 @@ void Draw()
 		DragFloat4("1",mat_1,0.1f);
 		DragFloat4("2",mat_2,0.1f);
 		DragFloat4("3",mat_3,0.1f);
-		DragFloat4("4",mat_4,0.1f);
+		DragFloat4("4\n\n",mat_4,0.1f);
 		tran.dice.world = {
 			mat_1[0],mat_1[1],mat_1[2],mat_1[3],
 			mat_2[0],mat_2[1],mat_2[2],mat_2[3],
 			mat_3[0],mat_3[1],mat_3[2],mat_3[3],
 			mat_4[0],mat_4[1],mat_4[2],mat_4[3]
 		};
+
+		DragFloat3("Object A", reinterpret_cast<float*>(&tran.obj.A), 0.01f);
+		DragFloat3("Object B\n\n", reinterpret_cast<float*>(&tran.obj.B), 0.01f);
+
+		DragFloat3("Object A Velocity", reinterpret_cast<float*>(&tran.obj.Avel));
+		DragFloat3("Object B Velocity", reinterpret_cast<float*>(&tran.obj.Bvel));
+
+		DragFloat3("Object A Angle Velocity", reinterpret_cast<float*>(&tran.obj.AangVel));
+		DragFloat3("Object B Angle Velocity", reinterpret_cast<float*>(&tran.obj.BangVel));
 
 		End();
 	}
@@ -138,6 +151,7 @@ void Draw()
 		if (Button("Dice"))show_dice_window = !show_dice_window;
 		if (Button("Dice 4X4"))show_dice4x4_window = !show_dice4x4_window;
 
+		Text("FPS: %.1f", GetIO().Framerate);
 		End();
 	}
 

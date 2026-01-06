@@ -129,6 +129,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			UINT height = HIWORD(lParam);
 			OnResizeDirectX(width, height);
 		}
+
 		return 0;
 	case WM_DESTROY:
 		PostQuitMessage(0);
