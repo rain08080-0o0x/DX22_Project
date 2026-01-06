@@ -33,7 +33,8 @@ SceneGame::SceneGame()
 	m_pDice->SetCamera(m_pCamera);
 	TRAN_INS;
 
-
+	A = new RigidBodyOBB({0.0f,5.0f,0.0f} ,{1.0f,1.0f,1.0f},10.0f);
+	B = new RigidBodyOBB({0.0f,0.0f,0.0f}, {10.0f,1.0f,10.0f}, 0.0f);
 }
 
 SceneGame::~SceneGame()
@@ -101,77 +102,171 @@ void SceneGame::Update()
 	{
 		m_pDice->Update();
 		//m_pCamera->SetLook(m_pDice->GetPos());
+		m_pDice->TestUpdate();
+
+		// 2. 衝突判定 (SAT等で別途実装が必要。ここでは結果が得られたと仮定)
+    // 例えば、boxAの頂点を計算し、boxBに含まれるかチェックするなど
+		Vec3 vertsA[8];
+		A->GetWorldVertices(vertsA);
+
+		// boxA の頂点から、boxB の上面（簡易）への接触点を作って解決する
+		{
+			const float planeY = B->center.y + B->extents.y;
+
+			// Aの最下点を取る（面接地なら4頂点がここに集まる）
+			float minY = vertsA[0].y;
+			for (int i = 1; i < 8; ++i)
+			{
+				if (vertsA[i].y < minY) minY = vertsA[i].y;
+			}
+
+			// 多少の誤差許容
+			const float contactEps = 0.001f;
+			// 「最下層付近」とみなす高さ幅（ここを広げすぎると傾きやすくなる）
+			const float minLayer = 0.01f;
+
+			// B上面の矩形範囲（Bを軸平行の床として扱う簡易）
+			const float minX = B->center.x - B->extents.x;
+			const float maxX = B->center.x + B->extents.x;
+			const float minZ = B->center.z - B->extents.z;
+			const float maxZ = B->center.z + B->extents.z;
+
+			// 反復（2回だけ）
+			for (int iter = 0; iter < 2; ++iter)
+			{
+				for (int i = 0; i < 8; ++i)
+				{
+					// B上面の真上にある頂点だけ採用（外なら無視）
+					if (vertsA[i].x < minX || vertsA[i].x > maxX) continue;
+					if (vertsA[i].z < minZ || vertsA[i].z > maxZ) continue;
+
+					// 最下層付近の頂点だけ接触点にする（面なら複数点になる）
+					if (vertsA[i].y > (minY + minLayer)) continue;
+
+					// めり込み（または接触）しているか
+					const float depth = planeY - vertsA[i].y;
+					if (depth <= -contactEps) continue;
+
+					CollisionResolver::Manifold m;
+					m.bodyA = B;                 // 支持側（床）
+					m.bodyB = A;                 // 乗る側
+					m.normal = Vec3(0, 1, 0);    // 上向き法線（簡易）
+					m.depth = depth;
+
+					m.contactPoint = vertsA[i];
+					m.contactPoint.y = planeY;   // 接触点を面上へ
+
+					CollisionResolver::ResolveCollision(m);
+				}
+			}
+		}
+
+		// 3. 物理更新
+		A->Update(1.0f/ 60.0f);
+		B->Update(1.0f/ 60.0f);
+
+		TRAN_INS;
+		DirectX::XMFLOAT3
+			pos = 
+		{
+			A->center.x,
+			A->center.y,
+			A->center.z
+		};
+
+		tran.obj.A = pos;
+		pos =
+		{
+			B->center.x,
+			B->center.y,
+			B->center.z
+		};
+		tran.obj.B = pos;
+		tran.obj.Avel = { A->velocity.x,A->velocity.y,A->velocity.z };
+		tran.obj.Bvel = { B->velocity.x,B->velocity.y,B->velocity.z };
+		tran.obj.AangVel = { A->angularVel.x,A->angularVel.y,A->angularVel.z };
+		tran.obj.BangVel = { B->angularVel.x,B->angularVel.y,B->angularVel.z };
+		if (IsKeyTrigger('Y'))A->center = {0.0,5.0f,0.0f};
+
+		if (IsKeyTrigger('R'))
+		{
+			A->angularVel.z += 3.14f;
+		}
 	}
 }
 
 void SceneGame::Draw()
 {
+	{
 
-	// 頂点シェーダーに渡す変換行列の変数を宣言 
-	DirectX::XMFLOAT4X4 fWVP[3];    // World,View,Projectionの略  
-	DirectX::XMMATRIX world, view, proj; // 各変換行列の格納先 
+		// 頂点シェーダーに渡す変換行列の変数を宣言 
+		DirectX::XMFLOAT4X4 fWVP[3];    // World,View,Projectionの略  
+		DirectX::XMMATRIX world, view, proj; // 各変換行列の格納先 
 
-	// 作成した行列を各変数へ格納 
-	world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-	view = DirectX::XMMatrixLookAtLH(
-		DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
-		DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f), 
-		DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
-	proj = 
-	DirectX::XMMatrixOrthographicOffCenterLH(
-		-640,640,	// 横下限上限値
-		-360,360,	// 縦下限上限値
-		0.001f,		// Near
-		1000.0f);	// Far
-	proj = DirectX::XMMatrixPerspectiveFovLH(
-		// DirectXMathに用意されている角度をラジアン角に変換する関数
-		DirectX::XMConvertToRadians(70.0f),	//角度
-		16.0f / 9.0f,						//アス比
-		0.1f,								//最小描画距離
-		100.0f);							//最長描画距離
-
-
-
-	// 計算用のデータから読み取り用のデータに変換 
-	DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
-	DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
-	DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
-
-	// モデルに変換行列を設定 
-	fWVP[1] = m_pCamera->GetViewMatrix();
-	fWVP[2] = m_pCamera->GetProjectionMatrix();
-
-	// シェーダーへ変換行列を設定 
-	ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
+		// 作成した行列を各変数へ格納 
+		world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+		view = DirectX::XMMatrixLookAtLH(
+			DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
+			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+		proj =
+			DirectX::XMMatrixOrthographicOffCenterLH(
+				-640, 640,	// 横下限上限値
+				-360, 360,	// 縦下限上限値
+				0.001f,		// Near
+				1000.0f);	// Far
+		proj = DirectX::XMMatrixPerspectiveFovLH(
+			// DirectXMathに用意されている角度をラジアン角に変換する関数
+			DirectX::XMConvertToRadians(70.0f),	//角度
+			16.0f / 9.0f,						//アス比
+			0.1f,								//最小描画距離
+			100.0f);							//最長描画距離
 
 
-	// モデルに使用する頂点シェーダー、ピクセルシェーダーを設定 
-	m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
-	m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
-	// 仮置きしているボックスにカメラを設定
-	Geometory::SetView(fWVP[1]);
-	Geometory::SetProjection(fWVP[2]);
+		// 計算用のデータから読み取り用のデータに変換 
+		DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
+		DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
+		DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
 
-	// 仮置きしているボックスにカメラを設定 
-	Geometory::SetView(m_pCamera->GetViewMatrix());
-	Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
+		// モデルに変換行列を設定 
+		fWVP[1] = m_pCamera->GetViewMatrix();
+		fWVP[2] = m_pCamera->GetProjectionMatrix();
 
-	// Spriteへカメラの行列を設定 
-	Sprite::SetView(m_pCamera->GetViewMatrix());
-	Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
+		// シェーダーへ変換行列を設定 
+		ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
 
+
+		// モデルに使用する頂点シェーダー、ピクセルシェーダーを設定 
+		m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+		m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
+
+		// 仮置きしているボックスにカメラを設定
+		Geometory::SetView(fWVP[1]);
+		Geometory::SetProjection(fWVP[2]);
+
+		// 仮置きしているボックスにカメラを設定 
+		Geometory::SetView(m_pCamera->GetViewMatrix());
+		Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
+
+		// Spriteへカメラの行列を設定 
+		Sprite::SetView(m_pCamera->GetViewMatrix());
+		Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
+	}
+	// モデルの描画 基本それぞれのDrawで出力させるのでいらないがサンプルとして残す
 	if(false)
-	// マテリアル別にメッシュを表示 
-	for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
-		// モデルのメッシュを取得 
-		const Model::Mesh* mesh = m_pModel->GetMesh(i);
-		// メッシュに割り当てられているマテリアルを取得 
-		Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
-		// シェーダーへマテリアルを設定 
-		ShaderList::SetMaterial(material);
-		// モデルの描画 
-		m_pModel->Draw(i);
+	{
+		// マテリアル別にメッシュを表示 
+		for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
+			// モデルのメッシュを取得 
+			const Model::Mesh* mesh = m_pModel->GetMesh(i);
+			// メッシュに割り当てられているマテリアルを取得 
+			Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
+			// シェーダーへマテリアルを設定 
+			ShaderList::SetMaterial(material);
+			// モデルの描画 
+			m_pModel->Draw(i);
+		}
 	}
 
 	if(!OnlyDice)
@@ -189,7 +284,46 @@ void SceneGame::Draw()
 	{
 		if (m_pDice)
 		{
-			m_pDice->Draw();
+			//m_pDice->Draw();
+			//m_pDice->TestDraw();
+		}
+		DirectX::XMFLOAT4 color = {0.0f,0.0f,0.0f,0.0f};
+		if (A)
+		{
+			color = { 1.0f,0.0f,0.0f,1.0f };
+			DirectX::XMFLOAT3 vtxA[8];
+			A->GetWorldVertices(vtxA);
+			Geometory::AddLine(vtxA[0], vtxA[1], color); // 
+			Geometory::AddLine(vtxA[1], vtxA[3], color); // 
+			Geometory::AddLine(vtxA[3], vtxA[2], color); // 
+			Geometory::AddLine(vtxA[2], vtxA[0], color); // 
+			Geometory::AddLine(vtxA[0 + 4], vtxA[1 + 4], color); // 
+			Geometory::AddLine(vtxA[1 + 4], vtxA[3 + 4], color); // 
+			Geometory::AddLine(vtxA[3 + 4], vtxA[2 + 4], color); // 
+			Geometory::AddLine(vtxA[2 + 4], vtxA[0 + 4], color); // 
+			Geometory::AddLine(vtxA[0], vtxA[4], color); // 
+			Geometory::AddLine(vtxA[1], vtxA[5], color); // 
+			Geometory::AddLine(vtxA[2], vtxA[6], color); // 
+			Geometory::AddLine(vtxA[3], vtxA[7], color); // 
+		}
+		if (B)
+		{
+			color = {0.0f,1.0,0.0f,1.0f};
+			DirectX::XMFLOAT3 vtxB[8];
+			B->GetWorldVertices(vtxB);
+			Geometory::AddLine(vtxB[0], vtxB[1], color); // 
+			Geometory::AddLine(vtxB[1], vtxB[3], color); // 
+			Geometory::AddLine(vtxB[3], vtxB[2], color); // 
+			Geometory::AddLine(vtxB[2], vtxB[0], color); // 
+			Geometory::AddLine(vtxB[0 + 4], vtxB[1 + 4], color); // 
+			Geometory::AddLine(vtxB[1 + 4], vtxB[3 + 4], color); // 
+			Geometory::AddLine(vtxB[3 + 4], vtxB[2 + 4], color); // 
+			Geometory::AddLine(vtxB[2 + 4], vtxB[0 + 4], color); // 
+			Geometory::AddLine(vtxB[0], vtxB[0 + 4], color); // 
+			Geometory::AddLine(vtxB[1], vtxB[1 + 4], color); // 
+			Geometory::AddLine(vtxB[2], vtxB[2 + 4], color); // 
+			Geometory::AddLine(vtxB[3], vtxB[3 + 4], color); // 
+
 		}
 	}
 }

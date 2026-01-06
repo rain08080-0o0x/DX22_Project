@@ -8,6 +8,7 @@
 #include "Block.h"
 #include "GaugeUI.h"
 #include "Dice.h"
+#include "Collision.h"
 
 class SceneGame : public Scene
 {
@@ -25,6 +26,9 @@ private:
 	GaugeUI* m_pGaugeUI;
 
 	Dice* m_pDice;
+
+	RigidBodyOBB *A;
+	RigidBodyOBB *B;
 
 	bool OnlyDice;
 };

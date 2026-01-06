@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-static const int FPS = 60;
+static const int FPS = 120;
 static const float fFPS = static_cast<float>(FPS);
 
 // リソースパス
@@ -17,6 +17,7 @@ static const float fFPS = static_cast<float>(FPS);
 #define METER(value) (value * 1.0f)
 #define MSEC(value) (value / fFPS)
 #define CMSEC(value) MSEC(CMETER(value))
+#define HALF(test) (test / 2.0f)
 static const float GRAVITY = 0.98f;
 
 // タイトル
