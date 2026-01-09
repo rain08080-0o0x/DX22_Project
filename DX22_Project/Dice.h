@@ -9,7 +9,7 @@
 
 
 // Å‘åƒTƒCƒRƒ”
-const int MAX_DICE = 8;
+const int MAX_DICE = 10;
 
 class Dice
 {

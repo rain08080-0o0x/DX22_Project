@@ -217,6 +217,129 @@ static void SnapOrientationToFace(RigidBodyOBB& b)
 	b.axis[2] = forward;
 }
 
+// body[support] の上面を「軸平行の床」として扱う簡易判定
+// あなたの元コードは床が軸平行前提なので、その前提を崩さないための判定
+static bool IsAxisAlignedFloorLike(const RigidBodyOBB& b)
+{
+	// 軸がだいたいワールド軸に揃っていればOK
+	// きつすぎると床判定されないので閾値はゆるめ
+	const float th = 0.95f;
+
+	Vec3 ax = b.axis[0];
+	Vec3 ay = b.axis[1];
+	Vec3 az = b.axis[2];
+
+	// 絶対値でワールド軸に近いか
+	auto absf_ = [](float v) { return (v < 0.0f) ? -v : v; };
+
+	bool xOK = (absf_(ax.x) > th && absf_(ax.y) < (1.0f - th) && absf_(ax.z) < (1.0f - th));
+	bool yOK = (absf_(ay.y) > th && absf_(ay.x) < (1.0f - th) && absf_(ay.z) < (1.0f - th));
+	bool zOK = (absf_(az.z) > th && absf_(az.x) < (1.0f - th) && absf_(az.y) < (1.0f - th));
+
+	return xOK && yOK && zOK;
+}
+
+// あなたの基準方式：moving の頂点を使って support 上面（軸平行床）と複数点で解く
+static void ResolveBoxOnTopPlane_MultiContact(RigidBodyOBB* support, RigidBodyOBB* moving)
+{
+	if (!support || !moving) return;
+
+	Vec3 verts[8];
+	moving->GetWorldVertices(verts);
+
+	const float planeY = support->center.y + support->extents.y;
+
+	// moving の最下点Y
+	float minY = verts[0].y;
+	for (int i = 1; i < 8; ++i)
+		if (verts[i].y < minY) minY = verts[i].y;
+
+	// 許容
+	const float contactEps = 0.001f;
+	const float minLayer = 0.01f;
+
+	// support を軸平行床として扱うので AABB 範囲は center/extents でOK
+	const float minX = support->center.x - support->extents.x;
+	const float maxX = support->center.x + support->extents.x;
+	const float minZ = support->center.z - support->extents.z;
+	const float maxZ = support->center.z + support->extents.z;
+
+	// 接触点を複数回流す（元コードの反復2回を維持）
+	for (int iter = 0; iter < 2; ++iter)
+	{
+		for (int i = 0; i < 8; ++i)
+		{
+			if (verts[i].x < minX || verts[i].x > maxX) continue;
+			if (verts[i].z < minZ || verts[i].z > maxZ) continue;
+
+			if (verts[i].y > (minY + minLayer)) continue;
+
+			const float depth = planeY - verts[i].y;
+			if (depth <= -contactEps) continue;
+
+			CollisionResolver::Manifold m;
+			m.bodyA = support;              // 支持側
+			m.bodyB = moving;               // 乗る側
+			m.normal = Vec3(0.0f, 1.0f, 0.0f);
+			m.depth = depth;
+
+			m.contactPoint = verts[i];
+			m.contactPoint.y = planeY;
+
+			CollisionResolver::ResolveCollision(m);
+
+			// 解決で姿勢や中心が動くので、頂点も更新しておく（同フレームの安定化）
+			moving->GetWorldVertices(verts);
+		}
+	}
+}
+
+// 汎用：配列の全ペアを解く
+//  - 静的かつ床っぽいものは「上面床」として複数点解決
+//  - それ以外は SAT 単一マニフォールド
+static void ResolveAllPairs_Generic(RigidBodyOBB* bodies[], int count, int solverIters)
+{
+	for (int iter = 0; iter < solverIters; ++iter)
+	{
+		for (int i = 0; i < count; ++i)
+		{
+			if (!bodies[i]) continue;
+
+			for (int j = i + 1; j < count; ++j)
+			{
+				if (!bodies[j]) continue;
+
+				RigidBodyOBB* A = bodies[i];
+				RigidBodyOBB* B = bodies[j];
+
+				// 両方静的ならスキップ
+				if (A->invMass == 0.0f && B->invMass == 0.0f)
+					continue;
+
+				// 片方が静的で床っぽいなら、床上面の複数接触点で解く
+				// どっちが床かを両方試す
+				if (A->invMass == 0.0f && IsAxisAlignedFloorLike(*A))
+				{
+					ResolveBoxOnTopPlane_MultiContact(A, B);
+					continue;
+				}
+				if (B->invMass == 0.0f && IsAxisAlignedFloorLike(*B))
+				{
+					ResolveBoxOnTopPlane_MultiContact(B, A);
+					continue;
+				}
+
+				// それ以外は SAT
+				CollisionResolver::Manifold m;
+				if (BuildManifoldSAT(*A, *B, m))
+				{
+					CollisionResolver::ResolveCollision(m);
+				}
+			}
+		}
+	}
+}
+
 
 //static float ProjectRadiusOnAxis(const RigidBodyOBB& b, const Vec3& nUnit)
 //{
@@ -323,7 +446,14 @@ Dice::Dice()
 	}
 
 	body[0] = new RigidBodyOBB({0.0f,5.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
-	body[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {10.0f,1.0f,10.0f}, 0.0f);
+	body[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {25.0f,1.0f,25.0f}, 0.0f);
+	body[2] = new RigidBodyOBB({0.0f,7.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[3] = new RigidBodyOBB({0.0f,10.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[4] = new RigidBodyOBB({0.0f,3.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[5] = new RigidBodyOBB({0.0f,1.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[6] = new RigidBodyOBB({0.0f,12.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[7] = new RigidBodyOBB({0.0f,15.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[8] = new RigidBodyOBB({0.0f,17.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
 
 	m_bodies[0] = new RigidBodyOBB({0.0f,5.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
 	m_bodies[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {10.0f,1.0f,10.0f}, 0.0f);
@@ -344,7 +474,6 @@ Dice::Dice()
 	if (!m_pModel->Load("Assets/Model/Dice/dice.fbx", 1.f, Model::ZFlip)) { // 倍率と反転は省略可
 		MessageBox(NULL, "Not found for dice", "Error", MB_OK); // エラーメッセージの表示
 	}
-
 }
 
 Dice::~Dice()
@@ -354,66 +483,69 @@ Dice::~Dice()
 		m_pModel->Reset();
 		m_pModel = nullptr;
 	}
+	for (int i = 0; i < MAX_DICE; ++i)
+	{
+		delete body[i];
+		body[i] = nullptr;
+	}
 }
+
 void Dice::Update(int)
 {
 	const float dt = 1.0f / fFPS;
 
-	// 1) 物理更新（積分）
+	// 1) 先に全ボディを積分（ここで center/axis が最新になる）
 	for (int i = 0; i < MAX_DICE; ++i)
 	{
 		if (body[i] == nullptr) continue;
 		body[i]->Update(dt);
 	}
 
-	// 2) 総当たり衝突（反復） + grounded 判定
-	bool grounded[MAX_DICE];
+	// 2) 汎用：配列の全ペア衝突解決
 	const int solverIters = 4;
-	ResolveAllPairs_SAT(body, MAX_DICE, solverIters, grounded);
+	ResolveAllPairs_Generic(body, MAX_DICE, solverIters);
 
-	// 3) 衝突で変わった angularVel を同フレームで回転に反映
+	// 3) 衝突で変わった angularVel を同フレームで姿勢に反映
 	for (int i = 0; i < MAX_DICE; ++i)
 	{
 		if (body[i] == nullptr) continue;
 		body[i]->IntegrateRotation(dt);
 	}
 
-	// 4) 面で立たせる：止まりそう＆接地している個体だけスナップ
-	// しきい値は調整前提（まずはこれで効く）
-	const float v2Sleep = 1e-6f;  // 並進速度^2
-	const float w2Sleep = 2e-5f;  // 角速度^2（少し大きめにしてスナップを早める）
-
-	for (int i = 0; i < MAX_DICE; ++i)
-	{
-		if (body[i] == nullptr) continue;
-
-		RigidBodyOBB& b = *body[i];
-
-		const float v2 = b.velocity.x * b.velocity.x + b.velocity.y * b.velocity.y + b.velocity.z * b.velocity.z;
-		const float w2 = b.angularVel.x * b.angularVel.x + b.angularVel.y * b.angularVel.y + b.angularVel.z * b.angularVel.z;
-
-		if (grounded[i] && v2 < v2Sleep && w2 < w2Sleep)
-		{
-			SnapOrientationToFace(b);
-
-			// 微振動で面が決まらないのを止める
-			b.angularVel = Vec3(0.0f, 0.0f, 0.0f);
-			b.velocity = Vec3(0.0f, 0.0f, 0.0f);
-		}
-	}
-
-	// 5) Transfer（代表だけ）
+	// 4) Transfer（必要なら。今まで通り 0 と 1 を入れる）
 	TRAN_INS;
+
 	if (body[0])
 	{
-		tran.dice.pos = { body[0]->center.x, body[0]->center.y, body[0]->center.z };
-		tran.dice.velocity = { body[0]->velocity.x, body[0]->velocity.y, body[0]->velocity.z };
-
-		if (IsKeyPress('R'))
-			body[0]->angularVel.z += 3.14f;
+		tran.obj.A = { body[0]->center.x, body[0]->center.y, body[0]->center.z };
+		tran.obj.Avel = { body[0]->velocity.x, body[0]->velocity.y, body[0]->velocity.z };
+		tran.obj.AangVel = { body[0]->angularVel.x, body[0]->angularVel.y, body[0]->angularVel.z };
+	}
+	if (body[1])
+	{
+		tran.obj.B = { body[1]->center.x, body[1]->center.y, body[1]->center.z };
+		tran.obj.Bvel = { body[1]->velocity.x, body[1]->velocity.y, body[1]->velocity.z };
+		tran.obj.BangVel = { body[1]->angularVel.x, body[1]->angularVel.y, body[1]->angularVel.z };
 	}
 
+	// テスト操作（そのまま維持）
+	if (body[0])
+	{
+		if (IsKeyTrigger('Y'))
+		{
+			body[0] = new RigidBodyOBB({ 0.0f,5.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+			body[2] = new RigidBodyOBB({ 0.0f,7.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+			body[3] = new RigidBodyOBB({ 0.0f,10.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+			body[4] = new RigidBodyOBB({ 0.0f,3.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+			body[5] = new RigidBodyOBB({ 0.0f,1.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+			body[6] = new RigidBodyOBB({ 0.0f,12.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+			body[7] = new RigidBodyOBB({ 0.0f,15.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+			body[8] = new RigidBodyOBB({ 0.0f,17.0f,0.0f }, { 1.0f,1.0f,1.0f }, 10.0f);
+		}
+		if (IsKeyTrigger('R')) body[0]->angularVel.z += 3.14f;
+	}
 }
+
 
 
 // 更新処理 
@@ -506,7 +638,12 @@ void Dice::Update(float dt)
 	tran.obj.Bvel = { body[1]->velocity.x,body[1]->velocity.y,body[1]->velocity.z };
 	tran.obj.AangVel = { body[0]->angularVel.x,body[0]->angularVel.y,body[0]->angularVel.z };
 	tran.obj.BangVel = { body[1]->angularVel.x,body[1]->angularVel.y,body[1]->angularVel.z };
-	if (IsKeyTrigger('Y'))body[0]->center = { 0.0,5.0f,0.0f };
+	if (IsKeyTrigger('Y'))
+	{
+		body[0]->center = { 0.0,5.0f,0.0f };
+		body[2]->center = { 0.0,7.0f,0.0f };
+		body[3]->center = { 0.0,10.0f,0.0f };
+	}
 
 	if (IsKeyTrigger('R'))
 	{
@@ -528,9 +665,13 @@ void Dice::Draw()
 		if (body[i] != nullptr)
 		{
 			color = { 1.0f,1.0f,1.0f,1.0f };
-			color.x = 1.0f - (((i + 1) % 2) == 0);
-			color.y = 1.0f - (((i + 1) % 4) == 0);
-			color.z = 1.0f - (((i + 1) % 8) == 0);
+			color.x = 1.0f - (((i + 1) & 0b10) != 0);
+			color.y = 1.0f - (((i + 1) & 0b100) == 0);
+			color.z = 1.0f - (((i + 1) & 0b1000) == 0);
+			if (color.x == 0.0f && color.y == 0.0f && color.z == 0.0f)
+			{
+				color = { 1.0f,1.0f,1.0f,1.0f };
+			}
 			DirectX::XMFLOAT3 vtxA[8];
 			body[i]->GetWorldVertices(vtxA);
 			Geometory::AddLine(vtxA[0], vtxA[1], color); // 
