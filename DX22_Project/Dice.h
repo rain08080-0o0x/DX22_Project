@@ -6,6 +6,9 @@
 #include "Model.h"
 #include "Defines.h"
 
+// 最大サイコロ数
+const int MAX_DICE = 8;
+
 class Dice
 {
 public:
@@ -18,8 +21,8 @@ public:
     void SetCamera(Camera* pCamera);
 
     // 物理への参照が必要なら
-    RigidBodyOBB& Body() { return body; }
-    const RigidBodyOBB& Body() const { return body; }
+//  RigidBodyOBB Body() { return body; }
+//  const RigidBodyOBB& Body() const { return body; }
 
     void TestUpdate();
     void TestDraw();
@@ -33,7 +36,7 @@ private:
 
     DirectX::XMFLOAT3 vertex[8];
     // 物理本体
-    RigidBodyOBB body;
+    RigidBodyOBB *body[MAX_DICE];
 
     // 表示用（必要なら）色などだけ Dice が持つ
     DirectX::XMFLOAT4 color = { 1,1,1,1 };

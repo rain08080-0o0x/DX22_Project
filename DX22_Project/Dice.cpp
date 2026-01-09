@@ -21,7 +21,6 @@ const float wall = 5.0f;
 
 Dice::Dice()
 	: m_pCamera(nullptr)
-	, body(Vec3::Vector3Zero(),Vec3::Vector3Zero(),0.0f)
 {
 	float size = sqrtf(2);
 	m_pos = { 0.0f,0.0f,0.0f };
@@ -29,7 +28,15 @@ Dice::Dice()
 	m_mass = 1.0f;
 	Vec3 pos = { m_pos.x,m_pos.y,m_pos.z };
 	Vec3 sizeV = {m_size.x,m_size.y,m_size.z};
-	body = RigidBodyOBB(pos, sizeV, m_mass);
+
+	for (int i = 0; i < MAX_DICE; i++)
+	{
+		body[i] = nullptr;
+	}
+
+	body[0] = new RigidBodyOBB({0.0f,5.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {10.0f,1.0f,10.0f}, 0.0f);
+
 	// 頂点決め
 	float sizehalf = HALF(0.5f);
 	vertex[0] = {m_pos.x - size ,m_pos.y - size,m_pos.z - size};// 左下後ろ
@@ -58,16 +65,103 @@ Dice::~Dice()
 	}
 }
 
+
 // 更新処理 
 void Dice::Update(float dt)
 {
-	body.Update(dt);
+	{
+		// 2. 衝突判定 (SAT等で別途実装が必要。ここでは結果が得られたと仮定)
+		// 例えば、boxAの頂点を計算し、boxBに含まれるかチェックするなど
+		Vec3 vertsA[8];
+		body[0]->GetWorldVertices(vertsA);
 
-	// Transferへの反映が欲しいなら、ここで“参照だけ”して書く（計算しない）
+		// boxA の頂点から、boxB の上面（簡易）への接触点を作って解決する
+		{
+			const float planeY = body[1]->center.y + body[1]->extents.y;
+
+			// Aの最下点を取る（面接地なら4頂点がここに集まる）
+			float minY = vertsA[0].y;
+			for (int i = 1; i < 8; ++i)
+			{
+				if (vertsA[i].y < minY) minY = vertsA[i].y;
+			}
+
+			// 多少の誤差許容
+			const float contactEps = 0.001f;
+			// 「最下層付近」とみなす高さ幅（ここを広げすぎると傾きやすくなる）
+			const float minLayer = 0.01f;
+
+			// B上面の矩形範囲（Bを軸平行の床として扱う簡易）
+			const float minX = body[1]->center.x - body[1]->extents.x;
+			const float maxX = body[1]->center.x + body[1]->extents.x;
+			const float minZ = body[1]->center.z - body[1]->extents.z;
+			const float maxZ = body[1]->center.z + body[1]->extents.z;
+
+			// 反復（2回だけ）
+			for (int iter = 0; iter < 2; ++iter)
+			{
+				for (int i = 0; i < 8; ++i)
+				{
+					// B上面の真上にある頂点だけ採用（外なら無視）
+					if (vertsA[i].x < minX || vertsA[i].x > maxX) continue;
+					if (vertsA[i].z < minZ || vertsA[i].z > maxZ) continue;
+
+					// 最下層付近の頂点だけ接触点にする（面なら複数点になる）
+					if (vertsA[i].y > (minY + minLayer)) continue;
+
+					// めり込み（または接触）しているか
+					const float depth = planeY - vertsA[i].y;
+					if (depth <= -contactEps) continue;
+
+					CollisionResolver::Manifold m;
+					m.bodyA = body[1];                 // 支持側（床）
+					m.bodyB = body[0];                 // 乗る側
+					m.normal = Vec3(0, 1, 0);    // 上向き法線（簡易）
+					m.depth = depth;
+
+					m.contactPoint = vertsA[i];
+					m.contactPoint.y = planeY;   // 接触点を面上へ
+
+					CollisionResolver::ResolveCollision(m);
+				}
+			}
+		}
+	}
+
+	// 3. 物理更新
+	for(int i = 0;i < MAX_DICE;i++)
+	{
+		if (body[i] == nullptr)continue;
+
+		body[i]->Update(1.0f / 60.0f);
+	}
 	TRAN_INS;
-	tran.dice.pos = { body.center.x,body.center.y,body.center.z };
-	tran.dice.velocity = { body.velocity.x,body.velocity.y,body.velocity.z };
+	DirectX::XMFLOAT3
+		pos =
+	{
+		body[0]->center.x,
+		body[0]->center.y,
+		body[0]->center.z
+	};
 
+	tran.obj.A = pos;
+	pos =
+	{
+		body[1]->center.x,
+		body[1]->center.y,
+		body[1]->center.z
+	};
+	tran.obj.B = pos;
+	tran.obj.Avel = { body[0]->velocity.x,body[0]->velocity.y,body[0]->velocity.z };
+	tran.obj.Bvel = { body[1]->velocity.x,body[1]->velocity.y,body[1]->velocity.z };
+	tran.obj.AangVel = { body[0]->angularVel.x,body[0]->angularVel.y,body[0]->angularVel.z };
+	tran.obj.BangVel = { body[1]->angularVel.x,body[1]->angularVel.y,body[1]->angularVel.z };
+	if (IsKeyTrigger('Y'))body[0]->center = { 0.0,5.0f,0.0f };
+
+	if (IsKeyTrigger('R'))
+	{
+		body[0]->angularVel.z += 3.14f;
+	}
 	// axis→クォータニオンに変換して tran.dice.rot に入れたいなら別途（後述）
 }
 
@@ -77,25 +171,32 @@ void Dice::Draw()
 {
 	using namespace DirectX;
 
-	// axisはワールド基底ベクトル（列ベクトルとして使う）
-	XMMATRIX R = XMMATRIX(
-		body.axis[0].x, body.axis[0].y, body.axis[0].z, 0.0f,
-		body.axis[1].x, body.axis[1].y, body.axis[1].z, 0.0f,
-		body.axis[2].x, body.axis[2].y, body.axis[2].z, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	);
 
-	XMMATRIX T = XMMatrixTranslation(body.center.x, body.center.y, body.center.z);
-
-	// extentsは半サイズなので *2 で全サイズ
-	XMMATRIX S = XMMatrixScaling(body.extents.x * 2.0f, body.extents.y * 2.0f, body.extents.z * 2.0f);
-
-	XMMATRIX W = S * R * T;
-
-	XMFLOAT4X4 xWorld;
-	XMStoreFloat4x4(&xWorld, XMMatrixTranspose(W));
-	Geometory::SetWorld(xWorld);
-	Geometory::DrawBox();
+	DirectX::XMFLOAT4 color = { 1.0f,1.0f,1.0f,1.0f };
+	for(int i = 0;i < MAX_DICE;i++)
+	{
+		if (body[i] != nullptr)
+		{
+			color = { 1.0f,1.0f,1.0f,1.0f };
+			color.x = 1.0f - (((i + 1) % 2) == 0);
+			color.y = 1.0f - (((i + 1) % 4) == 0);
+			color.z = 1.0f - (((i + 1) % 8) == 0);
+			DirectX::XMFLOAT3 vtxA[8];
+			body[i]->GetWorldVertices(vtxA);
+			Geometory::AddLine(vtxA[0], vtxA[1], color); // 
+			Geometory::AddLine(vtxA[1], vtxA[3], color); // 
+			Geometory::AddLine(vtxA[3], vtxA[2], color); // 
+			Geometory::AddLine(vtxA[2], vtxA[0], color); // 
+			Geometory::AddLine(vtxA[0 + 4], vtxA[1 + 4], color); // 
+			Geometory::AddLine(vtxA[1 + 4], vtxA[3 + 4], color); // 
+			Geometory::AddLine(vtxA[3 + 4], vtxA[2 + 4], color); // 
+			Geometory::AddLine(vtxA[2 + 4], vtxA[0 + 4], color); // 
+			Geometory::AddLine(vtxA[0], vtxA[4], color); // 
+			Geometory::AddLine(vtxA[1], vtxA[5], color); // 
+			Geometory::AddLine(vtxA[2], vtxA[6], color); // 
+			Geometory::AddLine(vtxA[3], vtxA[7], color); // 
+		}
+	}
 }
 
 
@@ -252,38 +353,5 @@ static void ClampVec3(DirectX::XMFLOAT3& v, float maxLen)
 		float s = maxLen / l;
 		v.x *= s; v.y *= s; v.z *= s;
 	}
-}
-void Dice::RollStable(float strength)
-{
-	body.WakeUp();
-
-	// 接地中の安全対策（これは物理に入れても良いが、命令側でも最小ならOK）
-	if (body.isGround)
-	{
-		body.center.y += 0.01f;
-		if (body.velocity.y < 0.2f) body.velocity.y = 0.2f;
-	}
-
-	// 方向の決定（これは最小の計算。乱数を使う以上避けられない）
-	float rx = ((float)rand() / 0x7fff) * 2.0f - 1.0f;
-	float rz = ((float)rand() / 0x7fff) * 2.0f - 1.0f;
-	float rl = sqrtf(rx * rx + rz * rz);
-	if (rl < 1e-4f) { rx = 1.0f; rz = 0.0f; rl = 1.0f; }
-	rx /= rl; rz /= rl;
-
-	// “加算するだけ”
-	float vKick = (2.0f + ((float)rand() / 0x7fff) * 2.0f) * strength;
-	body.velocity.x += rx * vKick;
-	body.velocity.z += rz * vKick;
-	body.velocity.y += 0.3f * strength;
-
-	float wKick = (8.0f + ((float)rand() / 0x7fff) * 8.0f) * strength;
-	body.angularVel.x += (-rz) * wKick;
-	body.angularVel.z += (rx)*wKick;
-	body.angularVel.y += (((float)rand() / 0x7fff) * 2.0f - 1.0f) * (1.0f * strength);
-
-	// 暴走防止は body 側に関数を用意して呼ぶのが綺麗
-	body.ClampLinear(8.0f);
-	body.ClampAngular(25.0f);
 }
 

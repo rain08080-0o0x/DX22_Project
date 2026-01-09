@@ -27,8 +27,6 @@ private:
 
 	Dice* m_pDice;
 
-	RigidBodyOBB *A;
-	RigidBodyOBB *B;
 
 	bool OnlyDice;
 };
