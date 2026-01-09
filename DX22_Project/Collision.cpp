@@ -273,6 +273,45 @@ void RigidBodyOBB::Update(float dt)
     }
 }
 
+void RigidBodyOBB::IntegrateRotation(float dt)
+{
+    if (isStatic) return;
+    if (invMass <= 0.0f) return;
+    if (isSleeping) return;
+
+    if (dt <= 0.0f) return;
+    if (dt > 0.1f) dt = 0.1f;
+
+    float wLen2 = angularVel.x * angularVel.x + angularVel.y * angularVel.y + angularVel.z * angularVel.z;
+    if (wLen2 <= 1e-12f)
+        return;
+
+    float wLen = sqrtf(wLen2);
+    Vec3 rotAxis = angularVel * (1.0f / wLen);
+    float angle = wLen * dt;
+
+    DirectX::XMMATRIX R = DirectX::XMMatrixRotationAxis(
+        DirectX::XMVectorSet(rotAxis.x, rotAxis.y, rotAxis.z, 0.0f),
+        angle
+    );
+
+    auto RotateVec = [&](const Vec3& v) -> Vec3
+        {
+            DirectX::XMVECTOR vv = DirectX::XMVectorSet(v.x, v.y, v.z, 0.0f);
+            vv = DirectX::XMVector3TransformNormal(vv, R);
+            DirectX::XMFLOAT3 tmp;
+            DirectX::XMStoreFloat3(&tmp, vv);
+            return Vec3(tmp.x, tmp.y, tmp.z);
+        };
+
+    axis[0] = RotateVec(axis[0]);
+    axis[1] = RotateVec(axis[1]);
+    axis[2] = RotateVec(axis[2]);
+
+    axis[0].Normalize();
+    axis[1] = (axis[1] - axis[0] * axis[0].Dot(axis[1])).Normalize();
+    axis[2] = axis[0].Cross(axis[1]);
+}
 
 
 

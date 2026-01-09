@@ -172,6 +172,8 @@ public:
     void AddAngularVelocity(const Vec3& dw);
     void ClampLinear(float vMax);
     void ClampAngular(float wMax);
+    void IntegrateRotation(float dt);
+
     // ===== Sleep / Gravity (追加ブロック) =====
     
     // 外力（力の蓄積）

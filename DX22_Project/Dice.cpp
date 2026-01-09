@@ -1,4 +1,4 @@
-#include "Dice.h"
+ï»¿#include "Dice.h"
 #include "Geometory.h"
 #include "Transfer.h"
 #include "Input.h"
@@ -8,16 +8,299 @@
 #include "Shader.h"
 #include "Defines.h"
 #include<math.h>
+#include <cfloat>   // FLT_MAX
+#include <cmath>    // fabsf
 using namespace DirectX;
 
-// –€C
+// Vec3å‹ã«å¯¾ã—ã¦å˜é …ãƒã‚¤ãƒŠã‚¹æ¼”ç®—å­ã‚’å®šç¾©ã™ã‚‹
+// Vec3.h ãªã©Vec3æ§‹é€ ä½“ã®å®šç¾©ãƒ•ã‚¡ã‚¤ãƒ«ã«ä»¥ä¸‹ã‚’è¿½åŠ ã—ã¦ãã ã•ã„
+
+inline Vec3 operator-(const Vec3& v)
+{
+	return Vec3(-v.x, -v.y, -v.z);
+}
+
+
+// æ‘©æ“¦
 const float friction = 0.97f;
-// —‰º‰Á‘¬“x
+// è½ä¸‹åŠ é€Ÿåº¦
 const float fall = 0.02f;
-// ~‚Ü‚é‰Á‘¬“x
+// æ­¢ã¾ã‚‹åŠ é€Ÿåº¦
 const float under = 0.01f;
-// •Ç
+// å£
 const float wall = 5.0f;
+
+static float ProjectRadiusOnAxis(const RigidBodyOBB & b, const Vec3 & nUnit)
+{
+	// r = Î£ extents[i] * |n Â· axis[i]|
+	return
+		b.extents.x * fabsf(nUnit.Dot(b.axis[0])) +
+		b.extents.y * fabsf(nUnit.Dot(b.axis[1])) +
+		b.extents.z * fabsf(nUnit.Dot(b.axis[2]));
+}
+
+static bool TryAxisSAT(
+	const RigidBodyOBB& A,
+	const RigidBodyOBB& B,
+	const Vec3& axisRaw,
+	const Vec3& centerDelta,
+	float& bestOverlap,
+	Vec3& bestNormal)
+{
+	const float eps = 1e-8f;
+	if (axisRaw.LengthSq() < eps)
+		return true; // crossè»¸ãŒæ½°ã‚Œã‚‹ã‚±ãƒ¼ã‚¹ã¯ç„¡è¦–
+
+	Vec3 axis = axisRaw.Normalize();
+
+	const float dist = fabsf(centerDelta.Dot(axis));
+	const float rA = ProjectRadiusOnAxis(A, axis);
+	const float rB = ProjectRadiusOnAxis(B, axis);
+
+	const float overlap = (rA + rB) - dist;
+	if (overlap < 0.0f)
+		return false; // åˆ†é›¢
+
+	if (overlap < bestOverlap)
+	{
+		bestOverlap = overlap;
+
+		// æ³•ç·šã‚’ A -> B æ–¹å‘ã«æƒãˆã‚‹
+		const float s = (centerDelta.Dot(axis) < 0.0f) ? -1.0f : 1.0f;
+		bestNormal = axis * s;
+	}
+	return true;
+}
+
+ //SATã§è¡çªã—ã¦ãŸã‚‰ Manifold ã‚’ä½œã‚‹ï¼ˆcontactPoint ã¯ç°¡æ˜“ï¼‰
+static bool BuildManifoldSAT(RigidBodyOBB& A, RigidBodyOBB& B, CollisionResolver::Manifold& outM)
+{
+	Vec3 d = B.center - A.center;
+
+	float bestOverlap = FLT_MAX;
+	Vec3  bestNormal(0.0f, 1.0f, 0.0f);
+
+	// 15è»¸ï¼šAã®3è»¸ + Bã®3è»¸ + cross 9è»¸
+	Vec3 axes[15];
+	int k = 0;
+	axes[k++] = A.axis[0];
+	axes[k++] = A.axis[1];
+	axes[k++] = A.axis[2];
+	axes[k++] = B.axis[0];
+	axes[k++] = B.axis[1];
+	axes[k++] = B.axis[2];
+
+	for (int i = 0; i < 3; ++i)
+		for (int j = 0; j < 3; ++j)
+			axes[k++] = A.axis[i].Cross(B.axis[j]);
+
+	for (int i = 0; i < 15; ++i)
+	{
+		if (!TryAxisSAT(A, B, axes[i], d, bestOverlap, bestNormal))
+			return false;
+	}
+
+	// contactPointï¼ˆç°¡æ˜“ï¼‰ï¼šæ”¯æŒç‚¹ã®ä¸­ç‚¹
+	const float rA = ProjectRadiusOnAxis(A, bestNormal);
+	const float rB = ProjectRadiusOnAxis(B, bestNormal);
+
+	const Vec3 pA = A.center + bestNormal * rA;
+	const Vec3 pB = B.center - bestNormal * rB;
+
+	outM.bodyA = &A;
+	outM.bodyB = &B;
+	outM.normal = bestNormal;
+	outM.depth = bestOverlap;
+	outM.contactPoint = (pA + pB) * 0.5f;
+	return true;
+}
+
+// ã“ã“ãŒæ±ç”¨ï¼šé…åˆ—ã®ä¸­ã®å…¨Rigidbodyã‚’ç·å½“ãŸã‚Šã§åˆ¤å®šã—ã¦è§£æ±ºã™ã‚‹
+static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solverIters, bool grounded[])
+{
+	// åˆæœŸåŒ–
+	for (int i = 0; i < maxCount; ++i)
+		grounded[i] = false;
+
+	for (int iter = 0; iter < solverIters; ++iter)
+	{
+		for (int i = 0; i < maxCount; ++i)
+		{
+			if (bodies[i] == nullptr) continue;
+
+			for (int j = i + 1; j < maxCount; ++j)
+			{
+				if (bodies[j] == nullptr) continue;
+
+				RigidBodyOBB& A = *bodies[i];
+				RigidBodyOBB& B = *bodies[j];
+
+				if (A.invMass == 0.0f && B.invMass == 0.0f)
+					continue;
+
+				CollisionResolver::Manifold m;
+				if (BuildManifoldSAT(A, B, m))
+				{
+					// æ¥åœ°ã£ã½ã„æ¥è§¦ï¼ˆã»ã¼ä¸Šä¸‹æ–¹å‘ã®æ³•ç·šï¼‰ã‚’æ‹¾ã†
+					// normal.y ã®ç¬¦å·ã¯çµ„ã¿åˆã‚ã›ã§å¤‰ã‚ã‚‹ã®ã§çµ¶å¯¾å€¤ã§è¦‹ã‚‹
+					if (fabsf(m.normal.y) > 0.7f)
+					{
+						grounded[i] = true;
+						grounded[j] = true;
+					}
+
+					CollisionResolver::ResolveCollision(m);
+				}
+			}
+		}
+	}
+}
+
+static float LenSq3(const Vec3& v)
+{
+	return v.x * v.x + v.y * v.y + v.z * v.z;
+}
+
+static Vec3 NormalizeSafe(const Vec3& v, const Vec3& fallback)
+{
+	float l2 = LenSq3(v);
+	if (l2 < 1e-12f) return fallback;
+	float inv = 1.0f / sqrtf(l2);
+	return v * inv;
+}
+
+static void SnapOrientationToFace(RigidBodyOBB& b)
+{
+	const Vec3 worldUp(0.0f, 1.0f, 0.0f);
+
+	// 6é¢ã®æ³•ç·šå€™è£œï¼ˆç¬¦å·åè»¢ã¯ * -1.0f ã§ï¼‰
+	Vec3 normals[6] =
+	{
+		b.axis[0],
+		b.axis[0] * -1.0f,
+		b.axis[1],
+		b.axis[1] * -1.0f,
+		b.axis[2],
+		b.axis[2] * -1.0f,
+	};
+
+	// ä¸€ç•ªä¸Šã‚’å‘ã„ã¦ã‚‹é¢ã‚’é¸ã¶
+	int best = 0;
+	float bestDot = -FLT_MAX;
+	for (int i = 0; i < 6; ++i)
+	{
+		float d = normals[i].Dot(worldUp);
+		if (d > bestDot)
+		{
+			bestDot = d;
+			best = i;
+		}
+	}
+
+	// ä¸Šæ–¹å‘
+	Vec3 up = NormalizeSafe(normals[best], worldUp);
+
+	// forward = axis[2] ã‚’æ¥åœ°å¹³é¢ã«æŠ•å½±
+	Vec3 forward = b.axis[2] + (up * (-up.Dot(b.axis[2])));
+	forward = NormalizeSafe(forward, Vec3(0.0f, 0.0f, 1.0f));
+
+	// right = forward x up
+	Vec3 right = forward.Cross(up);
+	right = NormalizeSafe(right, Vec3(1.0f, 0.0f, 0.0f));
+
+	// forward ã‚’å†è¨ˆç®—ï¼ˆç›´äº¤ä¿è¨¼ï¼‰
+	forward = up.Cross(right);
+	forward = NormalizeSafe(forward, Vec3(0.0f, 0.0f, 1.0f));
+
+	b.axis[0] = right;
+	b.axis[1] = up;
+	b.axis[2] = forward;
+}
+
+
+//static float ProjectRadiusOnAxis(const RigidBodyOBB& b, const Vec3& nUnit)
+//{
+//	return
+//		b.extents.x * fabsf(nUnit.Dot(b.axis[0])) +
+//		b.extents.y * fabsf(nUnit.Dot(b.axis[1])) +
+//		b.extents.z * fabsf(nUnit.Dot(b.axis[2]));
+//}
+
+//static bool TryAxisSAT(
+//	const RigidBodyOBB& A,
+//	const RigidBodyOBB& B,
+//	const Vec3& axisRaw,
+//	const Vec3& centerDelta,
+//	float& bestOverlap,
+//	Vec3& bestNormal)
+//{
+//	const float eps = 1e-8f;
+//	if (axisRaw.LengthSq() < eps)
+//		return true; // crossè»¸ãŒæ½°ã‚Œã‚‹å ´åˆã¯ç„¡è¦–
+//
+//	Vec3 axis = axisRaw.Normalize();
+//
+//	const float dist = fabsf(centerDelta.Dot(axis));
+//	const float rA = ProjectRadiusOnAxis(A, axis);
+//	const float rB = ProjectRadiusOnAxis(B, axis);
+//
+//	const float overlap = (rA + rB) - dist;
+//	if (overlap < 0.0f)
+//		return false; // åˆ†é›¢ã—ã¦ã‚‹
+//
+//	if (overlap < bestOverlap)
+//	{
+//		bestOverlap = overlap;
+//
+//		// æ³•ç·šã®å‘ãã‚’ A->B ã«æƒãˆã‚‹
+//		const float s = (centerDelta.Dot(axis) < 0.0f) ? -1.0f : 1.0f;
+//		bestNormal = axis * s;
+//	}
+//	return true;
+//}
+
+// SATã§è¡çªã—ã¦ãŸã‚‰ Manifold ã‚’ä½œã‚‹ï¼ˆcontactPointã¯ç°¡æ˜“ï¼šæ”¯æŒç‚¹ã®ä¸­ç‚¹ï¼‰
+//static bool BuildManifoldSAT(RigidBodyOBB& A, RigidBodyOBB& B, CollisionResolver::Manifold& outM)
+//{
+//	Vec3 d = B.center - A.center;
+//
+//	float bestOverlap = FLT_MAX;
+//	Vec3 bestNormal(0.0f, 1.0f, 0.0f);
+//
+//	// 15è»¸ï¼šAã®3è»¸ + Bã®3è»¸ + cross 9è»¸
+//	Vec3 axes[15];
+//	int k = 0;
+//	axes[k++] = A.axis[0];
+//	axes[k++] = A.axis[1];
+//	axes[k++] = A.axis[2];
+//	axes[k++] = B.axis[0];
+//	axes[k++] = B.axis[1];
+//	axes[k++] = B.axis[2];
+//
+//	for (int i = 0; i < 3; ++i)
+//		for (int j = 0; j < 3; ++j)
+//			axes[k++] = A.axis[i].Cross(B.axis[j]);
+//
+//	for (int i = 0; i < 15; ++i)
+//	{
+//		if (!TryAxisSAT(A, B, axes[i], d, bestOverlap, bestNormal))
+//			return false;
+//	}
+//
+//	// contactPointï¼ˆç°¡æ˜“ï¼‰
+//	const float rA = ProjectRadiusOnAxis(A, bestNormal);
+//	const float rB = ProjectRadiusOnAxis(B, bestNormal);
+//
+//	const Vec3 pA = A.center + bestNormal * rA;
+//	const Vec3 pB = B.center - bestNormal * rB;
+//
+//	outM.bodyA = &A;
+//	outM.bodyB = &B;
+//	outM.normal = bestNormal;
+//	outM.depth = bestOverlap;
+//	outM.contactPoint = (pA + pB) * 0.5f;
+//	return true;
+//}
 
 Dice::Dice()
 	: m_pCamera(nullptr)
@@ -34,24 +317,32 @@ Dice::Dice()
 		body[i] = nullptr;
 	}
 
+	for (int i = 0; i < kMaxBodies; i++)
+	{
+		m_bodies[i] = nullptr;
+	}
+
 	body[0] = new RigidBodyOBB({0.0f,5.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
 	body[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {10.0f,1.0f,10.0f}, 0.0f);
 
-	// ’¸“_Œˆ‚ß
+	m_bodies[0] = new RigidBodyOBB({0.0f,5.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	m_bodies[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {10.0f,1.0f,10.0f}, 0.0f);
+
+	// é ‚ç‚¹æ±ºã‚
 	float sizehalf = HALF(0.5f);
-	vertex[0] = {m_pos.x - size ,m_pos.y - size,m_pos.z - size};// ¶‰ºŒã‚ë
-	vertex[1] = {m_pos.x - size ,m_pos.y - size,m_pos.z + size};// ¶‰ºè‘O
-	vertex[2] = {m_pos.x - size ,m_pos.y + size,m_pos.z - size};// ¶ãŒã‚ë
-	vertex[3] = {m_pos.x - size ,m_pos.y + size,m_pos.z + size};// ¶ãè‘O
-	vertex[4] = {m_pos.x + size ,m_pos.y - size,m_pos.z - size};// ‰E‰ºŒã‚ë
-	vertex[5] = {m_pos.x + size ,m_pos.y - size,m_pos.z + size};// ‰E‰ºè‘O
-	vertex[6] = {m_pos.x + size ,m_pos.y + size,m_pos.z - size};// ‰EãŒã‚ë
-	vertex[7] = {m_pos.x + size ,m_pos.y + size,m_pos.z + size};// ‰Eãè‘O
+	vertex[0] = {m_pos.x - size ,m_pos.y - size,m_pos.z - size};// å·¦ä¸‹å¾Œã‚
+	vertex[1] = {m_pos.x - size ,m_pos.y - size,m_pos.z + size};// å·¦ä¸‹æ‰‹å‰
+	vertex[2] = {m_pos.x - size ,m_pos.y + size,m_pos.z - size};// å·¦ä¸Šå¾Œã‚
+	vertex[3] = {m_pos.x - size ,m_pos.y + size,m_pos.z + size};// å·¦ä¸Šæ‰‹å‰
+	vertex[4] = {m_pos.x + size ,m_pos.y - size,m_pos.z - size};// å³ä¸‹å¾Œã‚
+	vertex[5] = {m_pos.x + size ,m_pos.y - size,m_pos.z + size};// å³ä¸‹æ‰‹å‰
+	vertex[6] = {m_pos.x + size ,m_pos.y + size,m_pos.z - size};// å³ä¸Šå¾Œã‚
+	vertex[7] = {m_pos.x + size ,m_pos.y + size,m_pos.z + size};// å³ä¸Šæ‰‹å‰
 
 	m_pModel = new Model();
 
-	if (!m_pModel->Load("Assets/Model/Dice/dice.fbx", 1.f, Model::ZFlip)) { // ”{—¦‚Æ”½“]‚ÍÈ—ª‰Â
-		MessageBox(NULL, "Not found for dice", "Error", MB_OK); // ƒGƒ‰[ƒƒbƒZ[ƒW‚Ì•\¦
+	if (!m_pModel->Load("Assets/Model/Dice/dice.fbx", 1.f, Model::ZFlip)) { // å€ç‡ã¨åè»¢ã¯çœç•¥å¯
+		MessageBox(NULL, "Not found for dice", "Error", MB_OK); // ã‚¨ãƒ©ãƒ¼ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã®è¡¨ç¤º
 	}
 
 }
@@ -64,63 +355,122 @@ Dice::~Dice()
 		m_pModel = nullptr;
 	}
 }
+void Dice::Update(int)
+{
+	const float dt = 1.0f / fFPS;
+
+	// 1) ç‰©ç†æ›´æ–°ï¼ˆç©åˆ†ï¼‰
+	for (int i = 0; i < MAX_DICE; ++i)
+	{
+		if (body[i] == nullptr) continue;
+		body[i]->Update(dt);
+	}
+
+	// 2) ç·å½“ãŸã‚Šè¡çªï¼ˆåå¾©ï¼‰ + grounded åˆ¤å®š
+	bool grounded[MAX_DICE];
+	const int solverIters = 4;
+	ResolveAllPairs_SAT(body, MAX_DICE, solverIters, grounded);
+
+	// 3) è¡çªã§å¤‰ã‚ã£ãŸ angularVel ã‚’åŒãƒ•ãƒ¬ãƒ¼ãƒ ã§å›è»¢ã«åæ˜ 
+	for (int i = 0; i < MAX_DICE; ++i)
+	{
+		if (body[i] == nullptr) continue;
+		body[i]->IntegrateRotation(dt);
+	}
+
+	// 4) é¢ã§ç«‹ãŸã›ã‚‹ï¼šæ­¢ã¾ã‚Šãã†ï¼†æ¥åœ°ã—ã¦ã„ã‚‹å€‹ä½“ã ã‘ã‚¹ãƒŠãƒƒãƒ—
+	// ã—ãã„å€¤ã¯èª¿æ•´å‰æï¼ˆã¾ãšã¯ã“ã‚Œã§åŠ¹ãï¼‰
+	const float v2Sleep = 1e-6f;  // ä¸¦é€²é€Ÿåº¦^2
+	const float w2Sleep = 2e-5f;  // è§’é€Ÿåº¦^2ï¼ˆå°‘ã—å¤§ãã‚ã«ã—ã¦ã‚¹ãƒŠãƒƒãƒ—ã‚’æ—©ã‚ã‚‹ï¼‰
+
+	for (int i = 0; i < MAX_DICE; ++i)
+	{
+		if (body[i] == nullptr) continue;
+
+		RigidBodyOBB& b = *body[i];
+
+		const float v2 = b.velocity.x * b.velocity.x + b.velocity.y * b.velocity.y + b.velocity.z * b.velocity.z;
+		const float w2 = b.angularVel.x * b.angularVel.x + b.angularVel.y * b.angularVel.y + b.angularVel.z * b.angularVel.z;
+
+		if (grounded[i] && v2 < v2Sleep && w2 < w2Sleep)
+		{
+			SnapOrientationToFace(b);
+
+			// å¾®æŒ¯å‹•ã§é¢ãŒæ±ºã¾ã‚‰ãªã„ã®ã‚’æ­¢ã‚ã‚‹
+			b.angularVel = Vec3(0.0f, 0.0f, 0.0f);
+			b.velocity = Vec3(0.0f, 0.0f, 0.0f);
+		}
+	}
+
+	// 5) Transferï¼ˆä»£è¡¨ã ã‘ï¼‰
+	TRAN_INS;
+	if (body[0])
+	{
+		tran.dice.pos = { body[0]->center.x, body[0]->center.y, body[0]->center.z };
+		tran.dice.velocity = { body[0]->velocity.x, body[0]->velocity.y, body[0]->velocity.z };
+
+		if (IsKeyPress('R'))
+			body[0]->angularVel.z += 3.14f;
+	}
+
+}
 
 
-// XVˆ— 
+// æ›´æ–°å‡¦ç† 
 void Dice::Update(float dt)
 {
 	{
-		// 2. Õ“Ë”»’è (SAT“™‚Å•Ê“rÀ‘•‚ª•K—vB‚±‚±‚Å‚ÍŒ‹‰Ê‚ª“¾‚ç‚ê‚½‚Æ‰¼’è)
-		// —á‚¦‚ÎAboxA‚Ì’¸“_‚ğŒvZ‚µAboxB‚ÉŠÜ‚Ü‚ê‚é‚©ƒ`ƒFƒbƒN‚·‚é‚È‚Ç
+		// 2. è¡çªåˆ¤å®š (SATç­‰ã§åˆ¥é€”å®Ÿè£…ãŒå¿…è¦ã€‚ã“ã“ã§ã¯çµæœãŒå¾—ã‚‰ã‚ŒãŸã¨ä»®å®š)
+		// ä¾‹ãˆã°ã€boxAã®é ‚ç‚¹ã‚’è¨ˆç®—ã—ã€boxBã«å«ã¾ã‚Œã‚‹ã‹ãƒã‚§ãƒƒã‚¯ã™ã‚‹ãªã©
 		Vec3 vertsA[8];
 		body[0]->GetWorldVertices(vertsA);
 
-		// boxA ‚Ì’¸“_‚©‚çAboxB ‚Ìã–ÊiŠÈˆÕj‚Ö‚ÌÚG“_‚ğì‚Á‚Ä‰ğŒˆ‚·‚é
+		// boxA ã®é ‚ç‚¹ã‹ã‚‰ã€boxB ã®ä¸Šé¢ï¼ˆç°¡æ˜“ï¼‰ã¸ã®æ¥è§¦ç‚¹ã‚’ä½œã£ã¦è§£æ±ºã™ã‚‹
 		{
 			const float planeY = body[1]->center.y + body[1]->extents.y;
 
-			// A‚ÌÅ‰º“_‚ğæ‚éi–ÊÚ’n‚È‚ç4’¸“_‚ª‚±‚±‚ÉW‚Ü‚éj
+			// Aã®æœ€ä¸‹ç‚¹ã‚’å–ã‚‹ï¼ˆé¢æ¥åœ°ãªã‚‰4é ‚ç‚¹ãŒã“ã“ã«é›†ã¾ã‚‹ï¼‰
 			float minY = vertsA[0].y;
 			for (int i = 1; i < 8; ++i)
 			{
 				if (vertsA[i].y < minY) minY = vertsA[i].y;
 			}
 
-			// ‘½­‚ÌŒë·‹–—e
+			// å¤šå°‘ã®èª¤å·®è¨±å®¹
 			const float contactEps = 0.001f;
-			// uÅ‰º‘w•t‹ßv‚Æ‚İ‚È‚·‚‚³•i‚±‚±‚ğL‚°‚·‚¬‚é‚ÆŒX‚«‚â‚·‚­‚È‚éj
+			// ã€Œæœ€ä¸‹å±¤ä»˜è¿‘ã€ã¨ã¿ãªã™é«˜ã•å¹…ï¼ˆã“ã“ã‚’åºƒã’ã™ãã‚‹ã¨å‚¾ãã‚„ã™ããªã‚‹ï¼‰
 			const float minLayer = 0.01f;
 
-			// Bã–Ê‚Ì‹éŒ`”ÍˆÍiB‚ğ²•½s‚Ì°‚Æ‚µ‚Äˆµ‚¤ŠÈˆÕj
+			// Bä¸Šé¢ã®çŸ©å½¢ç¯„å›²ï¼ˆBã‚’è»¸å¹³è¡Œã®åºŠã¨ã—ã¦æ‰±ã†ç°¡æ˜“ï¼‰
 			const float minX = body[1]->center.x - body[1]->extents.x;
 			const float maxX = body[1]->center.x + body[1]->extents.x;
 			const float minZ = body[1]->center.z - body[1]->extents.z;
 			const float maxZ = body[1]->center.z + body[1]->extents.z;
 
-			// ”½•œi2‰ñ‚¾‚¯j
+			// åå¾©ï¼ˆ2å›ã ã‘ï¼‰
 			for (int iter = 0; iter < 2; ++iter)
 			{
 				for (int i = 0; i < 8; ++i)
 				{
-					// Bã–Ê‚Ì^ã‚É‚ ‚é’¸“_‚¾‚¯Ì—piŠO‚È‚ç–³‹j
+					// Bä¸Šé¢ã®çœŸä¸Šã«ã‚ã‚‹é ‚ç‚¹ã ã‘æ¡ç”¨ï¼ˆå¤–ãªã‚‰ç„¡è¦–ï¼‰
 					if (vertsA[i].x < minX || vertsA[i].x > maxX) continue;
 					if (vertsA[i].z < minZ || vertsA[i].z > maxZ) continue;
 
-					// Å‰º‘w•t‹ß‚Ì’¸“_‚¾‚¯ÚG“_‚É‚·‚éi–Ê‚È‚ç•¡”“_‚É‚È‚éj
+					// æœ€ä¸‹å±¤ä»˜è¿‘ã®é ‚ç‚¹ã ã‘æ¥è§¦ç‚¹ã«ã™ã‚‹ï¼ˆé¢ãªã‚‰è¤‡æ•°ç‚¹ã«ãªã‚‹ï¼‰
 					if (vertsA[i].y > (minY + minLayer)) continue;
 
-					// ‚ß‚è‚İi‚Ü‚½‚ÍÚGj‚µ‚Ä‚¢‚é‚©
+					// ã‚ã‚Šè¾¼ã¿ï¼ˆã¾ãŸã¯æ¥è§¦ï¼‰ã—ã¦ã„ã‚‹ã‹
 					const float depth = planeY - vertsA[i].y;
 					if (depth <= -contactEps) continue;
 
 					CollisionResolver::Manifold m;
-					m.bodyA = body[1];                 // x‘¤i°j
-					m.bodyB = body[0];                 // æ‚é‘¤
-					m.normal = Vec3(0, 1, 0);    // ãŒü‚«–@üiŠÈˆÕj
+					m.bodyA = body[1];                 // æ”¯æŒå´ï¼ˆåºŠï¼‰
+					m.bodyB = body[0];                 // ä¹—ã‚‹å´
+					m.normal = Vec3(0, 1, 0);    // ä¸Šå‘ãæ³•ç·šï¼ˆç°¡æ˜“ï¼‰
 					m.depth = depth;
 
 					m.contactPoint = vertsA[i];
-					m.contactPoint.y = planeY;   // ÚG“_‚ğ–Êã‚Ö
+					m.contactPoint.y = planeY;   // æ¥è§¦ç‚¹ã‚’é¢ä¸Šã¸
 
 					CollisionResolver::ResolveCollision(m);
 				}
@@ -128,7 +478,7 @@ void Dice::Update(float dt)
 		}
 	}
 
-	// 3. •¨—XV
+	// 3. ç‰©ç†æ›´æ–°
 	for(int i = 0;i < MAX_DICE;i++)
 	{
 		if (body[i] == nullptr)continue;
@@ -162,11 +512,11 @@ void Dice::Update(float dt)
 	{
 		body[0]->angularVel.z += 3.14f;
 	}
-	// axis¨ƒNƒH[ƒ^ƒjƒIƒ“‚É•ÏŠ·‚µ‚Ä tran.dice.rot ‚É“ü‚ê‚½‚¢‚È‚ç•Ê“riŒãqj
+	// axisâ†’ã‚¯ã‚©ãƒ¼ã‚¿ãƒ‹ã‚ªãƒ³ã«å¤‰æ›ã—ã¦ tran.dice.rot ã«å…¥ã‚ŒãŸã„ãªã‚‰åˆ¥é€”ï¼ˆå¾Œè¿°ï¼‰
 }
 
 
-// •`‰æˆ— 
+// æç”»å‡¦ç† 
 void Dice::Draw()
 {
 	using namespace DirectX;
@@ -200,7 +550,7 @@ void Dice::Draw()
 }
 
 
-// ƒJƒƒ‰‚Ìİ’è 
+// ã‚«ãƒ¡ãƒ©ã®è¨­å®š 
 void Dice::SetCamera(Camera* pCamera)
 {
 	m_pCamera = pCamera;
@@ -211,25 +561,25 @@ void Dice::SetCamera(Camera* pCamera)
 void Dice::TestUpdate()
 {
 	TRAN_INS;
-	//--- s—ñ”z—ñ‚Ì‚»‚ê‚¼‚ê‚Ì‚â‚Â
+	//--- è¡Œåˆ—é…åˆ—ã®ãã‚Œãã‚Œã®ã‚„ã¤
 
 	float size = 0.5f;
 
-	vertex[0] = { m_pos.x - size ,m_pos.y - size,m_pos.z - size };// ¶‰ºŒã‚ë
-	vertex[1] = { m_pos.x - size ,m_pos.y - size,m_pos.z + size };// ¶‰ºè‘O
-	vertex[2] = { m_pos.x - size ,m_pos.y + size,m_pos.z - size };// ¶ãŒã‚ë
-	vertex[3] = { m_pos.x - size ,m_pos.y + size,m_pos.z + size };// ¶ãè‘O
-	vertex[4] = { m_pos.x + size ,m_pos.y - size,m_pos.z - size };// ‰E‰ºŒã‚ë
-	vertex[5] = { m_pos.x + size ,m_pos.y - size,m_pos.z + size };// ‰E‰ºè‘O
-	vertex[6] = { m_pos.x + size ,m_pos.y + size,m_pos.z - size };// ‰EãŒã‚ë
-	vertex[7] = { m_pos.x + size ,m_pos.y + size,m_pos.z + size };// ‰Eãè‘O
+	vertex[0] = { m_pos.x - size ,m_pos.y - size,m_pos.z - size };// å·¦ä¸‹å¾Œã‚
+	vertex[1] = { m_pos.x - size ,m_pos.y - size,m_pos.z + size };// å·¦ä¸‹æ‰‹å‰
+	vertex[2] = { m_pos.x - size ,m_pos.y + size,m_pos.z - size };// å·¦ä¸Šå¾Œã‚
+	vertex[3] = { m_pos.x - size ,m_pos.y + size,m_pos.z + size };// å·¦ä¸Šæ‰‹å‰
+	vertex[4] = { m_pos.x + size ,m_pos.y - size,m_pos.z - size };// å³ä¸‹å¾Œã‚
+	vertex[5] = { m_pos.x + size ,m_pos.y - size,m_pos.z + size };// å³ä¸‹æ‰‹å‰
+	vertex[6] = { m_pos.x + size ,m_pos.y + size,m_pos.z - size };// å³ä¸Šå¾Œã‚
+	vertex[7] = { m_pos.x + size ,m_pos.y + size,m_pos.z + size };// å³ä¸Šæ‰‹å‰
 
-	if (true)// ’ê–Ê‚ÌŠp“xˆÚ“®
+	if (true)// åº•é¢ã®è§’åº¦ç§»å‹•
 	{	// 0,1,4,5
 		using namespace DirectX;
 		float rad = 3.1415f;
 		float radius = rad;
-						// ¶Œã		  ¶è‘O	‰EŒã‚ë	  ‰Eè‘O
+						// å·¦å¾Œ		  å·¦æ‰‹å‰	å³å¾Œã‚	  å³æ‰‹å‰
 		XMFLOAT3 vtx[4] = {vertex[0],vertex[1],vertex[4],vertex[5]};
 		XMFLOAT3 vtx2[4] = {vertex[2],vertex[3],vertex[6],vertex[7]};
 
@@ -262,44 +612,33 @@ void Dice::TestUpdate()
 void Dice::TestDraw()
 {
 	TRAN_INS;
-	DirectX::XMFLOAT4 color = tran.dice.color;// 0,1,4,5
-	if (true)
-	{	// ’ê–Ê
-		Geometory::AddLine(vertex[0], vertex[1], color);
-		Geometory::AddLine(vertex[1], vertex[4], color);
-		Geometory::AddLine(vertex[4], vertex[5], color);
-		Geometory::AddLine(vertex[5], vertex[0], color);
+	using namespace DirectX;
 
-		//“V–Ê 2,3,6,7
-		Geometory::AddLine(vertex[2], vertex[3], color);
-		Geometory::AddLine(vertex[3], vertex[6], color);
-		Geometory::AddLine(vertex[6], vertex[7], color);
-		Geometory::AddLine(vertex[7], vertex[2], color);
-		// ‘¤–Ê
-		Geometory::AddLine(vertex[2], vertex[0], color);
-		Geometory::AddLine(vertex[3], vertex[1], color);
-		Geometory::AddLine(vertex[6], vertex[4], color);
-		Geometory::AddLine(vertex[7], vertex[5], color);
-		DirectX::XMFLOAT3 pos = { 
-			m_pos.x + tran.dice.virtualVelocity.x,
-			m_pos.y + tran.dice.virtualVelocity.y,
-			m_pos.z + tran.dice.virtualVelocity.z };
-		Geometory::AddLine(m_pos, pos, color);
-	}
-	if(false)
+
+	DirectX::XMFLOAT4 color = { 1.0f,1.0f,1.0f,1.0f };
+	for (int i = 0; i < MAX_DICE; i++)
 	{
-		Geometory::AddLine(vertex[0], vertex[1], color);// 1
-		Geometory::AddLine(vertex[0], vertex[2], color);// 2
-		Geometory::AddLine(vertex[0], vertex[4], color);// 3
-		Geometory::AddLine(vertex[3], vertex[1], color);// 4
-		Geometory::AddLine(vertex[3], vertex[2], color);// 5
-		Geometory::AddLine(vertex[3], vertex[7], color);// 6
-		Geometory::AddLine(vertex[5], vertex[1], color);// 7
-		Geometory::AddLine(vertex[5], vertex[4], color);// 8
-		Geometory::AddLine(vertex[5], vertex[7], color);// 9
-		Geometory::AddLine(vertex[6], vertex[2], color);// 10
-		Geometory::AddLine(vertex[6], vertex[4], color);// 11
-		Geometory::AddLine(vertex[6], vertex[7], color);// 12
+		if (body[i] != nullptr)
+		{
+			color = { 1.0f,1.0f,1.0f,1.0f };
+			color.x = 1.0f - (((i + 1) % 2) == 0);
+			color.y = 1.0f - (((i + 1) % 4) == 0);
+			color.z = 1.0f - (((i + 1) % 8) == 0);
+			DirectX::XMFLOAT3 vtxA[8];
+			body[i]->GetWorldVertices(vtxA);
+			Geometory::AddLine(vtxA[0], vtxA[1], color); // 
+			Geometory::AddLine(vtxA[1], vtxA[3], color); // 
+			Geometory::AddLine(vtxA[3], vtxA[2], color); // 
+			Geometory::AddLine(vtxA[2], vtxA[0], color); // 
+			Geometory::AddLine(vtxA[0 + 4], vtxA[1 + 4], color); // 
+			Geometory::AddLine(vtxA[1 + 4], vtxA[3 + 4], color); // 
+			Geometory::AddLine(vtxA[3 + 4], vtxA[2 + 4], color); // 
+			Geometory::AddLine(vtxA[2 + 4], vtxA[0 + 4], color); // 
+			Geometory::AddLine(vtxA[0], vtxA[4], color); // 
+			Geometory::AddLine(vtxA[1], vtxA[5], color); // 
+			Geometory::AddLine(vtxA[2], vtxA[6], color); // 
+			Geometory::AddLine(vtxA[3], vtxA[7], color); // 
+		}
 	}
 
 	DirectX::XMFLOAT4X4 world; DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f));
@@ -309,31 +648,31 @@ void Dice::TestDraw()
 	fWVP[2] = m_pCamera->GetProjectionMatrix(true);
 
 
-	ShaderList::SetWVP(fWVP); // SetWVPŠÖ”‚Ìˆø”‚É‚ÍXMFLOAT4X4Œ^‚Å—v‘f”‚R‚Ì”z—ñ‚ÌƒAƒhƒŒƒX‚ğ“n‚· 
+	ShaderList::SetWVP(fWVP); // SetWVPé–¢æ•°ã®å¼•æ•°ã«ã¯XMFLOAT4X4å‹ã§è¦ç´ æ•°ï¼“ã®é…åˆ—ã®ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’æ¸¡ã™ 
 
-	// Sprite‚ÖƒJƒƒ‰‚Ìs—ñ‚ğİ’è 
+	// Spriteã¸ã‚«ãƒ¡ãƒ©ã®è¡Œåˆ—ã‚’è¨­å®š 
 	Sprite::SetView(m_pCamera->GetViewMatrix());
 	Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
 
 	
 
-	// ƒ‚ƒfƒ‹‚Ég—p‚·‚é’¸“_ƒVƒF[ƒ_[AƒsƒNƒZƒ‹ƒVƒF[ƒ_[‚ğİ’è 
+	// ãƒ¢ãƒ‡ãƒ«ã«ä½¿ç”¨ã™ã‚‹é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã€ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’è¨­å®š 
 	m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
 	m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
 	if(false)
-	// ƒ}ƒeƒŠƒAƒ‹•Ê‚ÉƒƒbƒVƒ…‚ğ•\¦ 
+	// ãƒãƒ†ãƒªã‚¢ãƒ«åˆ¥ã«ãƒ¡ãƒƒã‚·ãƒ¥ã‚’è¡¨ç¤º 
 	{
 		float ambient = 0.8f;
 		for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
-			// ƒ‚ƒfƒ‹‚ÌƒƒbƒVƒ…‚ğæ“¾ 
+			// ãƒ¢ãƒ‡ãƒ«ã®ãƒ¡ãƒƒã‚·ãƒ¥ã‚’å–å¾— 
 			const Model::Mesh* mesh = m_pModel->GetMesh(i);
-			// ƒƒbƒVƒ…‚ÉŠ„‚è“–‚Ä‚ç‚ê‚Ä‚¢‚éƒ}ƒeƒŠƒAƒ‹‚ğæ“¾ 
+			// ãƒ¡ãƒƒã‚·ãƒ¥ã«å‰²ã‚Šå½“ã¦ã‚‰ã‚Œã¦ã„ã‚‹ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å–å¾— 
 			Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
 			material.ambient = { ambient,ambient,ambient,ambient };
-			// ƒVƒF[ƒ_[‚Öƒ}ƒeƒŠƒAƒ‹‚ğİ’è 
+			// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¸ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’è¨­å®š 
 			ShaderList::SetMaterial(material);
-			// ƒ‚ƒfƒ‹‚Ì•`‰æ 
+			// ãƒ¢ãƒ‡ãƒ«ã®æç”» 
 			m_pModel->Draw(i);
 		}
 	}
@@ -354,4 +693,3 @@ static void ClampVec3(DirectX::XMFLOAT3& v, float maxLen)
 		v.x *= s; v.y *= s; v.z *= s;
 	}
 }
-

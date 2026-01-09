@@ -98,7 +98,7 @@ void SceneGame::Update()
 	}
 	else
 	{
-		m_pDice->Update();
+		m_pDice->Update(1);
 		//m_pCamera->SetLook(m_pDice->GetPos());
 		m_pDice->TestUpdate();
 	}
