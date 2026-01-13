@@ -842,14 +842,15 @@ void Dice::Draw()
 	{
 		// 使ってないDiceは0を代入
 		//tran.dice.currentFaceNumber[i] = 0;
-		if (i == 4 || i == 5 || i == 6 || i == 7)continue;
+		//if (i == 4 || i == 5 || i == 6 || i == 7)continue;
 
 		if (body[i] != nullptr)
 		{
 			color = { 1.0f,1.0f,1.0f,1.0f };
-			color.x = 1.0f - (((i + 1) & 0b10) != 0);
-			color.y = 1.0f - (((i + 1) & 0b100) == 0);
-			color.z = 1.0f - (((i + 1) & 0b1000) == 0);
+			color.x = 1.0f - (((i + 1) & 0b1) != 0);
+			color.y = 1.0f - (((i + 1) & 0b10) != 0);
+			color.z = 1.0f - (((i + 1) & 0b100) != 0);
+
 			if (color.x == 0.0f && color.y == 0.0f && color.z == 0.0f)
 			{
 				color = { 1.0f,1.0f,1.0f,1.0f };

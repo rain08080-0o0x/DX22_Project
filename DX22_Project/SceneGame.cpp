@@ -272,7 +272,6 @@ void SceneGame::Update()
 						// 役なしなら表示消す or --- にする
 						break;
 					}
-
 					m_roleFixedThisRoll = true;
 				}
 			}
@@ -417,7 +416,6 @@ void SceneGame::Draw()
 			m_pDice->Draw();
 			//m_pDice->TestDraw();
 		}
-		DirectX::XMFLOAT4 color = { 0.0f,0.0f,0.0f,0.0f };
 
 		if (m_role)
 		{
@@ -431,6 +429,5 @@ void SceneGame::Draw()
 		{
 			m_pRoleUI->Draw();
 		}
-
 	}
 }
