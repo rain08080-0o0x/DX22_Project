@@ -6,10 +6,8 @@
 #include "Model.h"
 #include "Defines.h"
 #include <memory>
+#include "UIManager.h"
 
-
-// 最大サイコロ数
-const int MAX_DICE = 10;
 
 class Dice
 {
@@ -17,17 +15,17 @@ public:
     Dice();
     ~Dice();
     void Update(int);
-    void Update(float dt = fFPS);   // 物理は body.Update(dt) だけ
+    void Update(float dt = fFPS);
     void Draw();
 
     void SetCamera(Camera* pCamera);
+    bool IsStop();
 
-    // 物理への参照が必要なら
-//  RigidBodyOBB Body() { return body; }
-//  const RigidBodyOBB& Body() const { return body; }
 
-    void TestUpdate();
-    void TestDraw();
+    void RollRandom(int index);
+
+    void SetDiceTexture(int count,int num);
+
 private:
     Camera* m_pCamera = nullptr;
     Model* m_pModel = nullptr;
@@ -42,13 +40,10 @@ private:
 
     // 表示用（必要なら）色などだけ Dice が持つ
     DirectX::XMFLOAT4 color = { 1,1,1,1 };
+    bool isActive;
 
 
-    // 物理ボディ配列（Dice同士の総当たり判定用）
-    static constexpr int kMaxBodies = 16;
-    RigidBodyOBB *m_bodies[kMaxBodies];
-    int m_count = 0; // 実際に使ってる個数
-
+    UIManager m_ui;
 };
 
 

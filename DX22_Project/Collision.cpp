@@ -89,10 +89,10 @@ Collision::Result Collision::Hit(Sphere a, Sphere b)
     return out;
 }
 
-RigidBodyOBB::RigidBodyOBB(Vec3 pos, Vec3 size, float m)
+RigidBodyOBB::RigidBodyOBB(Vec3 pos, Vec3 size, float maasss)
     : center(pos)
     , extents(size * 0.5f)
-    , mass(m)
+    , mass(maasss)
     , velocity(0, 0, 0)
     , angularVel(0, 0, 0)
     , isGround(false)
@@ -115,6 +115,7 @@ RigidBodyOBB::RigidBodyOBB(Vec3 pos, Vec3 size, float m)
     else {
         invMass = 0.0f;
         inertiaTensor = Vec3(0, 0, 0);
+        gravityEnabled = false;
     }
 }
 
@@ -163,6 +164,9 @@ void RigidBodyOBB::GetWorldVertices(DirectX::XMFLOAT3 outVertices[8]) const
 
 void RigidBodyOBB::Update(float dt)
 {
+    // 完全固定なら何もしない
+    if (fullyLocked) return;
+
     if (isStatic) return;
     if (invMass <= 0.0f) return;
     if (isSleeping) return;
@@ -313,6 +317,25 @@ void RigidBodyOBB::IntegrateRotation(float dt)
     axis[2] = axis[0].Cross(axis[1]);
 }
 
+void RigidBodyOBB::SetGravity(bool enable)
+{
+	gravityEnabled = enable;
+}
+
+void RigidBodyOBB::SetFullyLocked(bool lock)
+{
+    fullyLocked = lock;
+
+    if (lock)
+    {
+        // 物理的に完全停止
+        velocity = Vec3(0.0f, 0.0f, 0.0f);
+        angularVel = Vec3(0.0f, 0.0f, 0.0f);
+
+        gravityEnabled = false;
+    }
+}
+
 
 
 
@@ -444,3 +467,45 @@ void RigidBodyOBB::AddAngularVelocity(const Vec3& dw) { angularVel += dw; }
 
 void RigidBodyOBB::ClampLinear(float vMax) { ; }
 void RigidBodyOBB::ClampAngular(float wMax) { ; }
+
+int GetTopFace(const RigidBodyOBB& b)
+{
+    const Vec3 worldUp(0.0f, 1.0f, 0.0f);
+
+    // 6面の法線（符号反転は * -1.0f）
+    Vec3 normals[6] =
+    {
+        b.axis[0],              // +X
+        b.axis[0] * -1.0f,      // -X
+        b.axis[1],              // +Y
+        b.axis[1] * -1.0f,      // -Y
+        b.axis[2],              // +Z
+        b.axis[2] * -1.0f       // -Z
+    };
+
+    // 対応する出目
+    int faceValue[6] =
+    {
+        4, // +X
+        3, // -X
+        1, // +Y
+        6, // -Y
+        2, // +Z
+        5  // -Z
+    };
+
+    int bestFace = 1;
+    float bestDot = -FLT_MAX;
+
+    for (int i = 0; i < 6; ++i)
+    {
+        float d = normals[i].Dot(worldUp);
+        if (d > bestDot)
+        {
+            bestDot = d;
+            bestFace = faceValue[i];
+        }
+    }
+
+    return bestFace;
+}

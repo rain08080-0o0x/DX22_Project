@@ -11,8 +11,12 @@ public:
 	void Update() final;
 
 	void SetLook(DirectX::XMFLOAT3 set)final;
+	void SetPos(DirectX::XMFLOAT3 set)final;
+
+	void LockPos(bool set)final;
 private:
 	float m_radXZ;
 	float m_radY;
 	float m_radius;
+	bool isLock;
 };

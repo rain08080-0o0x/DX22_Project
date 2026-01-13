@@ -141,6 +141,8 @@ public:
 
     float stableTimer = 0.0f;      // 内部用
 
+    // 完全停止フラグ
+    bool fullyLocked = false;
 
     DirectX::XMFLOAT4 orientation = { 0,0,0,1 }; // quaternion
 
@@ -173,7 +175,10 @@ public:
     void ClampLinear(float vMax);
     void ClampAngular(float wMax);
     void IntegrateRotation(float dt);
-
+    // 重力適応変更関数
+    void SetGravity(bool enable);
+    // 完全停止設定関数
+    void SetFullyLocked(bool lock);
     // ===== Sleep / Gravity (追加ブロック) =====
     
     // 外力（力の蓄積）
@@ -246,3 +251,5 @@ private:
     // Matrixを使わないため、ベクトルをローカルに戻して計算し、ワールドに戻す
     static Vec3 ApplyInertiaInverse(const RigidBodyOBB* body, const Vec3& v);
 };
+
+int GetTopFace(const RigidBodyOBB& b);

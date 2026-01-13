@@ -1,9 +1,65 @@
-﻿#include "SceneGame.h"
+﻿/*****************************************************************//**
+ * \file   SceneGame.cpp
+ * \brief  ゲームシーン
+ * 
+ * \author 山本郁也
+ * \date   January 2026
+ *********************************************************************/
+#include "SceneGame.h"
 #include"Geometory.h"
 #include "ShaderList.h" 
 #include"Defines.h"
 #include"CameraDebug.h"
 #include "Transfer.h"
+#include "SceneManager.h"
+
+
+static void Sort3(int& a, int& b, int& c)
+{
+	if (a > b) std::swap(a, b);
+	if (b > c) std::swap(b, c);
+	if (a > b) std::swap(a, b);
+}
+
+static RoleResult CalcRole(int d0, int d1, int d2)
+{
+	Sort3(d0, d1, d2);
+
+	// ピンゾロ
+	if (d0 == 1 && d1 == 1 && d2 == 1)
+		return { RoleType::Pinzoro, 100, 0 };
+
+	// ゾロ目
+	if (d0 == d1 && d1 == d2)
+		return { RoleType::Zorome, 50 + d0 * 10, 0 };
+
+	// シゴロ
+	if (d0 == 4 && d1 == 5 && d2 == 6)
+		return { RoleType::Shigoro, 30, 0 };
+
+	// ヒフミ
+	if (d0 == 1 && d1 == 2 && d2 == 3)
+		return { RoleType::Hifumi, -20, 0 };
+
+	// 通常役（2個同じ + 残り1個）
+	if (d0 == d1 && d1 != d2)
+		return { RoleType::Me, d2, d2 };
+
+	if (d0 != d1 && d1 == d2)
+		return { RoleType::Me, d0, d0 };
+
+	// 役なし
+	return { RoleType::None, 0, 0 };
+}
+
+
+const float panelW = 375.0f;
+const float panelH = 520.0f;
+
+// 表示位置（開いてるときは右に寄せて少し余白）
+const float openX = SCREEN_WIDTH - panelW * 0.5f - 20.0f;
+// 閉じてるときは画面外（右に逃がす）
+const float closeX = SCREEN_WIDTH + panelW * 0.5f + 20.0f;
 
 SceneGame::SceneGame()
 	:OnlyDice(true)
@@ -33,6 +89,54 @@ SceneGame::SceneGame()
 	m_pDice->SetCamera(m_pCamera);
 	TRAN_INS;
 
+
+
+	m_pScore = new ScoreLite("Number/number.png", 360.0f, 40.0f, 48.0f, 64.0f, 56.0f);
+	m_pScore->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	m_scoredThisRoll = false;
+
+	m_pRoleUI = new UIObject(
+		"Role/Role_None.png",   // 仮（あとで差し替える）
+		360.0f, 120.0f,
+		256.0f, 96.0f
+	);
+
+	m_pRoleUI->SetColor(1, 1, 1, 1);
+	m_roleFixedThisRoll = false;
+
+	// 例：役一覧UI生成済みとして
+	//const float panelW = 375.0f;
+	//const float panelH = 520.0f;
+
+	//// 表示位置（開いてるときは右に寄せて少し余白）
+	//const float openX = SCREEN_WIDTH - panelW * 0.5f - 20.0f;
+	//// 閉じてるときは画面外（右に逃がす）
+	//const float closeX = SCREEN_WIDTH + panelW * 0.5f + 20.0f;
+
+	// 高さは好み。上寄せなら 140〜200 くらいが見やすい
+	m_roleListY = SCREEN_HEIGHT - panelH * 0.5f;
+
+	m_roleListOpen = false;
+	m_roleListX = closeX;
+	m_roleListTargetX = closeX;
+
+	// 速度（1秒でほぼ到達するくらい）
+	m_roleListSpeed = 14.0f;
+
+	tran.diceui.role.pos = { m_roleListX ,m_roleListY};
+	tran.diceui.role.size = {panelW,panelH};
+
+	// 生成
+	m_role = new UIObject("tintiro.png",
+		tran.diceui.role.pos.x,
+		tran.diceui.role.pos.y,
+		tran.diceui.role.size.x,
+		tran.diceui.role.size.y);
+	// 初期位置を反映
+	m_role->SetPosition(m_roleListX, m_roleListY);
+	m_role->SetSize(panelW, panelH);
+
+
 }
 
 SceneGame::~SceneGame()
@@ -57,6 +161,26 @@ SceneGame::~SceneGame()
 	{
 		delete m_pDice;
 		m_pDice = nullptr;
+	}
+	if (m_pGaugeUI)
+	{
+		delete m_pGaugeUI;
+		m_pGaugeUI = nullptr;
+	}
+	if (m_role)
+	{
+		delete m_role;
+		m_role = nullptr;
+	}
+	if(m_pScore)
+	{
+		delete m_pScore;
+		m_pScore = nullptr;
+	}
+	if (m_pRoleUI)
+	{
+		delete m_pRoleUI;
+		m_pRoleUI = nullptr;
 	}
 }
 
@@ -99,8 +223,102 @@ void SceneGame::Update()
 	else
 	{
 		m_pDice->Update(1);
-		//m_pCamera->SetLook(m_pDice->GetPos());
-		//m_pDice->TestUpdate();
+		m_pDice->SetCamera(m_pCamera);
+
+		if (m_pDice->IsStop())
+		{
+			m_pCamera->LockPos(true);
+
+			TRAN_INS;
+			const int a = tran.dice.currentFaceNumber[0];
+			const int b = tran.dice.currentFaceNumber[2];
+			const int c = tran.dice.currentFaceNumber[3];
+			if (!m_roleFixedThisRoll)
+			{
+
+				if (a >= 1 && a <= 6 && b >= 1 && b <= 6 && c >= 1 && c <= 6)
+				{
+					RoleResult r = CalcRole(a, b, c);
+
+					// スコア加算
+					m_pScore->AddScore(r.addScore);
+
+					// 役名表示
+					switch (r.role)
+					{
+					case RoleType::None:
+						m_pRoleUI->SetTexture("Role/Role_None.png");
+						break;
+					case RoleType::Hifumi:
+						m_pRoleUI->SetTexture("Role/Role_Hifumi.png");
+						break;
+					case RoleType::Shigoro:
+						m_pRoleUI->SetTexture("Role/Role_Shigoro.png");
+						break;
+					case RoleType::Zorome:
+						m_pRoleUI->SetTexture("Role/Role_Zorome.png");
+						break;
+					case RoleType::Pinzoro:
+						m_pRoleUI->SetTexture("Role/Role_Pinzoro.png");
+						break;
+					case RoleType::Me:
+					{
+						char path[64];
+						sprintf_s(path, "Role/Role_Me%d.png", r.me);
+						m_pRoleUI->SetTexture(path);
+						break;
+					}
+					default:
+						// 役なしなら表示消す or --- にする
+						break;
+					}
+
+					m_roleFixedThisRoll = true;
+				}
+			}
+		}
+		else
+		{
+			m_pCamera->LockPos(false);
+		}
+		if (IsKeyTrigger('R'))
+		{
+			if (m_pDice)
+			{
+				m_roleFixedThisRoll = false;
+				m_scoredThisRoll = false;
+				m_pDice->RollRandom(0);
+				m_pDice->RollRandom(2);
+				m_pDice->RollRandom(3);
+			}
+		}
+		// Shiftを押すたびに開閉
+		if (IsKeyTrigger(VK_SHIFT))
+		{
+			m_roleListOpen = !m_roleListOpen;
+
+			//const float panelW = 520.0f;
+			//const float openX  = 1280.0f - panelW * 0.5f - 20.0f;
+			//const float closeX = 1280.0f + panelW * 0.5f + 20.0f;
+
+			m_roleListTargetX = m_roleListOpen ? openX : closeX;
+		}
+
+		// dt（あなたの環境に合わせて）
+		const float dt = 1.0f / 120.0f;
+
+		// Lerpで滑らかに追従（指数追従）
+		{
+			float t = 1.0f - expf(-m_roleListSpeed * dt);
+			m_roleListX = m_roleListX + (m_roleListTargetX - m_roleListX) * t;
+
+			m_role->SetPosition(m_roleListX, m_roleListY);
+		}
+
+		if (IsKeyTrigger(VK_ESCAPE))
+		{
+			SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
+		}
 	}
 }
 
@@ -191,11 +409,28 @@ void SceneGame::Draw()
 	}
 	else
 	{
+		// 参照用のインスタンスを取得
+		TRAN_INS;
+
 		if (m_pDice)
 		{
 			m_pDice->Draw();
 			//m_pDice->TestDraw();
 		}
-		DirectX::XMFLOAT4 color = {0.0f,0.0f,0.0f,0.0f};
+		DirectX::XMFLOAT4 color = { 0.0f,0.0f,0.0f,0.0f };
+
+		if (m_role)
+		{
+			m_role->Draw();
+		}
+		if (m_pScore)
+		{
+			m_pScore->Draw();
+		}
+		if (m_pRoleUI)
+		{
+			m_pRoleUI->Draw();
+		}
+
 	}
 }

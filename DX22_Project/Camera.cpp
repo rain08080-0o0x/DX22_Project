@@ -56,3 +56,4 @@ DirectX::XMFLOAT3 Camera::GetLook()
 {
 	return m_look;
 }
+

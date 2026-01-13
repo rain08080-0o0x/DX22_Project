@@ -8,7 +8,7 @@ const float CameraDefaultDistance = -2.0f;
 CameraDebug::CameraDebug()
 	: m_radXZ(0.0f)
 	, m_radY(0.50f)
-	, m_radius(5.0f)
+	, m_radius(10.0f)
 {
     TRAN_INS;
     m_look = { 0.0f,0.0f,0.0f };
@@ -16,7 +16,9 @@ CameraDebug::CameraDebug()
     m_pos.y = m_look.y + m_radius * sinf(m_radY);
     m_pos.z = m_look.z + m_radius * cosf(m_radY) * cosf(m_radXZ);
 
-    tran.camera.eye = m_pos;
+    isLock = false;
+
+    tran.camera.eye = { 0,10,0.001f };
     tran.camera.look = m_look;
 }
 
@@ -28,11 +30,9 @@ CameraDebug::~CameraDebug()
 void CameraDebug::Update()
 {
     TRAN_INS;
-    if (true)
+    if (!isLock)
     {
         using namespace DirectX;
-        m_pos = tran.camera.eye;
-        m_look = tran.camera.look;
         // 先生のやつ
         //--- 注視点の移動
         // ↑(+z)に移動 
@@ -65,8 +65,8 @@ void CameraDebug::Update()
         if (IsKeyPress(VK_LEFT))  delta -= right * CameraSpeed;
 
         // 上下移動（ワールドY）
-        if (IsKeyPress(VK_SHIFT))   delta += up * CameraSpeed;
-        if (IsKeyPress(VK_CONTROL)) delta -= up * CameraSpeed;
+        //if (IsKeyPress(VK_SHIFT))   delta += up * CameraSpeed;
+        //if (IsKeyPress(VK_CONTROL)) delta -= up * CameraSpeed;
 
         // 視線を維持したまま平行移動：pos と look を同じだけ動かす
         pos += delta;
@@ -91,6 +91,12 @@ void CameraDebug::Update()
         m_pos.y = m_look.y + m_radius * sinf(m_radY);
         m_pos.z = m_look.z + m_radius * cosf(m_radY) * cosf(m_radXZ);
         // Transferの更新
+    }
+    else
+    {
+        m_pos = tran.camera.eye;
+        m_look = tran.camera.look;
+
         tran.camera.eye = m_pos;
         tran.camera.look = m_look;
     }
@@ -99,4 +105,15 @@ void CameraDebug::Update()
 void CameraDebug::SetLook(DirectX::XMFLOAT3 set)
 {
 	m_look = set;
+}
+
+void CameraDebug::SetPos(DirectX::XMFLOAT3 pos)
+{
+    m_pos = pos;
+    Transfer::GetInstance().camera.eye = m_pos;
+}
+
+void CameraDebug::LockPos(bool set)
+{
+    isLock = set;
 }

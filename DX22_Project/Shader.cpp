@@ -119,6 +119,7 @@ HRESULT Shader::Make(void* pData, UINT size)
 	}
 	// テクスチャ領域作成
 	m_pTextures.resize(shaderDesc.TextureNormalInstructions, nullptr);
+	SAFE_RELEASE(pReflection);
 
 	return MakeShader(pData, size);
 }
@@ -165,7 +166,7 @@ HRESULT VertexShader::MakeShader(void* pData, UINT size)
 	https://blog.techlab-xe.net/dxc-shader-reflection/
 	*/
 
-	ID3D11ShaderReflection *pReflection;
+	ID3D11ShaderReflection *pReflection = nullptr;
 	D3D11_SHADER_DESC shaderDesc;
 	D3D11_INPUT_ELEMENT_DESC* pInputDesc;
 	D3D11_SIGNATURE_PARAMETER_DESC sigDesc;
@@ -230,6 +231,8 @@ HRESULT VertexShader::MakeShader(void* pData, UINT size)
 	);
 	
 	delete[] pInputDesc;
+	SAFE_RELEASE(pReflection);
+
 	return hr;
 }
 

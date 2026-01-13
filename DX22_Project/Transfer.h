@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include "Defines.h"
 
 #define TRAN_INS Transfer &tran = Transfer::GetInstance();
 #define TRAN_INS_Get Transfer &tran = Transfer::GetInstance();tran
@@ -46,6 +47,18 @@ private:
 		DirectX::XMFLOAT4X4 world;	// ワールド座標系
 		DirectX::XMFLOAT4X4 obj;	// オブジェクト座標系
 		DirectX::XMFLOAT3 virtualVelocity;	//仮想運動量
+		int currentFaceNumber[MAX_DICE];	// 現在の表面ナンバー
+		float underVel = 0.0f; // これ以下の運動量なら停止用変数
+	};
+	struct UIobj
+	{
+		DirectX::XMFLOAT2 pos;
+		DirectX::XMFLOAT2 size;
+		DirectX::XMFLOAT4 color = { 1,1,1,1 };
+	};
+	struct UIInfo
+	{
+		UIobj role;
 	};
 public:
 	static Transfer& GetInstance()
@@ -58,4 +71,6 @@ public:
 	DiceInfo dice;
 	CameraInfo camera;
 	ObjectfromAtoB obj;
+	UIInfo diceui;
+	DirectX::XMFLOAT2 mousePos;
 };

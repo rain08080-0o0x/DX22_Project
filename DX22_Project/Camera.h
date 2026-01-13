@@ -25,8 +25,10 @@ public:
 	// ’‹“_‚Ìæ“¾ 
 	DirectX::XMFLOAT3 GetLook();
 
+	virtual void SetPos(DirectX::XMFLOAT3 pos) = 0;
 	virtual void SetLook(DirectX::XMFLOAT3 set) = 0;
 
+	virtual void LockPos(bool set) = 0;
 protected:
 	DirectX::XMFLOAT3 m_pos;  // À•W 
 	DirectX::XMFLOAT3 m_look;  // ’‹“_ 
