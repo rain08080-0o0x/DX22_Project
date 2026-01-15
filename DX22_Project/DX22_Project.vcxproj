@@ -177,6 +177,7 @@
     <ClCompile Include="Transfer.cpp" />
     <ClCompile Include="UIManager.cpp" />
     <ClCompile Include="UIObject.cpp" />
+    <ClCompile Include="Yukari.cpp" />
     <ClCompile Include="_geometory.cpp" />
     <ClCompile Include="_model.cpp" />
   </ItemGroup>
@@ -185,6 +186,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraDebug.h" />
     <ClInclude Include="Collision.h" />
+    <ClInclude Include="DebugUtil.h" />
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Dice.h" />
     <ClInclude Include="DirectX.h" />
@@ -217,6 +219,7 @@
     <ClInclude Include="Transfer.h" />
     <ClInclude Include="UIManager.h" />
     <ClInclude Include="UIObject.h" />
+    <ClInclude Include="Yukari.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

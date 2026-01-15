@@ -583,7 +583,15 @@ Dice::~Dice()
 		delete body[i];
 		body[i] = nullptr;
 	}
-	m_ui.Clear();
+	for (int i = 0; i < 3; ++i)
+	{
+		if (m_pDiceUI[i])
+		{
+			delete m_pDiceUI[i];
+			m_pDiceUI[i] = nullptr;
+		}
+	}
+
 }
 
 void Dice::Update(int)
@@ -640,7 +648,6 @@ void Dice::Update(int)
 	if (IsKeyTrigger('R'))
 	{
 		count = 0;
-		m_ui.Clear();
 	}
 	// 五秒経過 or Tキーで強制停止
 	if (count >= fFPS * 5 || IsKeyPress('T'))
@@ -927,8 +934,15 @@ void Dice::Draw()
 			//tran.dice.currentFaceNumber[i] = GetTopFace(*body[i]);
 		}
 	}
+	if(!isActive)
+	for (int i = 0; i < 3; ++i)
+	{
+		if (m_pDiceUI[i])
+		{
+			m_pDiceUI[i]->Draw();
+		}
+	}
 
-	m_ui.Draw();
 }
 
 
@@ -960,7 +974,7 @@ void Dice::RollRandom(int index)
 	b.angularVel = Vec3(0.0f, 0.0f, 0.0f);
 
 	// 2) 少し持ち上げる（床との即衝突防止）
-	b.center.y += 0.5f;
+	b.center.y = 2.5f;
 
 	// 3) 重力ON
 	b.SetGravity(true);
@@ -978,55 +992,41 @@ void Dice::RollRandom(int index)
 	// 6) スリープ解除（あるなら）
 	b.WakeUp();
 }
-
-void Dice::SetDiceTexture(int count,int num)
+void Dice::SetDiceTexture(int count, int num)
 {
-	std::string DiceTex = "";
+	std::string DiceTex;
 	DirectX::XMFLOAT2 pos;
-	DirectX::XMFLOAT2 size = { 50.0f,50.0f };
+	DirectX::XMFLOAT2 size = { 50.0f, 50.0f };
 
-	if (count < 0 || count >= 3)return;
+	if (count < 0 || count >= 3) return;
+
 	switch (count)
 	{
-	case 0:
-		pos = { 640.0f - 50.0f,25.0f };
-		break;
-	case 1:
-		pos = { 640.0f,25.0f };
-		break;
-	case 2:
-		pos = { 640.0f + 50.0f,25.0f };
-		break;
-	default:
-		return;
+	case 0: pos = { 640.0f - 50.0f, 25.0f }; break;
+	case 1: pos = { 640.0f,         25.0f }; break;
+	case 2: pos = { 640.0f + 50.0f, 25.0f }; break;
+	default: return;
 	}
 
 	switch (num)
 	{
-	case 1:
-		DiceTex = "Dice/one.png";
-		break;
-	case 2:
-		DiceTex = "Dice/two.png";
-		break;
-	case 3:
-		DiceTex = "Dice/three.png";
-		break;
-	case 4:
-		DiceTex = "Dice/four.png";
-		break;
-	case 5:
-		DiceTex = "Dice/five.png";
-		break;
-	case 6:
-		DiceTex = "Dice/six.png";
-		break;
+	case 1: DiceTex = "Dice/one.png";   break;
+	case 2: DiceTex = "Dice/two.png";   break;
+	case 3: DiceTex = "Dice/three.png"; break;
+	case 4: DiceTex = "Dice/four.png";  break;
+	case 5: DiceTex = "Dice/five.png";  break;
+	case 6: DiceTex = "Dice/six.png";   break;
+	default: return;
+	}
 
-	default:
+	// 初回だけ生成＆Add
+	if (!m_pDiceUI[count])
+	{
+		m_pDiceUI[count] = new UIObject(DiceTex.c_str(), pos.x, pos.y, size.x, size.y);
 		return;
 	}
 
-	UIObject* dice = new UIObject(DiceTex.c_str(), pos.x, pos.y, size.x, size.y);
-
-	m_ui.Add(dice);
+	// 2回目以降：テクスチャ差し替え（UIObjectにその機能が必要）
+	m_pDiceUI[count]->SetTexture(DiceTex.c_str());
 }
+

@@ -13,9 +13,9 @@ SceneTitle::SceneTitle()
     // ‰æ‘œ‚Í Assets/Texture/ ‚ğ UIObject ‘¤‚ª•t‚¯‚é‘O’ñ‚È‚ç‘Š‘Î‚ÅOK
     // —á: Assets/Texture/Title/Title_Logo.png ‚ğ’u‚¢‚½ê‡‚Í "Title/Title_Logo.png"
 
-    m_pLogo = new UIObject("Title/Title_Logo.png", SCREEN_WIDTH * 0.5f, 210.0f, 900.0f, 380.0f);
+    m_pLogo = new UIObject("Title/Title.png", SCREEN_WIDTH * 0.5f, 210.0f, 900.0f, 380.0f / 2);
     m_pStart = new UIObject("Title/Btn_Start.png", SCREEN_WIDTH * 0.5f, 550.0f, 380.0f, 110.0f);
-    m_pHint = new UIObject("Title/Title_Hint.png", SCREEN_WIDTH * 0.5f, 670.0f, 300.0f, 80.0f);
+    m_pHint = new UIObject("Title/Title_Hint.png", SCREEN_WIDTH * 0.5f, 670.0f, 300.0f, 120.0f);
 }
 
 SceneTitle::~SceneTitle()

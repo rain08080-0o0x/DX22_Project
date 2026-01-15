@@ -43,7 +43,8 @@ private:
     bool isActive;
 
 
-    UIManager m_ui;
+    UIObject* m_pDiceUI[3] = { nullptr, nullptr, nullptr };
+
 };
 
 

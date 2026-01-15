@@ -17,6 +17,8 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 
+// デバッグ用
+#include "DebugUtil.h"
 
 HRESULT Init(HWND hWnd, UINT width, UINT height)
 {
@@ -43,6 +45,9 @@ HRESULT Init(HWND hWnd, UINT width, UINT height)
 
 void Uninit()
 {
+	double t0 = NowMS();
+	DebugLog("App shutdown begin\n");
+
 	SceneManager::Uninit();
 
 	ShaderList::Uninit();
@@ -50,6 +55,8 @@ void Uninit()
 	Sprite::Uninit();
 	Geometory::Uninit();
 	UninitDirectX();
+
+	DebugLog("App shutdown end : %.2f ms\n", NowMS() - t0);
 }
 
 void Update()
@@ -176,6 +183,16 @@ void Draw()
 
 				if (ImGui::IsMousePosValid())
 					ImGui::Text("Mouse pos: (%g, %g)", io.MousePos.x, io.MousePos.y);
+				EndTabItem();
+			}
+			if (BeginTabItem("Yukari"))
+			{
+				DragFloat2("Yukari Pos", reinterpret_cast<float*>(&tran.yukari.pos));
+				DragFloat2("Yukari size", reinterpret_cast<float*>(&tran.yukari.size));
+
+				DragFloat2("Fukidasi pos", reinterpret_cast<float*>(&tran.fuki.pos));
+				DragFloat2("Fukidasi size", reinterpret_cast<float*>(&tran.fuki.size));
+
 				EndTabItem();
 			}
 

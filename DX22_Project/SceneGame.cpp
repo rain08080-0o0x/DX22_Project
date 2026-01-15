@@ -136,7 +136,19 @@ SceneGame::SceneGame()
 	m_role->SetPosition(m_roleListX, m_roleListY);
 	m_role->SetSize(panelW, panelH);
 
+	// 所持金表示（位置は好みで調整）
+	m_pMoneyUI = new ScoreLite("Number/number.png", 150.0f, 60.0f, 48.0f, 64.0f, 56.0f);
+	m_pMoneyUI->SetScore(m_money);
 
+	// 賭け初期化
+	m_money = 200;
+	m_bet = 0;
+	m_rollUsed = 0;
+	m_betState = BetState::WaitingBet;
+
+	m_pYukari = new Yukari();
+
+	isUsedYukari = true;
 }
 
 SceneGame::~SceneGame()
@@ -182,7 +194,19 @@ SceneGame::~SceneGame()
 		delete m_pRoleUI;
 		m_pRoleUI = nullptr;
 	}
+	if (m_pMoneyUI)
+	{
+		delete m_pMoneyUI;
+		m_pMoneyUI = nullptr;
+	}
+	if (m_pYukari)
+	{
+		delete m_pYukari;
+		m_pYukari = nullptr;
+	}
 }
+
+
 
 void SceneGame::Update()
 {
@@ -225,6 +249,8 @@ void SceneGame::Update()
 		m_pDice->Update(1);
 		m_pDice->SetCamera(m_pCamera);
 
+		m_pYukari->Update();
+
 		if (m_pDice->IsStop())
 		{
 			m_pCamera->LockPos(true);
@@ -248,30 +274,92 @@ void SceneGame::Update()
 					{
 					case RoleType::None:
 						m_pRoleUI->SetTexture("Role/Role_None.png");
+						m_pYukari->SetType(Yukari_Type::UnHappy);
 						break;
 					case RoleType::Hifumi:
 						m_pRoleUI->SetTexture("Role/Role_Hifumi.png");
+						m_pYukari->SetType(Yukari_Type::UnHappy);
 						break;
 					case RoleType::Shigoro:
 						m_pRoleUI->SetTexture("Role/Role_Shigoro.png");
+						m_pYukari->SetType(Yukari_Type::Happy);
 						break;
 					case RoleType::Zorome:
 						m_pRoleUI->SetTexture("Role/Role_Zorome.png");
+						m_pYukari->SetType(Yukari_Type::Happy);
 						break;
 					case RoleType::Pinzoro:
 						m_pRoleUI->SetTexture("Role/Role_Pinzoro.png");
+						m_pYukari->SetType(Yukari_Type::Happy);
 						break;
 					case RoleType::Me:
 					{
 						char path[64];
 						sprintf_s(path, "Role/Role_Me%d.png", r.me);
 						m_pRoleUI->SetTexture(path);
+						m_pYukari->SetType(Yukari_Type::Happy);
 						break;
 					}
 					default:
 						// 役なしなら表示消す or --- にする
 						break;
 					}
+					// 賭け結果（止まった瞬間に確定）
+					if (m_betState == BetState::Rolling)
+					{
+						// 先払い方式なので、勝ったら払い戻しとして上乗せする
+						// 例: mult=2 なら 2倍払い戻し（純利益は +1bet）
+						auto win = [&](int mult)
+							{
+								m_money += m_bet * mult;
+								if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
+
+								// ラウンド終了
+								m_bet = 0;
+								m_rollUsed = 0;
+								m_betState = BetState::WaitingBet;
+							};
+
+						auto continueRoll = [&]()
+							{
+								// 役なしで回数残ってるなら次のロール待ち
+								m_betState = BetState::WaitingRoll;
+							};
+
+						auto loseRound = [&]()
+							{
+								// すでに先払い済みなので、ここでは追加減算しない
+								m_bet = 0;
+								m_rollUsed = 0;
+								m_betState = BetState::WaitingBet;
+							};
+
+						if (r.role == RoleType::None)
+						{
+							if (m_rollUsed >= 3) loseRound();
+							else continueRoll();
+						}
+						else if (r.role == RoleType::Hifumi)
+						{
+							// ヒフミは即負け（先払いだけで終わり）
+							loseRound();
+						}
+						else
+						{
+							int mult = 1;
+							switch (r.role)
+							{
+							case RoleType::Pinzoro: mult = 10; break;
+							case RoleType::Zorome:  mult = 3;  break;
+							case RoleType::Shigoro: mult = 2;  break;
+							case RoleType::Me:      mult = 2;  break;
+							default:                mult = 1;  break;
+							}
+							win(mult);
+						}
+					}
+
+
 					m_roleFixedThisRoll = true;
 				}
 			}
@@ -280,17 +368,55 @@ void SceneGame::Update()
 		{
 			m_pCamera->LockPos(false);
 		}
-		if (IsKeyTrigger('R'))
+
+		// ベット選択（WaitingBet のときだけ）
+		if (m_betState == BetState::WaitingBet)
 		{
-			if (m_pDice)
+			int nextBet = 0;
+			if (IsKeyTrigger('1')) nextBet = 5;
+			if (IsKeyTrigger('2')) nextBet = 10;
+
+			if (nextBet > 0)
 			{
-				m_roleFixedThisRoll = false;
-				m_scoredThisRoll = false;
-				m_pDice->RollRandom(0);
-				m_pDice->RollRandom(2);
-				m_pDice->RollRandom(3);
+				// 所持金不足なら無視（UI出したいなら後で）
+				if (m_money >= nextBet)
+				{
+					m_bet = nextBet;
+					m_rollUsed = 0;
+					m_betState = BetState::WaitingRoll;
+
+					// 役表示をいったん None に
+					if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
+				}
 			}
 		}
+
+		if (IsKeyTrigger('R'))
+		{
+			// ラウンド中だけ振れる
+			if (m_betState == BetState::WaitingRoll)
+			{
+				if (m_rollUsed < 3 && m_pDice)
+				{
+					// 先払い（振ってる最中に減っている状態になる）
+					m_money -= m_bet;
+					if (m_money < 0) m_money = 0;
+					if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
+
+					m_roleFixedThisRoll = false;
+					m_scoredThisRoll = false;
+
+					m_rollUsed++;
+					m_betState = BetState::Rolling;
+
+					m_pDice->RollRandom(0);
+					m_pDice->RollRandom(2);
+					m_pDice->RollRandom(3);
+				}
+				m_pYukari->SetType(Yukari_Type::Think);
+			}
+		}
+
 		// Shiftを押すたびに開閉
 		if (IsKeyTrigger(VK_SHIFT))
 		{
@@ -428,6 +554,14 @@ void SceneGame::Draw()
 		if (m_pRoleUI)
 		{
 			m_pRoleUI->Draw();
+		}
+		if (m_pMoneyUI)
+		{
+			m_pMoneyUI->Draw();
+		}
+		if (m_pYukari && isUsedYukari)
+		{
+			m_pYukari->Draw();
 		}
 	}
 }

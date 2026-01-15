@@ -73,4 +73,6 @@ public:
 	ObjectfromAtoB obj;
 	UIInfo diceui;
 	DirectX::XMFLOAT2 mousePos;
+	UIobj yukari;
+	UIobj fuki;
 };
