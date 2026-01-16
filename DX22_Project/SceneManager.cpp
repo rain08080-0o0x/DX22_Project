@@ -1,10 +1,12 @@
 #include "SceneManager.h"
 #include "SceneTitle.h"
 #include "SceneGame.h"
+#include "SceneResult.h"
 
 Scene* SceneManager::m_pScene = nullptr;
 SceneManager::SceneType SceneManager::m_current = SceneManager::SCENE_TITLE;
 SceneManager::SceneType SceneManager::m_next = SceneManager::SCENE_TITLE;
+SceneManager::ResultType SceneManager::m_result = SceneManager::None;
 bool SceneManager::m_isChanging = false;
 
 void SceneManager::Init()
@@ -12,7 +14,7 @@ void SceneManager::Init()
     m_current = SCENE_TITLE;
     m_next = SCENE_TITLE;
     m_isChanging = false;
-
+    m_result = None;
     CreateScene(m_current);
 }
 
@@ -41,6 +43,9 @@ void SceneManager::CreateScene(SceneType type)
     case SCENE_GAME:
         m_pScene = new SceneGame();
         break;
+    case SCENE_RESULT:
+        m_pScene = new SceneResult();
+        break;
     default:
         m_pScene = new SceneTitle();
         break;
@@ -54,6 +59,16 @@ void SceneManager::ChangeScene(SceneType next)
 
     m_next = next;
     m_isChanging = true;
+}
+
+SceneManager::ResultType SceneManager::GetResultType()
+{
+    return m_result;
+}
+
+void SceneManager::ChangeResult(ResultType set)
+{
+    m_result = set;
 }
 
 void SceneManager::Update()

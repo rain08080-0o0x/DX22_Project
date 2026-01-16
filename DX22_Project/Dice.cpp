@@ -534,10 +534,10 @@ Dice::Dice()
 		body[i] = nullptr;
 	}
 
-	body[0] = new RigidBodyOBB({ 0.0f,5.0f,0.0f }, {1.0f,1.0f,1.0f}, 10.0f);
+	body[0] = new RigidBodyOBB({ 2.0f,1.0f,0.0f }, {1.0f,1.0f,1.0f}, 10.0f);
 	body[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {25.0f,1.0f,25.0f}, 0.0f);
-	body[2] = new RigidBodyOBB({0.0f,7.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
-	body[3] = new RigidBodyOBB({0.0f,10.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[2] = new RigidBodyOBB({-2.0f,1.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[3] = new RigidBodyOBB({0.0f,1.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
 	DiceRoll(*body[0],10);
 	DiceRoll(*body[2],10);
 	DiceRoll(*body[3],10);
@@ -849,7 +849,7 @@ void Dice::Draw()
 	{
 		// 使ってないDiceは0を代入
 		//tran.dice.currentFaceNumber[i] = 0;
-		//if (i == 4 || i == 5 || i == 6 || i == 7)continue;
+		if (i == 4 || i == 5 || i == 6 || i == 7)continue;
 
 		if (body[i] != nullptr)
 		{

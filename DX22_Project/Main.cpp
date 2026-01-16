@@ -78,9 +78,10 @@ void Draw()
 	static bool show_dice_window;
 	static bool show_dice4x4_window;
 
-	if(IsKeyTrigger('0'))show_main_window = !show_main_window;
+	if(IsKeyTrigger(VK_LSHIFT))show_main_window = !show_main_window;
 
 	using namespace ImGui;
+	using namespace std;
 	if (show_main_window)
 	{
 		Begin("Main Setting Window",&show_main_window);
@@ -176,8 +177,8 @@ void Draw()
 				std::string mouseInfoText;
 
 				ImGuiIO& io = ImGui::GetIO();
-				tran.mousePos.x = io.MousePos.x;
-				tran.mousePos.y = io.MousePos.y;
+				tran.mousePos.x = ImGui::GetCursorScreenPos().x;
+				tran.mousePos.y = ImGui::GetCursorScreenPos().y;
 				mouseInfoText = std::to_string(tran.mousePos.x) + " : " + std::to_string(tran.mousePos.y);
 				ImGui::Text(mouseInfoText.c_str());
 
@@ -195,14 +196,13 @@ void Draw()
 
 				EndTabItem();
 			}
-
 			EndTabBar();
 		}
-
 
 		Text("FPS: %.1f", GetIO().Framerate);
 		End();
 	}
+
 
 	// 軸線の表示
 	// グリッド
@@ -238,7 +238,7 @@ void Draw()
 	static bool camAutoSwitch = false;
 	static bool camUpDownSwitch = true;
 	static float camAutoRotate = 1.0f;
-	if (IsKeyTrigger(VK_RETURN)) {
+	if (IsKeyTrigger(VK_RETURN) && false) {
 		camAutoSwitch ^= true;
 	}
 	if (IsKeyTrigger(VK_SPACE)) {

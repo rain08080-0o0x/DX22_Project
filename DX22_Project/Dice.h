@@ -26,6 +26,7 @@ public:
 
     void SetDiceTexture(int count,int num);
 
+    bool isActive;
 private:
     Camera* m_pCamera = nullptr;
     Model* m_pModel = nullptr;
@@ -40,7 +41,6 @@ private:
 
     // 表示用（必要なら）色などだけ Dice が持つ
     DirectX::XMFLOAT4 color = { 1,1,1,1 };
-    bool isActive;
 
 
     UIObject* m_pDiceUI[3] = { nullptr, nullptr, nullptr };

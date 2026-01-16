@@ -149,6 +149,8 @@
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="Dice.cpp" />
     <ClCompile Include="DirectX.cpp" />
+    <ClCompile Include="Fade.cpp" />
+    <ClCompile Include="FadeBlack.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GaugeUI.cpp" />
     <ClCompile Include="Geometory.cpp" />
@@ -166,6 +168,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneGame.cpp" />
     <ClCompile Include="SceneManager.cpp" />
+    <ClCompile Include="SceneResult.cpp" />
     <ClCompile Include="SceneTitle.cpp" />
     <ClCompile Include="ScoreLite.cpp" />
     <ClCompile Include="Shader.cpp" />
@@ -190,6 +193,8 @@
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Dice.h" />
     <ClInclude Include="DirectX.h" />
+    <ClInclude Include="Fade.h" />
+    <ClInclude Include="FadeBlack.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GaugeUI.h" />
     <ClInclude Include="Geometory.h" />
@@ -209,6 +214,7 @@
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneGame.h" />
     <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="SceneResult.h" />
     <ClInclude Include="SceneTitle.h" />
     <ClInclude Include="ScoreLite.h" />
     <ClInclude Include="Shader.h" />

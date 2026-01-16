@@ -64,7 +64,7 @@ private:
 	bool m_scoredThisRoll = false;
 
 	UIObject* m_pRoleUI = nullptr;
-	bool m_roleFixedThisRoll = false;
+	bool m_roleFixedThisRoll = false; // スコアの多重加算をさせないようにする変数
 
 	// 役一覧スライド用
 	bool  m_roleListOpen;
@@ -84,6 +84,62 @@ private:
 	Yukari* m_pYukari;
 
 	bool isUsedYukari = false;
+public:
+	// ターン制
+	enum class TurnOwner
+	{
+		Player,
+		Enemy
+	};
+
+	enum class TurnPhase
+	{
+		TurnStart,     // ターン開始（初期化）
+		Betting,       // ベット選択
+		WaitingRoll,   // ロール入力待ち（敵は自動で進む）
+		Rolling,       // 転がり中
+		Resolve,       // 出目確定後の処理
+		TurnEnd        // 次のターンへ
+	};
+
+private:
+
+	void EndTurn();
+	void BeginTurn(TurnOwner owner);
+
+	void TurnUpdate();
+
+	void TurnStart();     // ターン開始（初期化）
+	void Betting();       // ベット選択
+	void WaitingRoll();   // ロール入力待ち（敵は自動で進む）
+	void Rolling();       // 転がり中
+	void Resolve();       // 出目確定後の処理
+	void TurnEnd();        // 次のターンへ
+
+private:
+
+	TurnOwner m_turnOwner = TurnOwner::Player;
+	TurnPhase m_turnPhase = TurnPhase::TurnStart;
+
+	TurnOwner m_nowOwner;
+	TurnOwner m_oldOwner;
+
+	int m_playerHP = 300;
+	int m_enemyHP = 300;
+
+	int m_damageThisTurn = 0;     // このターンのダメージ確定値（勝った時だけ入る）
+	bool m_resultReady = false;   // IsStop後に1回だけResolveするためのフラグ
+
+	// 敵AI用の簡単タイマー（自動でテンポ良くする）
+	float m_enemyWaitSec = 0.0f;
+
+	// Resolve 用に保持
+	RoleResult m_cachedRole;
+
+	ScoreLite* m_pPlayerHp;
+	ScoreLite* m_pEnemyHp;
+	UIObject* m_pPlayerUI;
+	UIObject* m_pEnemyUI;
 };
 
 #endif // __SCENE_GAME_H__

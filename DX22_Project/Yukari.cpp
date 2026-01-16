@@ -4,13 +4,13 @@
 Yukari::Yukari()
 {
 	TRAN_INS;
-	m_old = m_now = Yukari_Type::Think;
+	m_old = m_now = Yukari_Type::Normal;
 
 	DirectX::XMFLOAT2 size = { 500.0f,500.0f };
 	DirectX::XMFLOAT2 pos = { SCREEN_WIDTH - (size.x / 2.0f) + 100.0f, SCREEN_HEIGHT - (size.y / 2.0f * 0.75f) };
 	tran.yukari.pos = pos;
 	tran.yukari.size = size;
-	m_pYukari[0] = new UIObject("Yukari/normal.png", pos.x, pos.y, size.x, size.y);
+	m_pYukari[0] = new UIObject("Yukari/Œ»ê”L.png", pos.x, pos.y, size.x, size.y);
 	m_pYukari[1] = new UIObject("Yukari/happy.png", pos.x, pos.y, size.x, size.y);
 	m_pYukari[2] = new UIObject("Yukari/unhappy.png", pos.x, pos.y, size.x, size.y);
 	m_pYukari[3] = new UIObject("Yukari/think.png", pos.x, pos.y, size.x, size.y);
@@ -29,7 +29,7 @@ Yukari::Yukari()
 	size = { 656,151 };//3616:779
 	tran.fuki.pos = pos;
 	tran.fuki.size = size;
-	m_pFukidasi = new UIObject("Yukari/talk/ikimasuyo.png", pos.x, pos.y, size.x, size.y);
+	m_pFukidasi = new UIObject("Yukari/talk/sate.png", pos.x, pos.y, size.x, size.y);
 
 }
 
@@ -62,6 +62,7 @@ void Yukari::Draw()
 		case None:
 			break;
 		case Normal:
+			size.x *= 0.75f;
 			m_pYukari[0]->SetPosition(pos);
 			m_pYukari[0]->SetSize(size);
 			m_pYukari[0]->Draw();
