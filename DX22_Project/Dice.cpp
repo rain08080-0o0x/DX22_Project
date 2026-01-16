@@ -1,4 +1,4 @@
-ï»¿#include "Dice.h"
+#include "Dice.h"
 #include "Geometory.h"
 #include "Transfer.h"
 #include "Input.h"
@@ -13,8 +13,10 @@
 #include <cmath>    // fabsf
 using namespace DirectX;
 
-// Vec3å‹ã«å¯¾ã—ã¦å˜é …ãƒã‚¤ãƒŠã‚¹æ¼”ç®—å­ã‚’å®šç¾©ã™ã‚‹
-// Vec3.h ãªã©Vec3æ§‹é€ ä½“ã®å®šç¾©ãƒ•ã‚¡ã‚¤ãƒ«ã«ä»¥ä¸‹ã‚’è¿½åŠ ã—ã¦ãã ã•ã„
+static int s_rollFrameCount = 0;
+
+// Vec3Œ^‚É‘Î‚µ‚Ä’P€ƒ}ƒCƒiƒX‰‰Zq‚ğ’è‹`‚·‚é
+// Vec3.h ‚È‚ÇVec3\‘¢‘Ì‚Ì’è‹`ƒtƒ@ƒCƒ‹‚ÉˆÈ‰º‚ğ’Ç‰Á‚µ‚Ä‚­‚¾‚³‚¢
 
 inline Vec3 operator-(const Vec3& v)
 {
@@ -22,18 +24,64 @@ inline Vec3 operator-(const Vec3& v)
 }
 
 
-// æ‘©æ“¦
-const float friction = 0.97f;
-// è½ä¸‹åŠ é€Ÿåº¦
-const float fall = 0.02f;
-// æ­¢ã¾ã‚‹åŠ é€Ÿåº¦
-const float under = 0.01f;
-// å£
-const float wall = 2.5f;
 
+namespace
+{
+	// –€C
+	const float friction = 0.97f;
+	// —‰º‰Á‘¬“x
+	const float fall = 0.02f;
+	// ~‚Ü‚é‰Á‘¬“x
+	const float under = 0.01f;
+	// •Ç
+	const float wall = 2.5f;
+
+	const int kActiveDiceCount = 3;
+	const int kActiveDiceIndices[kActiveDiceCount] = { 0, 2, 3 };
+
+	void UpdateTranFromBody(const RigidBodyOBB* body, DirectX::XMFLOAT3& pos, DirectX::XMFLOAT3& vel, DirectX::XMFLOAT3& angVel)
+	{
+		if (!body) return;
+		pos = { body->center.x, body->center.y, body->center.z };
+		vel = { body->velocity.x, body->velocity.y, body->velocity.z };
+		angVel = { body->angularVel.x, body->angularVel.y, body->angularVel.z };
+	}
+
+	void ResetWallBody(RigidBodyOBB* wallBody, const Vec3& center)
+	{
+		if (!wallBody) return;
+		wallBody->axis[0] = { 1,0,0 };
+		wallBody->axis[1] = { 0,1,0 };
+		wallBody->axis[2] = { 0,0,1 };
+		wallBody->center = center;
+		wallBody->velocity = { 0,0,0 };
+		wallBody->angularVel = { 0,0,0 };
+	}
+
+	void StopDiceBodies(RigidBodyOBB* bodies[], const int* indices, int count)
+	{
+		for (int i = 0; i < count; ++i)
+		{
+			int index = indices[i];
+			if (!bodies[index]) continue;
+			bodies[index]->velocity = { 0,0,0 };
+			bodies[index]->angularVel = { 0,0,0 };
+		}
+	}
+
+	void UpdateDiceFaceNumbers(Transfer& tran, RigidBodyOBB* bodies[], const int* indices, int count)
+	{
+		for (int i = 0; i < count; ++i)
+		{
+			int index = indices[i];
+			if (!bodies[index]) continue;
+			tran.dice.currentFaceNumber[index] = GetTopFace(*bodies[index]);
+		}
+	}
+}
 static float ProjectRadiusOnAxis(const RigidBodyOBB & b, const Vec3 & nUnit)
 {
-	// r = Î£ extents[i] * |n Â· axis[i]|
+	// r = ƒ° extents[i] * |n E axis[i]|
 	return
 		b.extents.x * fabsf(nUnit.Dot(b.axis[0])) +
 		b.extents.y * fabsf(nUnit.Dot(b.axis[1])) +
@@ -50,7 +98,7 @@ static bool TryAxisSAT(
 {
 	const float eps = 1e-8f;
 	if (axisRaw.LengthSq() < eps)
-		return true; // crossè»¸ãŒæ½°ã‚Œã‚‹ã‚±ãƒ¼ã‚¹ã¯ç„¡è¦–
+		return true; // cross²‚ª’×‚ê‚éƒP[ƒX‚Í–³‹
 
 	Vec3 axis = axisRaw.Normalize();
 
@@ -60,20 +108,20 @@ static bool TryAxisSAT(
 
 	const float overlap = (rA + rB) - dist;
 	if (overlap < 0.0f)
-		return false; // åˆ†é›¢
+		return false; // •ª—£
 
 	if (overlap < bestOverlap)
 	{
 		bestOverlap = overlap;
 
-		// æ³•ç·šã‚’ A -> B æ–¹å‘ã«æƒãˆã‚‹
+		// –@ü‚ğ A -> B •ûŒü‚É‘µ‚¦‚é
 		const float s = (centerDelta.Dot(axis) < 0.0f) ? -1.0f : 1.0f;
 		bestNormal = axis * s;
 	}
 	return true;
 }
 
- //SATã§è¡çªã—ã¦ãŸã‚‰ Manifold ã‚’ä½œã‚‹ï¼ˆcontactPoint ã¯ç°¡æ˜“ï¼‰
+ //SAT‚ÅÕ“Ë‚µ‚Ä‚½‚ç Manifold ‚ğì‚éicontactPoint ‚ÍŠÈˆÕj
 static bool BuildManifoldSAT(RigidBodyOBB& A, RigidBodyOBB& B, CollisionResolver::Manifold& outM)
 {
 	Vec3 d = B.center - A.center;
@@ -81,7 +129,7 @@ static bool BuildManifoldSAT(RigidBodyOBB& A, RigidBodyOBB& B, CollisionResolver
 	float bestOverlap = FLT_MAX;
 	Vec3  bestNormal(0.0f, 1.0f, 0.0f);
 
-	// 15è»¸ï¼šAã®3è»¸ + Bã®3è»¸ + cross 9è»¸
+	// 15²FA‚Ì3² + B‚Ì3² + cross 9²
 	Vec3 axes[15];
 	int k = 0;
 	axes[k++] = A.axis[0];
@@ -101,7 +149,7 @@ static bool BuildManifoldSAT(RigidBodyOBB& A, RigidBodyOBB& B, CollisionResolver
 			return false;
 	}
 
-	// contactPointï¼ˆç°¡æ˜“ï¼‰ï¼šæ”¯æŒç‚¹ã®ä¸­ç‚¹
+	// contactPointiŠÈˆÕjFx“_‚Ì’†“_
 	const float rA = ProjectRadiusOnAxis(A, bestNormal);
 	const float rB = ProjectRadiusOnAxis(B, bestNormal);
 
@@ -116,10 +164,10 @@ static bool BuildManifoldSAT(RigidBodyOBB& A, RigidBodyOBB& B, CollisionResolver
 	return true;
 }
 
-// ã“ã“ãŒæ±ç”¨ï¼šé…åˆ—ã®ä¸­ã®å…¨Rigidbodyã‚’ç·å½“ãŸã‚Šã§åˆ¤å®šã—ã¦è§£æ±ºã™ã‚‹
+// ‚±‚±‚ª”Ä—pF”z—ñ‚Ì’†‚Ì‘SRigidbody‚ğ‘“–‚½‚è‚Å”»’è‚µ‚Ä‰ğŒˆ‚·‚é
 static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solverIters, bool grounded[])
 {
-	// åˆæœŸåŒ–
+	// ‰Šú‰»
 	for (int i = 0; i < maxCount; ++i)
 		grounded[i] = false;
 
@@ -142,8 +190,8 @@ static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solver
 				CollisionResolver::Manifold m;
 				if (BuildManifoldSAT(A, B, m))
 				{
-					// æ¥åœ°ã£ã½ã„æ¥è§¦ï¼ˆã»ã¼ä¸Šä¸‹æ–¹å‘ã®æ³•ç·šï¼‰ã‚’æ‹¾ã†
-					// normal.y ã®ç¬¦å·ã¯çµ„ã¿åˆã‚ã›ã§å¤‰ã‚ã‚‹ã®ã§çµ¶å¯¾å€¤ã§è¦‹ã‚‹
+					// Ú’n‚Á‚Û‚¢ÚGi‚Ù‚Úã‰º•ûŒü‚Ì–@üj‚ğE‚¤
+					// normal.y ‚Ì•„†‚Í‘g‚İ‡‚í‚¹‚Å•Ï‚í‚é‚Ì‚Åâ‘Î’l‚ÅŒ©‚é
 					if (fabsf(m.normal.y) > 0.7f)
 					{
 						grounded[i] = true;
@@ -174,7 +222,7 @@ static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solver
 //{
 //	const Vec3 worldUp(0.0f, 1.0f, 0.0f);
 //
-//	// 6é¢ã®æ³•ç·šå€™è£œï¼ˆç¬¦å·åè»¢ã¯ * -1.0f ã§ï¼‰
+//	// 6–Ê‚Ì–@üŒó•âi•„†”½“]‚Í * -1.0f ‚Åj
 //	Vec3 normals[6] =
 //	{
 //		b.axis[0],
@@ -185,7 +233,7 @@ static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solver
 //		b.axis[2] * -1.0f,
 //	};
 //
-//	// ä¸€ç•ªä¸Šã‚’å‘ã„ã¦ã‚‹é¢ã‚’é¸ã¶
+//	// ˆê”Ôã‚ğŒü‚¢‚Ä‚é–Ê‚ğ‘I‚Ô
 //	int best = 0;
 //	float bestDot = -FLT_MAX;
 //	for (int i = 0; i < 6; ++i)
@@ -198,10 +246,10 @@ static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solver
 //		}
 //	}
 //
-//	// ä¸Šæ–¹å‘
+//	// ã•ûŒü
 //	Vec3 up = NormalizeSafe(normals[best], worldUp);
 //
-//	// forward = axis[2] ã‚’æ¥åœ°å¹³é¢ã«æŠ•å½±
+//	// forward = axis[2] ‚ğÚ’n•½–Ê‚É“Š‰e
 //	Vec3 forward = b.axis[2] + (up * (-up.Dot(b.axis[2])));
 //	forward = NormalizeSafe(forward, Vec3(0.0f, 0.0f, 1.0f));
 //
@@ -209,7 +257,7 @@ static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solver
 //	Vec3 right = forward.Cross(up);
 //	right = NormalizeSafe(right, Vec3(1.0f, 0.0f, 0.0f));
 //
-//	// forward ã‚’å†è¨ˆç®—ï¼ˆç›´äº¤ä¿è¨¼ï¼‰
+//	// forward ‚ğÄŒvZi’¼Œğ•ÛØj
 //	forward = up.Cross(right);
 //	forward = NormalizeSafe(forward, Vec3(0.0f, 0.0f, 1.0f));
 //
@@ -218,19 +266,19 @@ static void ResolveAllPairs_SAT(RigidBodyOBB* bodies[], int maxCount, int solver
 //	b.axis[2] = forward;
 //}
 
-// body[support] ã®ä¸Šé¢ã‚’ã€Œè»¸å¹³è¡Œã®åºŠã€ã¨ã—ã¦æ‰±ã†ç°¡æ˜“åˆ¤å®š
-// ã‚ãªãŸã®å…ƒã‚³ãƒ¼ãƒ‰ã¯åºŠãŒè»¸å¹³è¡Œå‰æãªã®ã§ã€ãã®å‰æã‚’å´©ã•ãªã„ãŸã‚ã®åˆ¤å®š
+// body[support] ‚Ìã–Ê‚ğu²•½s‚Ì°v‚Æ‚µ‚Äˆµ‚¤ŠÈˆÕ”»’è
+// ‚ ‚È‚½‚ÌŒ³ƒR[ƒh‚Í°‚ª²•½s‘O’ñ‚È‚Ì‚ÅA‚»‚Ì‘O’ñ‚ğ•ö‚³‚È‚¢‚½‚ß‚Ì”»’è
 static bool IsAxisAlignedFloorLike(const RigidBodyOBB& b)
 {
-	// è»¸ãŒã ã„ãŸã„ãƒ¯ãƒ¼ãƒ«ãƒ‰è»¸ã«æƒã£ã¦ã„ã‚Œã°OK
-	// ãã¤ã™ãã‚‹ã¨åºŠåˆ¤å®šã•ã‚Œãªã„ã®ã§é–¾å€¤ã¯ã‚†ã‚‹ã‚
+	// ²‚ª‚¾‚¢‚½‚¢ƒ[ƒ‹ƒh²‚É‘µ‚Á‚Ä‚¢‚ê‚ÎOK
+	// ‚«‚Â‚·‚¬‚é‚Æ°”»’è‚³‚ê‚È‚¢‚Ì‚Åè‡’l‚Í‚ä‚é‚ß
 	const float th = 0.95f;
 
 	Vec3 ax = b.axis[0];
 	Vec3 ay = b.axis[1];
 	Vec3 az = b.axis[2];
 
-	// çµ¶å¯¾å€¤ã§ãƒ¯ãƒ¼ãƒ«ãƒ‰è»¸ã«è¿‘ã„ã‹
+	// â‘Î’l‚Åƒ[ƒ‹ƒh²‚É‹ß‚¢‚©
 	auto absf_ = [](float v) { return (v < 0.0f) ? -v : v; };
 
 	bool xOK = (absf_(ax.x) > th && absf_(ax.y) < (1.0f - th) && absf_(ax.z) < (1.0f - th));
@@ -240,7 +288,7 @@ static bool IsAxisAlignedFloorLike(const RigidBodyOBB& b)
 	return xOK && yOK && zOK;
 }
 
-// ã‚ãªãŸã®åŸºæº–æ–¹å¼ï¼šmoving ã®é ‚ç‚¹ã‚’ä½¿ã£ã¦ support ä¸Šé¢ï¼ˆè»¸å¹³è¡ŒåºŠï¼‰ã¨è¤‡æ•°ç‚¹ã§è§£ã
+// ‚ ‚È‚½‚ÌŠî€•û®Fmoving ‚Ì’¸“_‚ğg‚Á‚Ä support ã–Êi²•½s°j‚Æ•¡”“_‚Å‰ğ‚­
 static void ResolveBoxOnTopPlane_MultiContact(RigidBodyOBB* support, RigidBodyOBB* moving)
 {
 	if (!support || !moving) return;
@@ -250,22 +298,22 @@ static void ResolveBoxOnTopPlane_MultiContact(RigidBodyOBB* support, RigidBodyOB
 
 	const float planeY = support->center.y + support->extents.y;
 
-	// moving ã®æœ€ä¸‹ç‚¹Y
+	// moving ‚ÌÅ‰º“_Y
 	float minY = verts[0].y;
 	for (int i = 1; i < 8; ++i)
 		if (verts[i].y < minY) minY = verts[i].y;
 
-	// è¨±å®¹
+	// ‹–—e
 	const float contactEps = 0.001f;
 	const float minLayer = 0.01f;
 
-	// support ã‚’è»¸å¹³è¡ŒåºŠã¨ã—ã¦æ‰±ã†ã®ã§ AABB ç¯„å›²ã¯ center/extents ã§OK
+	// support ‚ğ²•½s°‚Æ‚µ‚Äˆµ‚¤‚Ì‚Å AABB ”ÍˆÍ‚Í center/extents ‚ÅOK
 	const float minX = support->center.x - support->extents.x;
 	const float maxX = support->center.x + support->extents.x;
 	const float minZ = support->center.z - support->extents.z;
 	const float maxZ = support->center.z + support->extents.z;
 
-	// æ¥è§¦ç‚¹ã‚’è¤‡æ•°å›æµã™ï¼ˆå…ƒã‚³ãƒ¼ãƒ‰ã®åå¾©2å›ã‚’ç¶­æŒï¼‰
+	// ÚG“_‚ğ•¡”‰ñ—¬‚·iŒ³ƒR[ƒh‚Ì”½•œ2‰ñ‚ğˆÛj
 	for (int iter = 0; iter < 2; ++iter)
 	{
 		for (int i = 0; i < 8; ++i)
@@ -279,8 +327,8 @@ static void ResolveBoxOnTopPlane_MultiContact(RigidBodyOBB* support, RigidBodyOB
 			if (depth <= -contactEps) continue;
 
 			CollisionResolver::Manifold m;
-			m.bodyA = support;              // æ”¯æŒå´
-			m.bodyB = moving;               // ä¹—ã‚‹å´
+			m.bodyA = support;              // x‘¤
+			m.bodyB = moving;               // æ‚é‘¤
 			m.normal = Vec3(0.0f, 1.0f, 0.0f);
 			m.depth = depth;
 
@@ -289,15 +337,15 @@ static void ResolveBoxOnTopPlane_MultiContact(RigidBodyOBB* support, RigidBodyOB
 
 			CollisionResolver::ResolveCollision(m);
 
-			// è§£æ±ºã§å§¿å‹¢ã‚„ä¸­å¿ƒãŒå‹•ãã®ã§ã€é ‚ç‚¹ã‚‚æ›´æ–°ã—ã¦ãŠãï¼ˆåŒãƒ•ãƒ¬ãƒ¼ãƒ ã®å®‰å®šåŒ–ï¼‰
+			// ‰ğŒˆ‚Åp¨‚â’†S‚ª“®‚­‚Ì‚ÅA’¸“_‚àXV‚µ‚Ä‚¨‚­i“¯ƒtƒŒ[ƒ€‚ÌˆÀ’è‰»j
 			moving->GetWorldVertices(verts);
 		}
 	}
 }
 
-// æ±ç”¨ï¼šé…åˆ—ã®å…¨ãƒšã‚¢ã‚’è§£ã
-//  - é™çš„ã‹ã¤åºŠã£ã½ã„ã‚‚ã®ã¯ã€Œä¸Šé¢åºŠã€ã¨ã—ã¦è¤‡æ•°ç‚¹è§£æ±º
-//  - ãã‚Œä»¥å¤–ã¯ SAT å˜ä¸€ãƒãƒ‹ãƒ•ã‚©ãƒ¼ãƒ«ãƒ‰
+// ”Ä—pF”z—ñ‚Ì‘SƒyƒA‚ğ‰ğ‚­
+//  - Ã“I‚©‚Â°‚Á‚Û‚¢‚à‚Ì‚Íuã–Ê°v‚Æ‚µ‚Ä•¡”“_‰ğŒˆ
+//  - ‚»‚êˆÈŠO‚Í SAT ’Pˆêƒ}ƒjƒtƒH[ƒ‹ƒh
 static void ResolveAllPairs_Generic(RigidBodyOBB* bodies[], int count, int solverIters)
 {
 	for (int iter = 0; iter < solverIters; ++iter)
@@ -313,12 +361,12 @@ static void ResolveAllPairs_Generic(RigidBodyOBB* bodies[], int count, int solve
 				RigidBodyOBB* A = bodies[i];
 				RigidBodyOBB* B = bodies[j];
 
-				// ä¸¡æ–¹é™çš„ãªã‚‰ã‚¹ã‚­ãƒƒãƒ—
+				// —¼•ûÃ“I‚È‚çƒXƒLƒbƒv
 				if (A->invMass == 0.0f && B->invMass == 0.0f)
 					continue;
 
-				// ç‰‡æ–¹ãŒé™çš„ã§åºŠã£ã½ã„ãªã‚‰ã€åºŠä¸Šé¢ã®è¤‡æ•°æ¥è§¦ç‚¹ã§è§£ã
-				// ã©ã£ã¡ãŒåºŠã‹ã‚’ä¸¡æ–¹è©¦ã™
+				// •Ğ•û‚ªÃ“I‚Å°‚Á‚Û‚¢‚È‚çA°ã–Ê‚Ì•¡”ÚG“_‚Å‰ğ‚­
+				// ‚Ç‚Á‚¿‚ª°‚©‚ğ—¼•û‚·
 				if (A->invMass == 0.0f && IsAxisAlignedFloorLike(*A))
 				{
 					ResolveBoxOnTopPlane_MultiContact(A, B);
@@ -330,7 +378,7 @@ static void ResolveAllPairs_Generic(RigidBodyOBB* bodies[], int count, int solve
 					continue;
 				}
 
-				// ãã‚Œä»¥å¤–ã¯ SAT
+				// ‚»‚êˆÈŠO‚Í SAT
 				CollisionResolver::Manifold m;
 				if (BuildManifoldSAT(*A, *B, m))
 				{
@@ -345,16 +393,16 @@ static DirectX::XMFLOAT4X4 MakeWorldFromOBB(const RigidBodyOBB& b, float modelUn
 {
 	using namespace DirectX;
 
-	// extents ã¯åŠã‚µã‚¤ã‚ºãªã®ã§ *2 ã§ä¸€è¾ºã®é•·ã•ã«ãªã‚‹
-	// ãƒ¢ãƒ‡ãƒ«ãŒã€Œ1è¾º modelUnitSize ã®ç«‹æ–¹ä½“ã€ãªã‚‰ã“ã‚Œã§ä¸€è‡´ã™ã‚‹
+	// extents ‚Í”¼ƒTƒCƒY‚È‚Ì‚Å *2 ‚Åˆê•Ó‚Ì’·‚³‚É‚È‚é
+	// ƒ‚ƒfƒ‹‚ªu1•Ó modelUnitSize ‚Ì—§•û‘Ìv‚È‚ç‚±‚ê‚Åˆê’v‚·‚é
 	const float sx = (b.extents.x * 2.0f) / modelUnitSize;
 	const float sy = (b.extents.y * 2.0f) / modelUnitSize;
 	const float sz = (b.extents.z * 2.0f) / modelUnitSize;
 
 	XMMATRIX S = XMMatrixScaling(sx, sy, sz);
 
-	// axis[0]=Right, axis[1]=Up, axis[2]=Forward ã‚’å›è»¢è¡Œåˆ—ã«ã™ã‚‹
-	// ã“ã®ä¸¦ã¹æ–¹ã§ OKï¼ˆæœ€å¾Œã« Transpose ã—ã¦ã‚·ã‚§ãƒ¼ãƒ€ã¸æ¸¡ã™è¨­è¨ˆã«åˆã‚ã›ã‚‹ï¼‰
+	// axis[0]=Right, axis[1]=Up, axis[2]=Forward ‚ğ‰ñ“]s—ñ‚É‚·‚é
+	// ‚±‚Ì•À‚×•û‚Å OKiÅŒã‚É Transpose ‚µ‚ÄƒVƒF[ƒ_‚Ö“n‚·İŒv‚É‡‚í‚¹‚éj
 	XMMATRIX R =
 	{
 		b.axis[0].x, b.axis[0].y, b.axis[0].z, 0.0f,
@@ -368,7 +416,7 @@ static DirectX::XMFLOAT4X4 MakeWorldFromOBB(const RigidBodyOBB& b, float modelUn
 	XMMATRIX W = S * R * T;
 
 	XMFLOAT4X4 out;
-	XMStoreFloat4x4(&out, XMMatrixTranspose(W)); // ã‚ãªãŸã®ç’°å¢ƒã¯ Transpose æ¸¡ã—å‰æ
+	XMStoreFloat4x4(&out, XMMatrixTranspose(W)); // ‚ ‚È‚½‚ÌŠÂ‹«‚Í Transpose “n‚µ‘O’ñ
 	return out;
 }
 
@@ -394,19 +442,19 @@ static float LenSq3(const Vec3& v)
 	return v.x * v.x + v.y * v.y + v.z * v.z;
 }
 
-// æˆ»ã‚Šå€¤ï¼šç¢ºå®šã—ãŸã‚‰ trueï¼ˆoutFace ã«å‡ºç›®ãŒå…¥ã‚‹ï¼‰
-//         ã¾ã å‹•ã„ã¦ã‚‹ãªã‚‰ false
+// –ß‚è’lFŠm’è‚µ‚½‚ç trueioutFace ‚Éo–Ú‚ª“ü‚éj
+//         ‚Ü‚¾“®‚¢‚Ä‚é‚È‚ç false
 static bool TryFinalizeDice(RigidBodyOBB& b, int& outFace)
 {
-	// å®Œå…¨å›ºå®šä¸­ãªã‚‰æ—¢ã«ç¢ºå®šæ¸ˆã¿æ‰±ã„
+	// Š®‘SŒÅ’è’†‚È‚çŠù‚ÉŠm’èÏ‚İˆµ‚¢
 	if (b.fullyLocked)
 	{
 		outFace = GetTopFace(b);
 		return true;
 	}
 
-	// ã—ãã„å€¤ï¼ˆå¿…è¦ãªã‚‰èª¿æ•´ï¼‰
-	// v2 ã¯é€Ÿåº¦^2ã€w2 ã¯è§’é€Ÿåº¦^2
+	// ‚µ‚«‚¢’li•K—v‚È‚ç’²®j
+	// v2 ‚Í‘¬“x^2Aw2 ‚ÍŠp‘¬“x^2
 	const float v2 = LenSq3(b.velocity);
 	const float w2 = LenSq3(b.angularVel);
 
@@ -416,10 +464,10 @@ static bool TryFinalizeDice(RigidBodyOBB& b, int& outFace)
 	if (v2 > v2Sleep || w2 > w2Sleep)
 		return false;
 
-	// æ­¢ã¾ã£ãŸï¼šå‡ºç›®ç¢ºå®š
+	// ~‚Ü‚Á‚½Fo–ÚŠm’è
 	outFace = GetTopFace(b);
 
-	// å®Œå…¨å›ºå®šï¼ˆç‰©ç†åœæ­¢ï¼‰
+	// Š®‘SŒÅ’èi•¨—’â~j
 	b.velocity = Vec3(0.0f, 0.0f, 0.0f);
 	b.angularVel = Vec3(0.0f, 0.0f, 0.0f);
 
@@ -452,7 +500,7 @@ static float RandRange(float minV, float maxV)
 //{
 //	const float eps = 1e-8f;
 //	if (axisRaw.LengthSq() < eps)
-//		return true; // crossè»¸ãŒæ½°ã‚Œã‚‹å ´åˆã¯ç„¡è¦–
+//		return true; // cross²‚ª’×‚ê‚éê‡‚Í–³‹
 //
 //	Vec3 axis = axisRaw.Normalize();
 //
@@ -462,20 +510,20 @@ static float RandRange(float minV, float maxV)
 //
 //	const float overlap = (rA + rB) - dist;
 //	if (overlap < 0.0f)
-//		return false; // åˆ†é›¢ã—ã¦ã‚‹
+//		return false; // •ª—£‚µ‚Ä‚é
 //
 //	if (overlap < bestOverlap)
 //	{
 //		bestOverlap = overlap;
 //
-//		// æ³•ç·šã®å‘ãã‚’ A->B ã«æƒãˆã‚‹
+//		// –@ü‚ÌŒü‚«‚ğ A->B ‚É‘µ‚¦‚é
 //		const float s = (centerDelta.Dot(axis) < 0.0f) ? -1.0f : 1.0f;
 //		bestNormal = axis * s;
 //	}
 //	return true;
 //}
 
-// SATã§è¡çªã—ã¦ãŸã‚‰ Manifold ã‚’ä½œã‚‹ï¼ˆcontactPointã¯ç°¡æ˜“ï¼šæ”¯æŒç‚¹ã®ä¸­ç‚¹ï¼‰
+// SAT‚ÅÕ“Ë‚µ‚Ä‚½‚ç Manifold ‚ğì‚éicontactPoint‚ÍŠÈˆÕFx“_‚Ì’†“_j
 //static bool BuildManifoldSAT(RigidBodyOBB& A, RigidBodyOBB& B, CollisionResolver::Manifold& outM)
 //{
 //	Vec3 d = B.center - A.center;
@@ -483,7 +531,7 @@ static float RandRange(float minV, float maxV)
 //	float bestOverlap = FLT_MAX;
 //	Vec3 bestNormal(0.0f, 1.0f, 0.0f);
 //
-//	// 15è»¸ï¼šAã®3è»¸ + Bã®3è»¸ + cross 9è»¸
+//	// 15²FA‚Ì3² + B‚Ì3² + cross 9²
 //	Vec3 axes[15];
 //	int k = 0;
 //	axes[k++] = A.axis[0];
@@ -503,7 +551,7 @@ static float RandRange(float minV, float maxV)
 //			return false;
 //	}
 //
-//	// contactPointï¼ˆç°¡æ˜“ï¼‰
+//	// contactPointiŠÈˆÕj
 //	const float rA = ProjectRadiusOnAxis(A, bestNormal);
 //	const float rB = ProjectRadiusOnAxis(B, bestNormal);
 //
@@ -534,14 +582,14 @@ Dice::Dice()
 		body[i] = nullptr;
 	}
 
-	body[0] = new RigidBodyOBB({ 0.0f,5.0f,0.0f }, {1.0f,1.0f,1.0f}, 10.0f);
+	body[0] = new RigidBodyOBB({ 2.0f,1.0f,0.0f }, {1.0f,1.0f,1.0f}, 10.0f);
 	body[1] = new RigidBodyOBB({0.0f,0.0f,0.0f}, {25.0f,1.0f,25.0f}, 0.0f);
-	body[2] = new RigidBodyOBB({0.0f,7.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
-	body[3] = new RigidBodyOBB({0.0f,10.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[2] = new RigidBodyOBB({-2.0f,1.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
+	body[3] = new RigidBodyOBB({0.0f,1.0f,0.0f}, {1.0f,1.0f,1.0f}, 10.0f);
 	DiceRoll(*body[0],10);
 	DiceRoll(*body[2],10);
 	DiceRoll(*body[3],10);
-	// å››æ–¹ã®å£ã‚’ç”Ÿæˆ
+	// l•û‚Ì•Ç‚ğ¶¬
 	body[4] = new RigidBodyOBB({ 0,5, wall }, { 2 * wall,10.0f,0.5f }, 100.0f);
 	body[5] = new RigidBodyOBB({ 0,5,-wall }, { 2 * wall,10.0f,0.5f }, 100.0f);
 	body[6] = new RigidBodyOBB({  wall,5,0 }, { 0.5f,10.0f,2 * wall }, 100.0f);
@@ -551,21 +599,21 @@ Dice::Dice()
 	body[5]->SetFullyLocked(true);
 	body[6]->SetFullyLocked(true);
 	body[7]->SetFullyLocked(true);
-	// é ‚ç‚¹æ±ºã‚
+	// ’¸“_Œˆ‚ß
 	float sizehalf = HALF(0.5f);
-	vertex[0] = {m_pos.x - size ,m_pos.y - size,m_pos.z - size};// å·¦ä¸‹å¾Œã‚
-	vertex[1] = {m_pos.x - size ,m_pos.y - size,m_pos.z + size};// å·¦ä¸‹æ‰‹å‰
-	vertex[2] = {m_pos.x - size ,m_pos.y + size,m_pos.z - size};// å·¦ä¸Šå¾Œã‚
-	vertex[3] = {m_pos.x - size ,m_pos.y + size,m_pos.z + size};// å·¦ä¸Šæ‰‹å‰
-	vertex[4] = {m_pos.x + size ,m_pos.y - size,m_pos.z - size};// å³ä¸‹å¾Œã‚
-	vertex[5] = {m_pos.x + size ,m_pos.y - size,m_pos.z + size};// å³ä¸‹æ‰‹å‰
-	vertex[6] = {m_pos.x + size ,m_pos.y + size,m_pos.z - size};// å³ä¸Šå¾Œã‚
-	vertex[7] = {m_pos.x + size ,m_pos.y + size,m_pos.z + size};// å³ä¸Šæ‰‹å‰
+	vertex[0] = {m_pos.x - size ,m_pos.y - size,m_pos.z - size};// ¶‰ºŒã‚ë
+	vertex[1] = {m_pos.x - size ,m_pos.y - size,m_pos.z + size};// ¶‰ºè‘O
+	vertex[2] = {m_pos.x - size ,m_pos.y + size,m_pos.z - size};// ¶ãŒã‚ë
+	vertex[3] = {m_pos.x - size ,m_pos.y + size,m_pos.z + size};// ¶ãè‘O
+	vertex[4] = {m_pos.x + size ,m_pos.y - size,m_pos.z - size};// ‰E‰ºŒã‚ë
+	vertex[5] = {m_pos.x + size ,m_pos.y - size,m_pos.z + size};// ‰E‰ºè‘O
+	vertex[6] = {m_pos.x + size ,m_pos.y + size,m_pos.z - size};// ‰EãŒã‚ë
+	vertex[7] = {m_pos.x + size ,m_pos.y + size,m_pos.z + size};// ‰Eãè‘O
 
 	m_pModel = new Model();
 
-	if (!m_pModel->Load("Assets/Model/Dice/dice.fbx", 1.f, Model::ZFlip)) { // å€ç‡ã¨åè»¢ã¯çœç•¥å¯
-		MessageBox(NULL, "Not found for dice", "Error", MB_OK); // ã‚¨ãƒ©ãƒ¼ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã®è¡¨ç¤º
+	if (!m_pModel->Load("Assets/Model/Dice/dice.fbx", 1.f, Model::ZFlip)) { // ”{—¦‚Æ”½“]‚ÍÈ—ª‰Â
+		MessageBox(NULL, "Not found for dice", "Error", MB_OK); // ƒGƒ‰[ƒƒbƒZ[ƒW‚Ì•\¦
 	}
 
 }
@@ -598,117 +646,62 @@ void Dice::Update(int)
 {
 	const float dt = 1.0f / fFPS;
 
-	// 1) å…ˆã«å…¨ãƒœãƒ‡ã‚£ã‚’ç©åˆ†ï¼ˆã“ã“ã§ center/axis ãŒæœ€æ–°ã«ãªã‚‹ï¼‰
+	// 1) æ‚É‘Sƒ{ƒfƒB‚ğÏ•ªi‚±‚±‚Å center/axis ‚ªÅV‚É‚È‚éj
 	for (int i = 0; i < MAX_DICE; ++i)
 	{
 		if (body[i] == nullptr) continue;
 		body[i]->Update(dt);
 	}
 
-	// 2) æ±ç”¨ï¼šé…åˆ—ã®å…¨ãƒšã‚¢è¡çªè§£æ±º
+	// 2) ”Ä—pF”z—ñ‚Ì‘SƒyƒAÕ“Ë‰ğŒˆ
 	const int solverIters = 4;
 	ResolveAllPairs_Generic(body, MAX_DICE, solverIters);
 
-	// 3) è¡çªã§å¤‰ã‚ã£ãŸ angularVel ã‚’åŒãƒ•ãƒ¬ãƒ¼ãƒ ã§å§¿å‹¢ã«åæ˜ 
+	// 3) Õ“Ë‚Å•Ï‚í‚Á‚½ angularVel ‚ğ“¯ƒtƒŒ[ƒ€‚Åp¨‚É”½‰f
 	for (int i = 0; i < MAX_DICE; ++i)
 	{
 		if (body[i] == nullptr) continue;
 		body[i]->IntegrateRotation(dt);
 	}
 
-	// 4) Transferï¼ˆå¿…è¦ãªã‚‰ã€‚ä»Šã¾ã§é€šã‚Š 0 ã¨ 1 ã‚’å…¥ã‚Œã‚‹ï¼‰
+	// 4) Transferi•K—v‚È‚çB¡‚Ü‚Å’Ê‚è 0 ‚Æ 1 ‚ğ“ü‚ê‚éj
 	TRAN_INS;
+	UpdateTranFromBody(body[0], tran.obj.A, tran.obj.Avel, tran.obj.AangVel);
+	UpdateTranFromBody(body[1], tran.obj.B, tran.obj.Bvel, tran.obj.BangVel);
 
-	if (body[0])
-	{
-		tran.obj.A = { body[0]->center.x, body[0]->center.y, body[0]->center.z };
-		tran.obj.Avel = { body[0]->velocity.x, body[0]->velocity.y, body[0]->velocity.z };
-		tran.obj.AangVel = { body[0]->angularVel.x, body[0]->angularVel.y, body[0]->angularVel.z };
-	}
-	if (body[1])
-	{
-		tran.obj.B = { body[1]->center.x, body[1]->center.y, body[1]->center.z };
-		tran.obj.Bvel = { body[1]->velocity.x, body[1]->velocity.y, body[1]->velocity.z };
-		tran.obj.BangVel = { body[1]->angularVel.x, body[1]->angularVel.y, body[1]->angularVel.z };
-	}
-
-	// ãƒ†ã‚¹ãƒˆæ“ä½œï¼ˆãã®ã¾ã¾ç¶­æŒï¼‰
-	static int count;
+	// ƒeƒXƒg‘€ìi‚»‚Ì‚Ü‚ÜˆÛj
 	if (IsKeyTrigger('Y'))
 	{
 		//DiceRoll(*body[0], 15.0f);
 		//DiceRoll(*body[2], 15.0f);
 		//DiceRoll(*body[3], 15.0f);
-		//count = 0;
+		//s_rollFrameCount = 0;
 		//tran.dice.currentFaceNumber[0] = 0;
 		//tran.dice.currentFaceNumber[2] = 0;
 		//tran.dice.currentFaceNumber[3] = 0;
 		//isActive = true;
 	}
-	if (IsKeyTrigger('R'))
+	// ŒÜ•bŒo‰ß or TƒL[‚Å‹­§’â~
+	if (s_rollFrameCount >= fFPS * 5 || IsKeyPress('T'))
 	{
-		count = 0;
-	}
-	// äº”ç§’çµŒé or Tã‚­ãƒ¼ã§å¼·åˆ¶åœæ­¢
-	if (count >= fFPS * 5 || IsKeyPress('T'))
-	{
-		body[0]->velocity = { 0,0,0 };
-		body[0]->angularVel = { 0,0,0 };
-		body[2]->velocity = { 0,0,0 };
-		body[2]->angularVel = { 0,0,0 };
-		body[3]->velocity = { 0,0,0 };
-		body[3]->angularVel = { 0,0,0 };
-
-		// NULLãƒã‚§ãƒƒã‚¯ã‚’è¿½åŠ ã—ã¦å®‰å…¨ã«ã‚¢ã‚¯ã‚»ã‚¹ã™ã‚‹
-		if (body[0] != nullptr) {
-			tran.dice.currentFaceNumber[0] = GetTopFace(*body[0]);
-		}
-		tran.dice.currentFaceNumber[0] = GetTopFace(*body[0]);
-		tran.dice.currentFaceNumber[2] = GetTopFace(*body[2]);
-		tran.dice.currentFaceNumber[3] = GetTopFace(*body[3]);
+		StopDiceBodies(body, kActiveDiceIndices, kActiveDiceCount);
+		UpdateDiceFaceNumbers(tran, body, kActiveDiceIndices, kActiveDiceCount);
 		isActive = false;
 
-		int dice0 = tran.dice.currentFaceNumber[0];
-		int dice2 = tran.dice.currentFaceNumber[2];
-		int dice3 = tran.dice.currentFaceNumber[3];
-
-		SetDiceTexture(0, dice0);
-		SetDiceTexture(1, dice2);
-		SetDiceTexture(2, dice3);
+		for (int i = 0; i < kActiveDiceCount; ++i)
+		{
+			int face = tran.dice.currentFaceNumber[kActiveDiceIndices[i]];
+			SetDiceTexture(i, face);
+		}
 	}
-	count++;
-	body[4]->axis[0] = { 1,0,0 };
-	body[4]->axis[1] = { 0,1,0 };
-	body[4]->axis[2] = { 0,0,1 };
-	body[4]->center = { 0,5,wall };
-	body[4]->velocity = { 0,0,0 };
-	body[4]->angularVel = { 0,0,0 };
+	s_rollFrameCount++;
 
+	ResetWallBody(body[4], { 0,5, wall });
+	ResetWallBody(body[5], { 0,5,-wall });
+	ResetWallBody(body[6], {  wall,5,0 });
+	ResetWallBody(body[7], { -wall,5,0 });
 
-	body[5]->axis[0] = { 1,0,0 };
-	body[5]->axis[1] = { 0,1,0 };
-	body[5]->axis[2] = { 0,0,1 };
-	body[5]->center = { 0,5,-wall };
-	body[5]->velocity = { 0,0,0 };
-	body[5]->angularVel = { 0,0,0 };
-
-
-	body[6]->axis[0] = { 1,0,0 };
-	body[6]->axis[1] = { 0,1,0 };
-	body[6]->axis[2] = { 0,0,1 };
-	body[6]->center = { wall,5,0 };
-	body[6]->velocity = { 0,0,0 };
-	body[6]->angularVel = { 0,0,0 };
-
-
-	body[7]->axis[0] = { 1,0,0 };
-	body[7]->axis[1] = { 0,1,0 };
-	body[7]->axis[2] = { 0,0,1 };
-	body[7]->center = { -wall,5,0 };
-	body[7]->velocity = { 0,0,0 };
-	body[7]->angularVel = { 0,0,0 };
-
-	// å‡ºç›®ä¿å­˜ï¼ˆDiceã‚¯ãƒ©ã‚¹ã®ãƒ¡ãƒ³ãƒã«ã—ã¦ã‚‚OKï¼‰
+	// o–Ú•Û‘¶iDiceƒNƒ‰ƒX‚Ìƒƒ“ƒo‚É‚µ‚Ä‚àOKj
 	static int g_face[MAX_DICE] = { 0 };
 
 	for (int i = 0; i < MAX_DICE; ++i)
@@ -716,7 +709,7 @@ void Dice::Update(int)
 		if (!body[i]) continue;
 		if (i == 1)continue;
 
-		// å£ã‚„åºŠã¯ç¢ºå®šå¯¾è±¡å¤–ãªã‚‰ã‚¹ã‚­ãƒƒãƒ—
+		// •Ç‚â°‚ÍŠm’è‘ÎÛŠO‚È‚çƒXƒLƒbƒv
 		if (body[i]->invMass == 0.0f) continue;
 
 		int face = 0;
@@ -728,63 +721,61 @@ void Dice::Update(int)
 
 }
 
-
-
-// æ›´æ–°å‡¦ç† 
+// XVˆ— 
 void Dice::Update(float dt)
 {
 	{
-		// 2. è¡çªåˆ¤å®š (SATç­‰ã§åˆ¥é€”å®Ÿè£…ãŒå¿…è¦ã€‚ã“ã“ã§ã¯çµæœãŒå¾—ã‚‰ã‚ŒãŸã¨ä»®å®š)
-		// ä¾‹ãˆã°ã€boxAã®é ‚ç‚¹ã‚’è¨ˆç®—ã—ã€boxBã«å«ã¾ã‚Œã‚‹ã‹ãƒã‚§ãƒƒã‚¯ã™ã‚‹ãªã©
+		// 2. Õ“Ë”»’è (SAT“™‚Å•Ê“rÀ‘•‚ª•K—vB‚±‚±‚Å‚ÍŒ‹‰Ê‚ª“¾‚ç‚ê‚½‚Æ‰¼’è)
+		// —á‚¦‚ÎAboxA‚Ì’¸“_‚ğŒvZ‚µAboxB‚ÉŠÜ‚Ü‚ê‚é‚©ƒ`ƒFƒbƒN‚·‚é‚È‚Ç
 		Vec3 vertsA[8];
 		body[0]->GetWorldVertices(vertsA);
 
-		// boxA ã®é ‚ç‚¹ã‹ã‚‰ã€boxB ã®ä¸Šé¢ï¼ˆç°¡æ˜“ï¼‰ã¸ã®æ¥è§¦ç‚¹ã‚’ä½œã£ã¦è§£æ±ºã™ã‚‹
+		// boxA ‚Ì’¸“_‚©‚çAboxB ‚Ìã–ÊiŠÈˆÕj‚Ö‚ÌÚG“_‚ğì‚Á‚Ä‰ğŒˆ‚·‚é
 		{
 			const float planeY = body[1]->center.y + body[1]->extents.y;
 
-			// Aã®æœ€ä¸‹ç‚¹ã‚’å–ã‚‹ï¼ˆé¢æ¥åœ°ãªã‚‰4é ‚ç‚¹ãŒã“ã“ã«é›†ã¾ã‚‹ï¼‰
+			// A‚ÌÅ‰º“_‚ğæ‚éi–ÊÚ’n‚È‚ç4’¸“_‚ª‚±‚±‚ÉW‚Ü‚éj
 			float minY = vertsA[0].y;
 			for (int i = 1; i < 8; ++i)
 			{
 				if (vertsA[i].y < minY) minY = vertsA[i].y;
 			}
 
-			// å¤šå°‘ã®èª¤å·®è¨±å®¹
+			// ‘½­‚ÌŒë·‹–—e
 			const float contactEps = 0.001f;
-			// ã€Œæœ€ä¸‹å±¤ä»˜è¿‘ã€ã¨ã¿ãªã™é«˜ã•å¹…ï¼ˆã“ã“ã‚’åºƒã’ã™ãã‚‹ã¨å‚¾ãã‚„ã™ããªã‚‹ï¼‰
+			// uÅ‰º‘w•t‹ßv‚Æ‚İ‚È‚·‚‚³•i‚±‚±‚ğL‚°‚·‚¬‚é‚ÆŒX‚«‚â‚·‚­‚È‚éj
 			const float minLayer = 0.01f;
 
-			// Bä¸Šé¢ã®çŸ©å½¢ç¯„å›²ï¼ˆBã‚’è»¸å¹³è¡Œã®åºŠã¨ã—ã¦æ‰±ã†ç°¡æ˜“ï¼‰
+			// Bã–Ê‚Ì‹éŒ`”ÍˆÍiB‚ğ²•½s‚Ì°‚Æ‚µ‚Äˆµ‚¤ŠÈˆÕj
 			const float minX = body[1]->center.x - body[1]->extents.x;
 			const float maxX = body[1]->center.x + body[1]->extents.x;
 			const float minZ = body[1]->center.z - body[1]->extents.z;
 			const float maxZ = body[1]->center.z + body[1]->extents.z;
 
-			// åå¾©ï¼ˆ2å›ã ã‘ï¼‰
+			// ”½•œi2‰ñ‚¾‚¯j
 			for (int iter = 0; iter < 2; ++iter)
 			{
 				for (int i = 0; i < 8; ++i)
 				{
-					// Bä¸Šé¢ã®çœŸä¸Šã«ã‚ã‚‹é ‚ç‚¹ã ã‘æ¡ç”¨ï¼ˆå¤–ãªã‚‰ç„¡è¦–ï¼‰
+					// Bã–Ê‚Ì^ã‚É‚ ‚é’¸“_‚¾‚¯Ì—piŠO‚È‚ç–³‹j
 					if (vertsA[i].x < minX || vertsA[i].x > maxX) continue;
 					if (vertsA[i].z < minZ || vertsA[i].z > maxZ) continue;
 
-					// æœ€ä¸‹å±¤ä»˜è¿‘ã®é ‚ç‚¹ã ã‘æ¥è§¦ç‚¹ã«ã™ã‚‹ï¼ˆé¢ãªã‚‰è¤‡æ•°ç‚¹ã«ãªã‚‹ï¼‰
+					// Å‰º‘w•t‹ß‚Ì’¸“_‚¾‚¯ÚG“_‚É‚·‚éi–Ê‚È‚ç•¡”“_‚É‚È‚éj
 					if (vertsA[i].y > (minY + minLayer)) continue;
 
-					// ã‚ã‚Šè¾¼ã¿ï¼ˆã¾ãŸã¯æ¥è§¦ï¼‰ã—ã¦ã„ã‚‹ã‹
+					// ‚ß‚è‚İi‚Ü‚½‚ÍÚGj‚µ‚Ä‚¢‚é‚©
 					const float depth = planeY - vertsA[i].y;
 					if (depth <= -contactEps) continue;
 
 					CollisionResolver::Manifold m;
-					m.bodyA = body[1];                 // æ”¯æŒå´ï¼ˆåºŠï¼‰
-					m.bodyB = body[0];                 // ä¹—ã‚‹å´
-					m.normal = Vec3(0, 1, 0);    // ä¸Šå‘ãæ³•ç·šï¼ˆç°¡æ˜“ï¼‰
+					m.bodyA = body[1];                 // x‘¤i°j
+					m.bodyB = body[0];                 // æ‚é‘¤
+					m.normal = Vec3(0, 1, 0);    // ãŒü‚«–@üiŠÈˆÕj
 					m.depth = depth;
 
 					m.contactPoint = vertsA[i];
-					m.contactPoint.y = planeY;   // æ¥è§¦ç‚¹ã‚’é¢ä¸Šã¸
+					m.contactPoint.y = planeY;   // ÚG“_‚ğ–Êã‚Ö
 
 					CollisionResolver::ResolveCollision(m);
 				}
@@ -792,7 +783,7 @@ void Dice::Update(float dt)
 		}
 	}
 
-	// 3. ç‰©ç†æ›´æ–°
+	// 3. •¨—XV
 	for(int i = 0;i < MAX_DICE;i++)
 	{
 		if (body[i] == nullptr)continue;
@@ -800,27 +791,9 @@ void Dice::Update(float dt)
 		body[i]->Update(1.0f / 60.0f);
 	}
 	TRAN_INS;
-	DirectX::XMFLOAT3
-		pos =
-	{
-		body[0]->center.x,
-		body[0]->center.y,
-		body[0]->center.z
-	};
-
-	tran.obj.A = pos;
-	pos =
-	{
-		body[1]->center.x,
-		body[1]->center.y,
-		body[1]->center.z
-	};
-	tran.obj.B = pos;
-	tran.obj.Avel = { body[0]->velocity.x,body[0]->velocity.y,body[0]->velocity.z };
-	tran.obj.Bvel = { body[1]->velocity.x,body[1]->velocity.y,body[1]->velocity.z };
-	tran.obj.AangVel = { body[0]->angularVel.x,body[0]->angularVel.y,body[0]->angularVel.z };
-	tran.obj.BangVel = { body[1]->angularVel.x,body[1]->angularVel.y,body[1]->angularVel.z };
-	// ãƒ‡ãƒãƒƒã‚°ç”¨
+	UpdateTranFromBody(body[0], tran.obj.A, tran.obj.Avel, tran.obj.AangVel);
+	UpdateTranFromBody(body[1], tran.obj.B, tran.obj.Bvel, tran.obj.BangVel);
+	// ƒfƒoƒbƒO—p
 	if (IsKeyTrigger('Y'))
 	{
 		body[0]->center = { 0.0,5.0f,0.0f };
@@ -836,7 +809,7 @@ void Dice::Update(float dt)
 }
 
 
-// æç”»å‡¦ç† 
+// •`‰æˆ— 
 void Dice::Draw()
 {
 	using namespace DirectX;
@@ -847,7 +820,7 @@ void Dice::Draw()
 	DirectX::XMFLOAT4 color = { 1.0f,1.0f,1.0f,1.0f };
 	for(int i = 0;i < MAX_DICE;i++)
 	{
-		// ä½¿ã£ã¦ãªã„Diceã¯0ã‚’ä»£å…¥
+		// g‚Á‚Ä‚È‚¢Dice‚Í0‚ğ‘ã“ü
 		//tran.dice.currentFaceNumber[i] = 0;
 		//if (i == 4 || i == 5 || i == 6 || i == 7)continue;
 
@@ -878,9 +851,9 @@ void Dice::Draw()
 			Geometory::AddLine(vtxA[2], vtxA[6], color);
 			Geometory::AddLine(vtxA[3], vtxA[7], color);
 
-			// åºŠã‚’æç”»ã—ãªã„
+			// °‚ğ•`‰æ‚µ‚È‚¢
 			if (i == 1)continue;
-			// å£ã‚‚æç”»ã—ãªã„
+			// •Ç‚à•`‰æ‚µ‚È‚¢
 			if (i == 4)continue;
 			if (i == 5)continue;
 			if (i == 6)continue;
@@ -892,42 +865,42 @@ void Dice::Draw()
 			fWVP[0] = MakeWorldFromOBB(*body[i], 1.0f);
 
 
-			// ãƒ¢ãƒ‡ãƒ«ã«å¤‰æ›è¡Œåˆ—ã‚’è¨­å®š 
+			// ƒ‚ƒfƒ‹‚É•ÏŠ·s—ñ‚ğİ’è 
 			fWVP[1] = m_pCamera->GetViewMatrix();
 			fWVP[2] = m_pCamera->GetProjectionMatrix();
 
 
 
-			// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¸å¤‰æ›è¡Œåˆ—ã‚’è¨­å®š 
-			ShaderList::SetWVP(fWVP); // SetWVPé–¢æ•°ã®å¼•æ•°ã«ã¯XMFLOAT4X4å‹ã§è¦ç´ æ•°ï¼“ã®é…åˆ—ã®ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’æ¸¡ã™ 
+			// ƒVƒF[ƒ_[‚Ö•ÏŠ·s—ñ‚ğİ’è 
+			ShaderList::SetWVP(fWVP); // SetWVPŠÖ”‚Ìˆø”‚É‚ÍXMFLOAT4X4Œ^‚Å—v‘f”‚R‚Ì”z—ñ‚ÌƒAƒhƒŒƒX‚ğ“n‚· 
 
 
-			// ãƒ¢ãƒ‡ãƒ«ã«ä½¿ç”¨ã™ã‚‹é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã€ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’è¨­å®š 
+			// ƒ‚ƒfƒ‹‚Ég—p‚·‚é’¸“_ƒVƒF[ƒ_[AƒsƒNƒZƒ‹ƒVƒF[ƒ_[‚ğİ’è 
 			m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
 			m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
-			// ä»®ç½®ãã—ã¦ã„ã‚‹ãƒœãƒƒã‚¯ã‚¹ã«ã‚«ãƒ¡ãƒ©ã‚’è¨­å®š
+			// ‰¼’u‚«‚µ‚Ä‚¢‚éƒ{ƒbƒNƒX‚ÉƒJƒƒ‰‚ğİ’è
 			Geometory::SetView(fWVP[1]);
 			Geometory::SetProjection(fWVP[2]);
 
-			// ä»®ç½®ãã—ã¦ã„ã‚‹ãƒœãƒƒã‚¯ã‚¹ã«ã‚«ãƒ¡ãƒ©ã‚’è¨­å®š 
+			// ‰¼’u‚«‚µ‚Ä‚¢‚éƒ{ƒbƒNƒX‚ÉƒJƒƒ‰‚ğİ’è 
 			Geometory::SetView(m_pCamera->GetViewMatrix());
 			Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
 
-			// Spriteã¸ã‚«ãƒ¡ãƒ©ã®è¡Œåˆ—ã‚’è¨­å®š 
+			// Sprite‚ÖƒJƒƒ‰‚Ìs—ñ‚ğİ’è 
 			Sprite::SetView(m_pCamera->GetViewMatrix());
 			Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
 
-			// ãƒãƒ†ãƒªã‚¢ãƒ«åˆ¥ã«ãƒ¡ãƒƒã‚·ãƒ¥ã‚’è¡¨ç¤º 
+			// ƒ}ƒeƒŠƒAƒ‹•Ê‚ÉƒƒbƒVƒ…‚ğ•\¦ 
 			for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
-				// ãƒ¢ãƒ‡ãƒ«ã®ãƒ¡ãƒƒã‚·ãƒ¥ã‚’å–å¾— 
+				// ƒ‚ƒfƒ‹‚ÌƒƒbƒVƒ…‚ğæ“¾ 
 				const Model::Mesh* mesh = m_pModel->GetMesh(i);
-				// ãƒ¡ãƒƒã‚·ãƒ¥ã«å‰²ã‚Šå½“ã¦ã‚‰ã‚Œã¦ã„ã‚‹ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å–å¾— 
+				// ƒƒbƒVƒ…‚ÉŠ„‚è“–‚Ä‚ç‚ê‚Ä‚¢‚éƒ}ƒeƒŠƒAƒ‹‚ğæ“¾ 
 				Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
 				material.ambient = {0.7f,0.7f,0.7f,1.0f};
-				// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¸ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’è¨­å®š 
+				// ƒVƒF[ƒ_[‚Öƒ}ƒeƒŠƒAƒ‹‚ğİ’è 
 				ShaderList::SetMaterial(material);
-				// ãƒ¢ãƒ‡ãƒ«ã®æç”» 
+				// ƒ‚ƒfƒ‹‚Ì•`‰æ 
 				m_pModel->Draw(i);
 			}
 
@@ -946,7 +919,7 @@ void Dice::Draw()
 }
 
 
-// ã‚«ãƒ¡ãƒ©ã®è¨­å®š 
+// ƒJƒƒ‰‚Ìİ’è 
 void Dice::SetCamera(Camera* pCamera)
 {
 	m_pCamera = pCamera;
@@ -968,28 +941,29 @@ void Dice::RollRandom(int index)
 	b.SetFullyLocked(false);
 	b.SetGravity(true);
 	isActive = true;
+	s_rollFrameCount = 0;
 
-	// 1) ä¸€æ—¦å®‰å®šåŒ–
+	// 1) ˆê’UˆÀ’è‰»
 	b.velocity = Vec3(0.0f, 0.0f, 0.0f);
 	b.angularVel = Vec3(0.0f, 0.0f, 0.0f);
 
-	// 2) å°‘ã—æŒã¡ä¸Šã’ã‚‹ï¼ˆåºŠã¨ã®å³è¡çªé˜²æ­¢ï¼‰
+	// 2) ­‚µ‚¿ã‚°‚éi°‚Æ‚Ì‘¦Õ“Ë–h~j
 	b.center.y = 2.5f;
 
-	// 3) é‡åŠ›ON
+	// 3) d—ÍON
 	b.SetGravity(true);
 
-	// 4) åˆé€Ÿï¼ˆä¸Šï¼‹æ¨ªï¼‰
+	// 4) ‰‘¬iã{‰¡j
 	b.velocity.y = RandRange(4.0f, 6.0f);
 	b.velocity.x = RandRange(-1.5f, 1.5f);
 	b.velocity.z = RandRange(-1.5f, 1.5f);
 
-	// 5) è§’é€Ÿåº¦ï¼ˆã©ã®è»¸ã«ã‚‚å›ã‚‹ï¼‰
+	// 5) Šp‘¬“xi‚Ç‚Ì²‚É‚à‰ñ‚éj
 	b.angularVel.x = RandRange(-8.0f, 8.0f);
 	b.angularVel.y = RandRange(-8.0f, 8.0f);
 	b.angularVel.z = RandRange(-8.0f, 8.0f);
 
-	// 6) ã‚¹ãƒªãƒ¼ãƒ—è§£é™¤ï¼ˆã‚ã‚‹ãªã‚‰ï¼‰
+	// 6) ƒXƒŠ[ƒv‰ğœi‚ ‚é‚È‚çj
 	b.WakeUp();
 }
 void Dice::SetDiceTexture(int count, int num)
@@ -1019,14 +993,22 @@ void Dice::SetDiceTexture(int count, int num)
 	default: return;
 	}
 
-	// åˆå›ã ã‘ç”Ÿæˆï¼†Add
+	// ‰‰ñ‚¾‚¯¶¬•Add
 	if (!m_pDiceUI[count])
 	{
 		m_pDiceUI[count] = new UIObject(DiceTex.c_str(), pos.x, pos.y, size.x, size.y);
 		return;
 	}
 
-	// 2å›ç›®ä»¥é™ï¼šãƒ†ã‚¯ã‚¹ãƒãƒ£å·®ã—æ›¿ãˆï¼ˆUIObjectã«ãã®æ©Ÿèƒ½ãŒå¿…è¦ï¼‰
+	// 2‰ñ–ÚˆÈ~FƒeƒNƒXƒ`ƒƒ·‚µ‘Ö‚¦iUIObject‚É‚»‚Ì‹@”\‚ª•K—vj
 	m_pDiceUI[count]->SetTexture(DiceTex.c_str());
 }
+
+
+
+
+
+
+
+
 

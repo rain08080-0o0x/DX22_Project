@@ -1,4 +1,4 @@
-ï»¿#include "Player.h"
+#include "Player.h"
 #include "Geometory.h"
 #include "Input.h"
 #include "Transfer.h"
@@ -22,7 +22,7 @@ Player::Player()
     m_pShadowTex = new Texture();
     if (FAILED(m_pShadowTex->Create("Assets/Texture/shadow.png")))
     {
-        MessageBox(NULL, "Texture load failed.Â¥nPlayer.cpp", "Error", MB_OK);
+        MessageBox(NULL, "Texture load failed.\nPlayer.cpp", "Error", MB_OK);
     }
 }
 
@@ -36,13 +36,13 @@ Player::~Player()
 
 void Player::Update()
 {
-    // ã‚«ãƒ¡ãƒ©ãŒè¨­å®šã•ã‚Œã¦ãªã„å ´åˆã¯å‡¦ç†ã—ãªã„ 
+    // ƒJƒƒ‰‚ªİ’è‚³‚ê‚Ä‚È‚¢ê‡‚Íˆ—‚µ‚È‚¢ 
     if (!m_pCamera) { return; }
-    // ãƒœãƒ¼ãƒ«ãŒåœæ­¢ã—ã¦ã„ã‚‹ã‹ã©ã†ã‹ã«ã‚ˆã£ã¦å‡¦ç†ã‚’å¤‰ãˆã‚‹ 
+    // ƒ{[ƒ‹‚ª’â~‚µ‚Ä‚¢‚é‚©‚Ç‚¤‚©‚É‚æ‚Á‚Äˆ—‚ğ•Ï‚¦‚é 
     if (m_isStop)
-        UpdateShot(); // çƒã‚’æ‰“ã¤å‡¦ç† 
+        UpdateShot(); // ‹…‚ğ‘Å‚Âˆ— 
     else
-        UpdateMove(); // æ‰“ã£ãŸçƒã®ç§»å‹•å‡¦ç† 
+        UpdateMove(); // ‘Å‚Á‚½‹…‚ÌˆÚ“®ˆ— 
     m_collision.center = m_pos;
 }
 
@@ -59,11 +59,11 @@ void Player::Draw()
     Geometory::SetWorld(mat);
     Geometory::DrawBox();
 
-    // å½±ã®å¤§ãã•ã‚’è¨ˆç®— 
-    float rate = (m_pos.y - m_shadowPos.y) / 4.0f; // è·é›¢ãŒè¿‘ã‘ã‚Œã°0,é ã‘ã‚Œã°1 
-    float scale = (1.0f - rate);      // rateã‚’0ãªã‚‰1ã€1ãªã‚‰0ã«ãªã‚‹ã‚ˆã†åè»¢ 
+    // ‰e‚Ì‘å‚«‚³‚ğŒvZ 
+    float rate = (m_pos.y - m_shadowPos.y) / 4.0f; // ‹——£‚ª‹ß‚¯‚ê‚Î0,‰“‚¯‚ê‚Î1 
+    float scale = (1.0f - rate);      // rate‚ğ0‚È‚ç1A1‚È‚ç0‚É‚È‚é‚æ‚¤”½“] 
 
-    // å½±ã‚’è¡¨ç¤ºã™ã‚‹ãŸã‚ã®è¡Œåˆ—è¨ˆç®— 
+    // ‰e‚ğ•\¦‚·‚é‚½‚ß‚Ìs—ñŒvZ 
     DirectX::XMMATRIX R = DirectX::XMMatrixRotationX(DirectX::XMConvertToRadians(90));
     S = DirectX::XMMatrixScaling(scale,scale,scale);
     T = DirectX::XMMatrixTranslation(m_shadowPos.x,m_shadowPos.y,m_shadowPos.z);
@@ -71,10 +71,10 @@ void Player::Draw()
     DirectX::XMFLOAT4X4 fMat;
     DirectX::XMStoreFloat4x4(&fMat, DirectX::XMMatrixTranspose(mWorld));
 
-    // å½±ã®è¡¨ç¤º     
+    // ‰e‚Ì•\¦     
     Sprite::SetWorld(fMat);
     Sprite::SetSize({ 3.0f,3.0f });
-    Sprite::SetColor({ 0.0f, 0.0f, 0.0f, scale * 0.8f }); // åœ°é¢ã¨ã®è·é›¢ã«å¿œã˜ã¦å½±ã®é€æ˜åº¦ã‚’è¨­å®š 
+    Sprite::SetColor({ 0.0f, 0.0f, 0.0f, scale * 0.8f }); // ’n–Ê‚Æ‚Ì‹——£‚É‰‚¶‚Ä‰e‚Ì“§–¾“x‚ğİ’è 
     Sprite::SetTexture(m_pShadowTex);
     Sprite::Draw();
 }
@@ -106,14 +106,14 @@ float Player::GetPower()
 
 void Player::Bound(BoundAxis axis)
 {
-    // æ¥è§¦æ–¹å‘ã«å¿œã˜ã¦ã‚ã‚Šè¾¼ã¿è§£æ¶ˆ 
+    // ÚG•ûŒü‚É‰‚¶‚Ä‚ß‚è‚İ‰ğÁ 
     switch (axis) {
     case BoundX: m_pos.x -= m_move.x; break;
     case BoundY: m_pos.y -= m_move.y; break;
     case BoundZ: m_pos.z -= m_move.z; break;
     }
-    // æ¥è§¦æ–¹å‘ã«å¿œã˜ãŸæ‘©æ“¦ã‚’è¨­å®šï¼ˆæ•°å€¤ã¯é©å½“ï¼‰ 
-    DirectX::XMFLOAT3 friction; // æ‘©æ“¦ 
+    // ÚG•ûŒü‚É‰‚¶‚½–€C‚ğİ’èi”’l‚Í“K“–j 
+    DirectX::XMFLOAT3 friction; // –€C 
     switch (axis)
     {
     case BoundX: friction = DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f); break;
@@ -121,23 +121,23 @@ void Player::Bound(BoundAxis axis)
     case BoundZ: friction = DirectX::XMFLOAT3(1.0f, 1.0f, 0.95f); break;
     }
 
-    // æ¥è§¦æ™‚ã®æ¸›é€Ÿ 
+    // ÚG‚ÌŒ¸‘¬ 
     m_move.x *= friction.x;
     m_move.y *= friction.y;
     m_move.z *= friction.z;
 
-    // ç§»å‹•æ–¹å‘ã®åè»¢ 
+    // ˆÚ“®•ûŒü‚Ì”½“] 
     switch (axis) {
     case BoundX: m_move.x = -m_move.x; break;
     case BoundY: m_move.y = -m_move.y; break;
     case BoundZ: m_move.z = -m_move.z; break;
     }
 
-    // åœ°é¢æ¥åœ°åˆ¤å®š 
+    // ’n–ÊÚ’n”»’è 
     if (0.0f < m_move.y && m_move.y < 0.05f) 
     {
-        m_move.y = 0.0f; // è»¢ãŒã£ã¦ã„ã‚‹ã¯ãšãªã®ã§Yã®ç§»å‹•ã‚’0ã«ã™ã‚‹ 
-        m_isGround = true; // åœ°é¢ã«ã„ã‚‹çŠ¶æ…‹ã¨ã¿ãªã™ 
+        m_move.y = 0.0f; // “]‚ª‚Á‚Ä‚¢‚é‚Í‚¸‚È‚Ì‚ÅY‚ÌˆÚ“®‚ğ0‚É‚·‚é 
+        m_isGround = true; // ’n–Ê‚É‚¢‚éó‘Ô‚Æ‚İ‚È‚· 
     }
 }
 
@@ -147,7 +147,7 @@ bool Player::CheckStop()
     DirectX::XMVECTOR vMove = DirectX::XMLoadFloat3(&m_move);
     DirectX::XMVECTOR vLen = DirectX::XMVector3Length(vMove);
     DirectX::XMStoreFloat(&speed, vLen);
-    // åœ°é¢ã«ã„ã¦ç§»å‹•ã‚¹ãƒ”ãƒ¼ãƒ‰ãŒä¸€å®šå€¤ã‚’ä¸‹å›ã£ãŸã‚‰åœæ­¢ã¨ã¿ãªã™ 
+    // ’n–Ê‚É‚¢‚ÄˆÚ“®ƒXƒs[ƒh‚ªˆê’è’l‚ğ‰º‰ñ‚Á‚½‚ç’â~‚Æ‚İ‚È‚· 
     return m_isGround && speed < 0.5f;
 }
 
@@ -159,36 +159,36 @@ void Player::UpdateShot()
     case Player::SHOT_WAIT:
         if (IsKeyTrigger('Z'))
         {
-            m_shotPower = 0.0f;   // ãƒ‘ãƒ¯ãƒ¼ã‚’ï¼ã«ãƒªã‚»ãƒƒãƒˆ z
-            m_shotstep = SHOT_KEEP;  // ãƒ‘ãƒ¯ãƒ¼ã‚’æºœã‚ã‚‹æ‰‹é †ã«å¤‰æ›´ 
+            m_shotPower = 0.0f;   // ƒpƒ[‚ğ‚O‚ÉƒŠƒZƒbƒg z
+            m_shotstep = SHOT_KEEP;  // ƒpƒ[‚ğ—­‚ß‚éè‡‚É•ÏX 
         }
         break;
     case Player::SHOT_KEEP:
-        m_shotPower += 0.02f; // ãƒ‘ãƒ¯ãƒ¼ã‚’æºœã‚ç¶šã‘ã‚‹ 
+        m_shotPower += 0.02f; // ƒpƒ[‚ğ—­‚ß‘±‚¯‚é 
 
-        // ãƒ‘ãƒ¯ãƒ¼ãŒä¸Šé™ã‚’è¶…ãˆãªã„ã‚ˆã†ã«åˆ¤å®š 
+        // ƒpƒ[‚ªãŒÀ‚ğ’´‚¦‚È‚¢‚æ‚¤‚É”»’è 
         if (m_shotPower > 1.0f)
             m_shotPower = 1.0f;
 
-        // ã‚­ãƒ¼å…¥åŠ›ã‚’æ­¢ã‚ãŸã‚‰çƒã‚’æ‰“ã¤æ‰‹é †ã«å¤‰æ›´ 
+        // ƒL[“ü—Í‚ğ~‚ß‚½‚ç‹…‚ğ‘Å‚Âè‡‚É•ÏX 
         if (IsKeyRelease('Z')) {
             m_shotstep = SHOT_RELEASE;
         }
         break;
     case Player::SHOT_RELEASE:
-		// æ‰“ã¡å‡ºã™è¨ˆç®—
-        DirectX::XMFLOAT3 camPos = m_pCamera->GetPos();						//ã‚«ãƒ¡ãƒ©ã®ä½ç½®ã‚’å–å¾—
-        DirectX::XMVECTOR vCamPos = DirectX::XMLoadFloat3(&camPos);			//ã‚«ãƒ¡ãƒ©ã®ä½ç½®ã‚’è¨ˆç®—ç”¨ã®å‹ã«å¤‰æ›
-        DirectX::XMVECTOR vPos = DirectX::XMLoadFloat3(&m_pos);				//è‡ªåˆ†ã®ä½ç½®ã‚’è¨ˆç®—ç”¨ã®å‹ã«å¤‰æ›
-        DirectX::XMVECTOR vec = DirectX::XMVectorSubtract(vPos, vCamPos);	//ã‚«ãƒ¡ãƒ©ã‹ã‚‰è‡ªåˆ†ã®ä½ç½®ã«å‘ã‹ã†ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨ˆç®—
-        vec = DirectX::XMVector3Normalize(vec);		//ãƒ™ã‚¯ãƒˆãƒ«ã®æ­£è¦åŒ–
-        vec = DirectX::XMVectorScale(vec, m_shotPower);		//æ­£è¦åŒ–ã—ãŸãƒ™ã‚¯ãƒˆãƒ«ã‚’ã€æºœã‚ãŸåŠ›ã«å¿œã˜ã¦ä¼¸ã°ã™
-        DirectX::XMStoreFloat3(&m_move, vec);//ç§»å‹•ã®ãƒ‡ãƒ¼ã‚¿m_moveã«è¨ˆç®—ã—ãŸvecã‚’è¨­å®šã™ã‚‹ï¼ˆè¨ˆç®—ç”¨ã®å‹ã‹ã‚‰ä¿å­˜ç”¨ã®å‹ã«å¤‰æ›;
+		// ‘Å‚¿o‚·ŒvZ
+        DirectX::XMFLOAT3 camPos = m_pCamera->GetPos();						//ƒJƒƒ‰‚ÌˆÊ’u‚ğæ“¾
+        DirectX::XMVECTOR vCamPos = DirectX::XMLoadFloat3(&camPos);			//ƒJƒƒ‰‚ÌˆÊ’u‚ğŒvZ—p‚ÌŒ^‚É•ÏŠ·
+        DirectX::XMVECTOR vPos = DirectX::XMLoadFloat3(&m_pos);				//©•ª‚ÌˆÊ’u‚ğŒvZ—p‚ÌŒ^‚É•ÏŠ·
+        DirectX::XMVECTOR vec = DirectX::XMVectorSubtract(vPos, vCamPos);	//ƒJƒƒ‰‚©‚ç©•ª‚ÌˆÊ’u‚ÉŒü‚©‚¤ƒxƒNƒgƒ‹‚ğŒvZ
+        vec = DirectX::XMVector3Normalize(vec);		//ƒxƒNƒgƒ‹‚Ì³‹K‰»
+        vec = DirectX::XMVectorScale(vec, m_shotPower);		//³‹K‰»‚µ‚½ƒxƒNƒgƒ‹‚ğA—­‚ß‚½—Í‚É‰‚¶‚ÄL‚Î‚·
+        DirectX::XMStoreFloat3(&m_move, vec);//ˆÚ“®‚Ìƒf[ƒ^m_move‚ÉŒvZ‚µ‚½vec‚ğİ’è‚·‚éiŒvZ—p‚ÌŒ^‚©‚ç•Û‘¶—p‚ÌŒ^‚É•ÏŠ·;
 
-        // æ‰“ã¡å‡ºã—å¾Œã®æƒ…å ±ã‚’è¨­å®š
-        m_isStop = false;			// ç§»å‹•ã™ã‚‹ã®ã§åœæ­¢ã«ã—ãªã„ 
-        m_isGround = false;         // é£›ã¶ã®ã§ä¸€æ—¦åœ°é¢ã‹ã‚‰é›¢ã‚ŒãŸã¨ã¿ãªã™
-        m_shotstep = SHOT_WAIT;		// ã‚­ãƒ¼å…¥åŠ›å¾…ã¡ã®æ‰‹é †ã«æˆ»ã™
+        // ‘Å‚¿o‚µŒã‚Ìî•ñ‚ğİ’è
+        m_isStop = false;			// ˆÚ“®‚·‚é‚Ì‚Å’â~‚É‚µ‚È‚¢ 
+        m_isGround = false;         // ”ò‚Ô‚Ì‚Åˆê’U’n–Ê‚©‚ç—£‚ê‚½‚Æ‚İ‚È‚·
+        m_shotstep = SHOT_WAIT;		// ƒL[“ü—Í‘Ò‚¿‚Ìè‡‚É–ß‚·
         m_shotPower = 0.0f;
         break;
     }
@@ -196,26 +196,26 @@ void Player::UpdateShot()
 
 void Player::UpdateMove()
 {
-    // é‡åŠ› 
+    // d—Í 
     m_move.y -= 0.02f;
 
-    // æ¸›é€Ÿå‡¦ç†(ç©ºæ°—æŠµæŠ— 
+    // Œ¸‘¬ˆ—(‹ó‹C’ïR 
     m_move.x *= 0.99f;
     m_move.y *= 0.99f;
     m_move.z *= 0.99f;
 
-    // ç§»å‹•å‡¦ç† 
+    // ˆÚ“®ˆ— 
     m_pos.x += m_move.x;
     m_pos.y += m_move.y;
     m_pos.z += m_move.z;
 
-    // åœ°é¢æ¥è§¦åˆ¤å®š 
+    // ’n–ÊÚG”»’è 
     if (m_pos.y < 0.0f) {
         m_pos.y = 0.0f;
         Bound(BoundY);
     }
 
-    // åœæ­¢åˆ¤å®š 
+    // ’â~”»’è 
     if (CheckStop()) {
         m_isStop = true;
         m_shotStep = SHOT_WAIT;

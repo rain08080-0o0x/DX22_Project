@@ -1,6 +1,6 @@
-ï»¿/*********************************************************************
+/*********************************************************************
  * \file   UIObject.cpp
- * \brief  UIã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®åŸºåº•ã‚¯ãƒ©ã‚¹ Base class of UI Object.
+ * \brief  UIƒIƒuƒWƒFƒNƒg‚ÌŠî’êƒNƒ‰ƒX Base class of UI Object.
  *
  * \author AT12C-41 Kotetsu Wakabayashi
  * \date   2025-11-18
@@ -99,15 +99,15 @@ void UIObject::Begin2D()
 	if (s_is2DBegin) return;
 	s_is2DBegin = true;
 
-	// ç¾åœ¨ã®RT/DSã‚’é€€é¿
+	// Œ»İ‚ÌRT/DS‚ğ‘Ş”ğ
 	s_prevRTV = GetDefaultRTV();
 	s_prevDSV = GetDefaultDSV();
 
-	// UIã¯æ·±åº¦ã„ã‚‰ãªã„ã®ã§ DSV ã‚’åˆ‡ã‚‹ï¼ˆã‚ãªãŸã®Drawã®æ„å›³ã‚’ç¶­æŒï¼‰
+	// UI‚Í[“x‚¢‚ç‚È‚¢‚Ì‚Å DSV ‚ğØ‚éi‚ ‚È‚½‚ÌDraw‚ÌˆÓ}‚ğˆÛj
 	SetRenderTargets(1, &s_prevRTV, nullptr);
 	SetDepthTest(false);
 
-	// 2Dç”¨ View/Proj ã¯å…¨UIå…±é€šã§1å›ã ã‘è¨­å®š
+	// 2D—p View/Proj ‚Í‘SUI‹¤’Ê‚Å1‰ñ‚¾‚¯İ’è
 	DirectX::XMFLOAT4X4 view, proj;
 	DirectX::XMVECTOR eye = DirectX::XMVectorSet(0.f, 0.f, -5.f, 0.f);
 	DirectX::XMVECTOR fcs = DirectX::XMVectorSet(0.f, 0.f, 0.f, 0.f);
@@ -132,13 +132,13 @@ void UIObject::End2D()
 	if (!s_is2DBegin) return;
 	s_is2DBegin = false;
 
-	// RT/DSã‚’æˆ»ã™
+	// RT/DS‚ğ–ß‚·
 	SetRenderTargets(1, &s_prevRTV, s_prevDSV);
 	SetDepthTest(true);
 }
 void UIObject::Draw()
 {
-	// Begin2D ãŒå‘¼ã°ã‚Œã¦ãªã„å ´åˆã§ã‚‚å‹•ãã‚ˆã†ã«ä¿é™ºï¼ˆæ—¢å­˜ã‚³ãƒ¼ãƒ‰äº’æ›ï¼‰
+	// Begin2D ‚ªŒÄ‚Î‚ê‚Ä‚È‚¢ê‡‚Å‚à“®‚­‚æ‚¤‚É•ÛŒ¯iŠù‘¶ƒR[ƒhŒİŠ·j
 	bool autoBegin = false;
 	if (!s_is2DBegin)
 	{
@@ -148,7 +148,7 @@ void UIObject::Draw()
 
 	DirectX::XMFLOAT4X4 world;
 
-	// ä¸­å¿ƒã«åˆã‚ã›ã‚‹ï¼ˆã‚ãªãŸã®ãƒ­ã‚¸ãƒƒã‚¯ãã®ã¾ã¾ï¼‰
+	// ’†S‚É‡‚í‚¹‚éi‚ ‚È‚½‚ÌƒƒWƒbƒN‚»‚Ì‚Ü‚Üj
 	DirectX::XMMATRIX S = DirectX::XMMatrixScaling(1.0f, -1.f, 1.0f);
 	DirectX::XMMATRIX Rx = DirectX::XMMatrixRotationX(DirectX::XMConvertToRadians(m_fRotation.x));
 	DirectX::XMMATRIX Ry = DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(m_fRotation.y));
@@ -211,17 +211,17 @@ void UIObject::SetColor( float R, float G, float B, float A )
 }
 
 /**
- * \brief å§‹ç‚¹ã€çµ‚ç‚¹ã€è§’åº¦ã‚’æŒ‡å®šã—ã¦ã‚°ãƒ©ãƒ‡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’æç”».
+ * \brief n“_AI“_AŠp“x‚ğw’è‚µ‚ÄƒOƒ‰ƒf[ƒVƒ‡ƒ“‚ğ•`‰æ.
  *
- * \param fromR å§‹ç‚¹Rå€¤(0.0f ~ 1.0f)
- * \param fromG å§‹ç‚¹Gå€¤(0.0f ~ 1.0f)
- * \param fromB å§‹ç‚¹Bå€¤(0.0f ~ 1.0f)
- * \param fromA å§‹ç‚¹Aå€¤(0.0f ~ 1.0f)
- * \param toR çµ‚ç‚¹Rå€¤(0.0f ~ 1.0f)
- * \param toG çµ‚ç‚¹Gå€¤(0.0f ~ 1.0f)
- * \param toB çµ‚ç‚¹Bå€¤(0.0f ~ 1.0f)
- * \param toA çµ‚ç‚¹Aå€¤(0.0f ~ 1.0f)
- * \param degree è§’åº¦(0 ~ 360: 0 = ä¸Šã‹ã‚‰ä¸‹)
+ * \param fromR n“_R’l(0.0f ~ 1.0f)
+ * \param fromG n“_G’l(0.0f ~ 1.0f)
+ * \param fromB n“_B’l(0.0f ~ 1.0f)
+ * \param fromA n“_A’l(0.0f ~ 1.0f)
+ * \param toR I“_R’l(0.0f ~ 1.0f)
+ * \param toG I“_G’l(0.0f ~ 1.0f)
+ * \param toB I“_B’l(0.0f ~ 1.0f)
+ * \param toA I“_A’l(0.0f ~ 1.0f)
+ * \param degree Šp“x(0 ~ 360: 0 = ã‚©‚ç‰º)
  */
 void UIObject::GenerateGradient(
 	float fromR, float fromG, float fromB, float fromA, float toR, float toG, float toB, float toA, int degree )
@@ -297,15 +297,15 @@ void UIObject::SetColor( DirectX::XMFLOAT4 color )
 }
 
 /**
- * \brief å§‹ç‚¹ã€çµ‚ç‚¹ã€è§’åº¦ã‚’æŒ‡å®šã—ã¦ã‚°ãƒ©ãƒ‡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’æç”».
+ * \brief n“_AI“_AŠp“x‚ğw’è‚µ‚ÄƒOƒ‰ƒf[ƒVƒ‡ƒ“‚ğ•`‰æ.
  *
- * \param colorFrom å§‹ç‚¹(å„å€¤ 0.0f ~ 1.0f)
- * \param colorTo çµ‚ç‚¹(å„å€¤ 0.0f ~ 1.0f)
- * \param degree è§’åº¦(0 ~ 360: 0 = ä¸Šã‹ã‚‰ä¸‹)
+ * \param colorFrom n“_(Še’l 0.0f ~ 1.0f)
+ * \param colorTo I“_(Še’l 0.0f ~ 1.0f)
+ * \param degree Šp“x(0 ~ 360: 0 = ã‚©‚ç‰º)
  */
 void UIObject::GenerateGradient( DirectX::XMFLOAT4 colorFrom, DirectX::XMFLOAT4 colorTo, int degree )
 {
-	float angleRad = DirectX::XMConvertToRadians( degree );
+	float angleRad = DirectX::XMConvertToRadians(static_cast<float>(degree));
 
 	DirectX::XMFLOAT2 dir( std::cos( angleRad ), std::sin( angleRad ) );
 
@@ -316,7 +316,7 @@ void UIObject::GenerateGradient( DirectX::XMFLOAT4 colorFrom, DirectX::XMFLOAT4 
 		DirectX::XMFLOAT2( 0.5f, -0.5f ),
 	};
 
-	//--- å°„å½±å€¤ã‚’è¨ˆç®—
+	//--- Ë‰e’l‚ğŒvZ
 	float t[4];
 	float tMin = FLT_MAX;
 	float tMax = -FLT_MAX;
@@ -329,7 +329,7 @@ void UIObject::GenerateGradient( DirectX::XMFLOAT4 colorFrom, DirectX::XMFLOAT4 
 
 	float invLen = ( tMax != tMin ) ? 1.0f / ( tMax - tMin ) : 0.0f;
 
-	//--- æ­£è¦åŒ–ã—ã¦è‰²ã‚’è£œé–“ã—ã€é ‚ç‚¹ã‚«ãƒ©ãƒ¼ã«åæ˜ 
+	//--- ³‹K‰»‚µ‚ÄF‚ğ•âŠÔ‚µA’¸“_ƒJƒ‰[‚É”½‰f
 	for ( int i = 0; i < 4; ++i )
 	{
 		float u = ( t[i] - tMin ) * invLen;

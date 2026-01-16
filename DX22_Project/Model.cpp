@@ -1,10 +1,59 @@
 #include "Model.h"
 #include "DirectXTex/TextureLoad.h"
 #include <algorithm>
+#include <Windows.h>
+#include <string>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+namespace
+{
+	bool FileExists(const char* path)
+	{
+		DWORD attr = GetFileAttributesA(path);
+		return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+	}
+
+	std::string GetExecutableDir()
+	{
+		char buffer[MAX_PATH] = {};
+		DWORD len = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+		if (len == 0 || len == MAX_PATH)
+			return std::string();
+
+		std::string full(buffer, len);
+		size_t pos = full.find_last_of("\\/");
+		if (pos == std::string::npos)
+			return std::string();
+
+		return full.substr(0, pos + 1);
+	}
+
+	std::string ResolveAssetPath(const char* path)
+	{
+		if (FileExists(path))
+			return std::string(path);
+
+		std::string exeDir = GetExecutableDir();
+		if (!exeDir.empty())
+		{
+			std::string candidate = exeDir + path;
+			if (FileExists(candidate.c_str()))
+				return candidate;
+
+			candidate = exeDir + "..\\..\\" + path;
+			if (FileExists(candidate.c_str()))
+				return candidate;
+
+			candidate = exeDir + "..\\..\\DX22_Project\\" + path;
+			if (FileExists(candidate.c_str()))
+				return candidate;
+		}
+
+		return std::string(path);
+	}
+}
 #ifdef _DEBUG
 #include "Geometory.h"
 #endif
@@ -194,7 +243,9 @@ bool Model::Load(const char* file, float scale, Flip flip)
 	//flag |= aiProcess_MakeLeftHanded;
 
 	// assimpで読み込み
-	const aiScene* pScene = importer.ReadFile(file, flag);
+	const std::string resolvedPath = ResolveAssetPath(file);
+
+	const aiScene* pScene = importer.ReadFile(resolvedPath.c_str(), flag);
 	if (!pScene) {
 #ifdef _DEBUG
 		m_errorStr = importer.GetErrorString();
@@ -207,7 +258,7 @@ bool Model::Load(const char* file, float scale, Flip flip)
 	m_loadFlip = flip;
 
 	// ディレクトリの読み取り
-	std::string directory = file;
+	std::string directory = resolvedPath;
 	auto strIt = directory.begin();
 	while (strIt != directory.end()) {
 		if (*strIt == '/')
@@ -350,7 +401,9 @@ Model::AnimeNo Model::AddAnimation(const char* file)
 	if (m_loadFlip == Flip::XFlip)  flag |= aiProcess_MakeLeftHanded;
 
 	// assimpで読み込み
-	const aiScene* pScene = importer.ReadFile(file, flag);
+	const std::string resolvedPath = ResolveAssetPath(file);
+
+	const aiScene* pScene = importer.ReadFile(resolvedPath.c_str(), flag);
 	if (!pScene)
 	{
 #ifdef _DEBUG
@@ -1086,4 +1139,6 @@ void Model::LerpTransform(Transform* pOut, const Transform& a, const Transform& 
 	DirectX::XMStoreFloat4(&pOut->quaternion, vec[1][0]);
 	DirectX::XMStoreFloat3(&pOut->scale, vec[2][0]);
 }
+
+
 

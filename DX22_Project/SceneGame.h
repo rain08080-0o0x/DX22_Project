@@ -48,11 +48,18 @@ public:
 public:
 
 private:
-	Model* m_pModel;
+	void UpdatePlayerMode();
+	void UpdateDiceMode();
+	void UpdateEnemyTurn();
+	void HandlePlayerAutoBet();
+	void HandleDiceStop();
+	void UpdateRoleUI(const RoleResult& result);
+	void ApplyBetResult(const RoleResult& result);
+	void HandleBetInput();
+	void HandleRollInput();
+	void UpdateRoleListPanel(float dt);
+
 	Camera* m_pCamera;
-	Player* m_pPlayer;
-	Block* m_pBlock;
-	GaugeUI* m_pGaugeUI;
 
 	Dice* m_pDice;
 	bool OnlyDice = true;
@@ -64,6 +71,7 @@ private:
 	bool m_scoredThisRoll = false;
 
 	UIObject* m_pRoleUI = nullptr;
+	UIObject* m_pTurnUI = nullptr;
 	bool m_roleFixedThisRoll = false;
 
 	// 役一覧スライド用
@@ -81,9 +89,55 @@ private:
 	// 所持金表示
 	ScoreLite* m_pMoneyUI = nullptr;
 
+	// HP表示
+	ScoreLite* m_pPlayerHp = nullptr;
+	ScoreLite* m_pEnemyHp = nullptr;
+	UIObject* m_pPlayerHpIcon = nullptr;
+	UIObject* m_pEnemyHpIcon = nullptr;
+
 	Yukari* m_pYukari;
 
 	bool isUsedYukari = false;
+public:
+	// ターン制
+	enum class TurnOwner
+	{
+		Player,
+		Enemy
+	};
+
+	enum class TurnPhase
+	{
+		TurnStart,     // ターン開始（初期化）
+		Betting,       // ベット選択
+		WaitingRoll,   // ロール入力待ち（敵は自動で進む）
+		Rolling,       // 転がり中
+		Resolve,       // 出目確定後の処理
+		TurnEnd        // 次のターンへ
+	};
+
+	void EndTurn();
+	void BeginTurn(TurnOwner owner);
+
+private:
+
+	TurnOwner m_turnOwner = TurnOwner::Player;
+	TurnPhase m_turnPhase = TurnPhase::TurnStart;
+
+	int m_playerHP = 300;
+	int m_enemyHP = 300;
+
+	int m_damageThisTurn = 0;     // このターンのダメージ確定値（勝った時だけ入る）
+	bool m_resultReady = false;   // IsStop後に1回だけResolveするためのフラグ
+
+	// 敵AI用の簡単タイマー（自動でテンポ良くする）
+	float m_enemyWaitSec = 0.0f;
+
+	// Resolve 用に保持
+	RoleResult m_cachedRole;
 };
 
 #endif // __SCENE_GAME_H__
+
+
+

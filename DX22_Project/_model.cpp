@@ -67,10 +67,10 @@ void Model::MakeMesh(const void* ptr, float scale, Flip flip)
 		MeshBuffer::Description desc = {};
 		desc.pVtx = m_meshes[i].vertices.data();
 		desc.vtxSize = sizeof(Vertex);
-		desc.vtxCount = m_meshes[i].vertices.size();
+		desc.vtxCount = static_cast<UINT>(m_meshes[i].vertices.size());
 		desc.pIdx = m_meshes[i].indices.data();
 		desc.idxSize = sizeof(unsigned long);
-		desc.idxCount = m_meshes[i].indices.size();
+		desc.idxCount = static_cast<UINT>(m_meshes[i].indices.size());
 		desc.topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 				
 		// ☆頂点バッファ作成

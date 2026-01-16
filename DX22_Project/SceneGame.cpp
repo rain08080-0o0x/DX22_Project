@@ -1,8 +1,8 @@
-ï»¿/*****************************************************************//**
+/*****************************************************************//**
  * \file   SceneGame.cpp
- * \brief  ã‚²ãƒ¼ãƒ ã‚·ãƒ¼ãƒ³
+ * \brief  E½QE½[E½E½E½VE½[E½E½
  * 
- * \author å±±æœ¬éƒä¹Ÿ
+ * \author E½RE½{E½E½E½
  * \date   January 2026
  *********************************************************************/
 #include "SceneGame.h"
@@ -25,66 +25,125 @@ static RoleResult CalcRole(int d0, int d1, int d2)
 {
 	Sort3(d0, d1, d2);
 
-	// ãƒ”ãƒ³ã‚¾ãƒ­
+	// E½sE½E½E½]E½E½
 	if (d0 == 1 && d1 == 1 && d2 == 1)
 		return { RoleType::Pinzoro, 100, 0 };
 
-	// ã‚¾ãƒ­ç›®
+	// E½]E½E½E½E½
 	if (d0 == d1 && d1 == d2)
 		return { RoleType::Zorome, 50 + d0 * 10, 0 };
 
-	// ã‚·ã‚´ãƒ­
+	// E½VE½SE½E½
 	if (d0 == 4 && d1 == 5 && d2 == 6)
 		return { RoleType::Shigoro, 30, 0 };
 
-	// ãƒ’ãƒ•ãƒŸ
+	// E½qE½tE½~
 	if (d0 == 1 && d1 == 2 && d2 == 3)
 		return { RoleType::Hifumi, -20, 0 };
 
-	// é€šå¸¸å½¹ï¼ˆ2å€‹åŒã˜ + æ®‹ã‚Š1å€‹ï¼‰
+	// E½Êï¿½E½E½i2E½Â“ï¿½E½E½ + E½cE½E½1E½Âj
 	if (d0 == d1 && d1 != d2)
 		return { RoleType::Me, d2, d2 };
 
 	if (d0 != d1 && d1 == d2)
 		return { RoleType::Me, d0, d0 };
 
-	// å½¹ãªã—
+	// E½E½E½È‚ï¿½
 	return { RoleType::None, 0, 0 };
 }
 
+static float StepSec60fps()
+{
+	return 1.0f / 60.0f;
+}
 
-const float panelW = 375.0f;
-const float panelH = 520.0f;
+void SceneGame::BeginTurn(TurnOwner owner)
+{
+	m_turnOwner = owner;
+	m_turnPhase = TurnPhase::Betting;
 
-// è¡¨ç¤ºä½ç½®ï¼ˆé–‹ã„ã¦ã‚‹ã¨ãã¯å³ã«å¯„ã›ã¦å°‘ã—ä½™ç™½ï¼‰
-const float openX = SCREEN_WIDTH - panelW * 0.5f - 20.0f;
-// é–‰ã˜ã¦ã‚‹ã¨ãã¯ç”»é¢å¤–ï¼ˆå³ã«é€ƒãŒã™ï¼‰
-const float closeX = SCREEN_WIDTH + panelW * 0.5f + 20.0f;
+	m_bet = 0;
+	m_rollUsed = 0;
+	m_betState = BetState::WaitingBet;
+	m_damageThisTurn = 0;
+	m_resultReady = false;
+	m_roleFixedThisRoll = false;
+	m_scoredThisRoll = false;
+
+	if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
+
+	if (m_pTurnUI)
+	{
+		const char* turnTex = (owner == TurnOwner::Player) ? "Character/Player.png" : "Character/Enemy.png";
+		m_pTurnUI->SetTexture(turnTex);
+	}
+
+	m_enemyWaitSec = (owner == TurnOwner::Enemy) ? 1.0f : 0.0f;
+}
+
+void SceneGame::EndTurn()
+{
+	if (m_damageThisTurn > 0)
+	{
+		if (m_turnOwner == TurnOwner::Player)
+		{
+			m_enemyHP -= m_damageThisTurn;
+			if (m_enemyHP < 0) m_enemyHP = 0;
+		}
+		else
+		{
+			m_playerHP -= m_damageThisTurn;
+			if (m_playerHP < 0) m_playerHP = 0;
+		}
+	}
+
+	if (m_pPlayerHp) m_pPlayerHp->SetScore(m_playerHP);
+	if (m_pEnemyHp) m_pEnemyHp->SetScore(m_enemyHP);
+	TurnOwner next = (m_turnOwner == TurnOwner::Player) ? TurnOwner::Enemy : TurnOwner::Player;
+	BeginTurn(next);
+}
+
+
+namespace
+{
+	const float kRolePanelWidth = 375.0f;
+	const float kRolePanelHeight = 520.0f;
+
+	// E½\E½E½E½Ê’uE½iE½JE½E½E½Ä‚ï¿½Æ‚ï¿½E½Í‰EE½ÉŠñ‚¹‚Äï¿½E½E½E½]E½E½E½j
+	const float kRolePanelOpenX = SCREEN_WIDTH - kRolePanelWidth * 0.5f - 20.0f;
+	// E½Â‚ï¿½E½Ä‚ï¿½Æ‚ï¿½E½Í‰ï¿½ÊŠOE½iE½EE½É“ï¿½E½E½E½E½E½j
+	const float kRolePanelCloseX = SCREEN_WIDTH + kRolePanelWidth * 0.5f + 20.0f;
+
+	const float kRolePanelLerpDt = 1.0f / 120.0f;
+
+	const float kTurnIndicatorSize = 96.0f;
+	const float kTurnIndicatorMargin = 20.0f;
+
+	const float kHpDigitW = 48.0f;
+	const float kHpDigitH = 64.0f;
+	const float kHpDigitSpacing = 56.0f;
+	const float kHpIconSize = 64.0f;
+	const float kHpIconGap = 12.0f;
+	const float kPlayerHpX = 140.0f;
+	const float kPlayerHpY = 60.0f;
+	const float kEnemyHpX = SCREEN_WIDTH - 140.0f;
+	const float kEnemyHpY = 160.0f;
+	const float kHpIconOffsetX = kHpDigitW * 0.5f + kHpIconGap + kHpIconSize * 0.5f;
+}
 
 SceneGame::SceneGame()
 	:OnlyDice(true)
 {
-	m_pModel = new Model();
 
-	//if (!m_pModel->Load("Assets/Model/Furina/furina.pmx", 0.1f,Model::None)) { // å€ç‡ã¨åè»¢ã¯çœ
 	m_pCamera = new CameraDebug();
-// ç•¥å¯
-	if (!m_pModel->Load("Assets/Model/KayKit/Assets/fbx/green/platform_1x1x1_green.fbx", 1.f,Model::ZFlip)) { // å€ç‡ã¨åè»¢ã¯çœç•¥å¯
-		MessageBox(NULL, "Branch_01","Error", MB_OK); // ã‚¨ãƒ©ãƒ¼ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã®è¡¨ç¤º
-	}
-	//--- ãƒ¢ãƒ‡ãƒ«ã®æç”»
-	RenderTarget* pRTV = GetDefaultRTV(); // ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã®RenderTargetViewã‚’å–å¾—
-	DepthStencil* pDSV = GetDefaultDSV(); // ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã®DepthStencilViewã‚’å–å¾—
-	SetRenderTargets(1, &pRTV, pDSV); // ç¬¬3å¼•æ•°ãŒnullã®å ´åˆã€2Dè¡¨ç¤ºã¨ãªã‚‹
+	//--- E½E½E½fE½E½E½Ì•`E½E½
+	RenderTarget* pRTV = GetDefaultRTV(); // E½fE½tE½HE½E½E½gE½E½RenderTargetViewE½E½E½æ“¾
+	DepthStencil* pDSV = GetDefaultDSV(); // E½fE½tE½HE½E½E½gE½E½DepthStencilViewE½E½E½æ“¾
+	SetRenderTargets(1, &pRTV, pDSV); // E½E½3E½E½E½E½E½E½nullE½Ìê‡E½A2DE½\E½E½E½Æ‚È‚ï¿½
 
 	SetDepthTest(true);
-	m_pPlayer = new Player();
-	m_pPlayer->SetCamera(m_pCamera);
-	m_pBlock = new Block();
-	m_pBlock->SetPos(DirectX::XMFLOAT3(0.0f, 0.0f, -5.0f));
-	m_pGaugeUI = new GaugeUI();
 
-	// ä¸€ã¤ã ã‘
+	// E½E½Â‚ï¿½E½E½
 	m_pDice = new Dice();
 	m_pDice->SetCamera(m_pCamera);
 	TRAN_INS;
@@ -96,7 +155,7 @@ SceneGame::SceneGame()
 	m_scoredThisRoll = false;
 
 	m_pRoleUI = new UIObject(
-		"Role/Role_None.png",   // ä»®ï¼ˆã‚ã¨ã§å·®ã—æ›¿ãˆã‚‹ï¼‰
+		"Role/Role_None.png",   // E½E½E½iE½E½E½Æ‚Åï¿½E½E½E½Ö‚ï¿½E½E½j
 		360.0f, 120.0f,
 		256.0f, 96.0f
 	);
@@ -104,43 +163,49 @@ SceneGame::SceneGame()
 	m_pRoleUI->SetColor(1, 1, 1, 1);
 	m_roleFixedThisRoll = false;
 
-	// ä¾‹ï¼šå½¹ä¸€è¦§UIç”Ÿæˆæ¸ˆã¿ã¨ã—ã¦
-	//const float panelW = 375.0f;
-	//const float panelH = 520.0f;
+	const float turnX = SCREEN_WIDTH - kTurnIndicatorMargin - kTurnIndicatorSize * 0.5f - 50.0f;
+	const float turnY = kTurnIndicatorMargin + 20.0f;
+	m_pTurnUI = new UIObject("Character/Player.png", turnX, turnY, kTurnIndicatorSize, kTurnIndicatorSize);
+	m_pTurnUI->SetColor(1, 1, 1, 1);
 
-	//// è¡¨ç¤ºä½ç½®ï¼ˆé–‹ã„ã¦ã‚‹ã¨ãã¯å³ã«å¯„ã›ã¦å°‘ã—ä½™ç™½ï¼‰
-	//const float openX = SCREEN_WIDTH - panelW * 0.5f - 20.0f;
-	//// é–‰ã˜ã¦ã‚‹ã¨ãã¯ç”»é¢å¤–ï¼ˆå³ã«é€ƒãŒã™ï¼‰
-	//const float closeX = SCREEN_WIDTH + panelW * 0.5f + 20.0f;
-
-	// é«˜ã•ã¯å¥½ã¿ã€‚ä¸Šå¯„ã›ãªã‚‰ 140ã€œ200 ãã‚‰ã„ãŒè¦‹ã‚„ã™ã„
-	m_roleListY = SCREEN_HEIGHT - panelH * 0.5f;
+	// E½E½E½E½E½ÍDE½İBE½E½ñ‚¹‚È‚ï¿½ 140?200 E½E½E½ç‚¢E½E½E½E½E½â‚·E½E½
+	m_roleListY = SCREEN_HEIGHT - kRolePanelHeight * 0.5f;
 
 	m_roleListOpen = false;
-	m_roleListX = closeX;
-	m_roleListTargetX = closeX;
+	m_roleListX = kRolePanelCloseX;
+	m_roleListTargetX = kRolePanelCloseX;
 
-	// é€Ÿåº¦ï¼ˆ1ç§’ã§ã»ã¼åˆ°é”ã™ã‚‹ãã‚‰ã„ï¼‰
+	// E½E½E½xE½i1E½bE½Å‚Ù‚Ú“ï¿½E½BE½E½E½é‚­E½ç‚¢E½j
 	m_roleListSpeed = 14.0f;
 
 	tran.diceui.role.pos = { m_roleListX ,m_roleListY};
-	tran.diceui.role.size = {panelW,panelH};
+	tran.diceui.role.size = {kRolePanelWidth,kRolePanelHeight};
 
-	// ç”Ÿæˆ
+	// E½E½E½E½
 	m_role = new UIObject("tintiro.png",
 		tran.diceui.role.pos.x,
 		tran.diceui.role.pos.y,
 		tran.diceui.role.size.x,
 		tran.diceui.role.size.y);
-	// åˆæœŸä½ç½®ã‚’åæ˜ 
+	// E½E½E½E½E½Ê’uE½ğ”½‰f
 	m_role->SetPosition(m_roleListX, m_roleListY);
-	m_role->SetSize(panelW, panelH);
+	m_role->SetSize(kRolePanelWidth, kRolePanelHeight);
 
-	// æ‰€æŒé‡‘è¡¨ç¤ºï¼ˆä½ç½®ã¯å¥½ã¿ã§èª¿æ•´ï¼‰
+	// E½E½E½E½E½E½E½\E½E½E½iE½Ê’uE½ÍDE½İ‚Å’ï¿½E½E½E½j
 	m_pMoneyUI = new ScoreLite("Number/number.png", 150.0f, 60.0f, 48.0f, 64.0f, 56.0f);
 	m_pMoneyUI->SetScore(m_money);
 
-	// è³­ã‘åˆæœŸåŒ–
+	// HPE½\E½E½
+	m_pPlayerHp = new ScoreLite("Number/number.png", kPlayerHpX, kPlayerHpY, kHpDigitW, kHpDigitH, kHpDigitSpacing);
+	m_pPlayerHp->SetScore(m_playerHP);
+	m_pEnemyHp = new ScoreLite("Number/number.png", kEnemyHpX, kEnemyHpY, kHpDigitW, kHpDigitH, kHpDigitSpacing);
+	m_pEnemyHp->SetScore(m_enemyHP);
+
+	const float playerHpIconX = kPlayerHpX + kHpIconOffsetX;
+	const float enemyHpIconX = kEnemyHpX + kHpIconOffsetX;
+	m_pPlayerHpIcon = new UIObject("Character/Player.png", playerHpIconX, kPlayerHpY, kHpIconSize, kHpIconSize);
+	m_pEnemyHpIcon = new UIObject("Character/Enemy.png", enemyHpIconX, kEnemyHpY, kHpIconSize, kHpIconSize);
+	// E½qE½E½E½E½E½E½E½E½
 	m_money = 200;
 	m_bet = 0;
 	m_rollUsed = 0;
@@ -148,36 +213,22 @@ SceneGame::SceneGame()
 
 	m_pYukari = new Yukari();
 
-	isUsedYukari = true;
+	isUsedYukari = false;
+
+	BeginTurn(TurnOwner::Player);
 }
 
 SceneGame::~SceneGame()
 {
-	if (m_pModel) {
-		delete m_pModel;
-		m_pModel = nullptr;
-	}
+
 	if (m_pCamera) {
 		delete m_pCamera;
 		m_pCamera = nullptr;
-	}
-	if (m_pPlayer) {
-		delete m_pPlayer;
-		m_pPlayer = nullptr;
-	}
-	if (m_pBlock) {
-		delete m_pBlock;
-		m_pBlock= nullptr;
 	}
 	if (m_pDice)
 	{
 		delete m_pDice;
 		m_pDice = nullptr;
-	}
-	if (m_pGaugeUI)
-	{
-		delete m_pGaugeUI;
-		m_pGaugeUI = nullptr;
 	}
 	if (m_role)
 	{
@@ -194,10 +245,35 @@ SceneGame::~SceneGame()
 		delete m_pRoleUI;
 		m_pRoleUI = nullptr;
 	}
+	if (m_pTurnUI)
+	{
+		delete m_pTurnUI;
+		m_pTurnUI = nullptr;
+	}
 	if (m_pMoneyUI)
 	{
 		delete m_pMoneyUI;
 		m_pMoneyUI = nullptr;
+	}
+	if (m_pPlayerHp)
+	{
+		delete m_pPlayerHp;
+		m_pPlayerHp = nullptr;
+	}
+	if (m_pEnemyHp)
+	{
+		delete m_pEnemyHp;
+		m_pEnemyHp = nullptr;
+	}
+	if (m_pPlayerHpIcon)
+	{
+	delete m_pPlayerHpIcon;
+	m_pPlayerHpIcon = nullptr;
+	}
+	if (m_pEnemyHpIcon)
+	{
+	delete m_pEnemyHpIcon;
+	m_pEnemyHpIcon = nullptr;
 	}
 	if (m_pYukari)
 	{
@@ -206,256 +282,343 @@ SceneGame::~SceneGame()
 	}
 }
 
-
-
 void SceneGame::Update()
 {
 	m_pCamera->Update();
-	if(!OnlyDice)
+	if (!OnlyDice)
 	{
-		m_pBlock->Update();
-		m_pPlayer->SetCamera(m_pCamera);
-		m_pPlayer->Update();
-		m_pCamera->SetLook(m_pPlayer->GetPos());
-		m_pDice->Update();
+		UpdatePlayerMode();
+		return;
+	}
 
-		Collision::Box a = m_pPlayer->GetCollision();
-		Collision::Box b = m_pBlock->GetCollision();
+	UpdateDiceMode();
+}
 
-		Collision::Result result;
-		result = Collision::Hit(a, b);
+void SceneGame::UpdatePlayerMode()
+{
+}
 
-		if (result.isHit)
-		{
-			if (result.dir.x != 0.0f)m_pPlayer->Bound(Player::BoundX);
-			if (result.dir.y != 0.0f)m_pPlayer->Bound(Player::BoundY);
-			if (result.dir.z != 0.0f)m_pPlayer->Bound(Player::BoundZ);
-		}
+void SceneGame::UpdateDiceMode()
+{
+	m_pDice->Update(1);
+	m_pDice->SetCamera(m_pCamera);
 
-		DirectX::XMFLOAT3 shadowPos = m_pPlayer->GetPos();
-		Collision::Box s = m_pPlayer->GetShadowCollision();
-		result = Collision::Hit(b, s);
-		if (result.isHit)
-			shadowPos.y = b.center.y + b.size.y * 0.5f;
-		else
-			shadowPos.y = 0.0f;
-		m_pPlayer->SetShadowPos(shadowPos);
+	m_pYukari->Update();
 
-		m_pGaugeUI->SetGauge(m_pPlayer->GetPower());
-		m_pGaugeUI->Update();
+	if (m_turnOwner == TurnOwner::Enemy)
+	{
+		UpdateEnemyTurn();
 	}
 	else
 	{
-		m_pDice->Update(1);
-		m_pDice->SetCamera(m_pCamera);
-
-		m_pYukari->Update();
-
-		if (m_pDice->IsStop())
-		{
-			m_pCamera->LockPos(true);
-
-			TRAN_INS;
-			const int a = tran.dice.currentFaceNumber[0];
-			const int b = tran.dice.currentFaceNumber[2];
-			const int c = tran.dice.currentFaceNumber[3];
-			if (!m_roleFixedThisRoll)
-			{
-
-				if (a >= 1 && a <= 6 && b >= 1 && b <= 6 && c >= 1 && c <= 6)
-				{
-					RoleResult r = CalcRole(a, b, c);
-
-					// ã‚¹ã‚³ã‚¢åŠ ç®—
-					m_pScore->AddScore(r.addScore);
-
-					// å½¹åè¡¨ç¤º
-					switch (r.role)
-					{
-					case RoleType::None:
-						m_pRoleUI->SetTexture("Role/Role_None.png");
-						m_pYukari->SetType(Yukari_Type::UnHappy);
-						break;
-					case RoleType::Hifumi:
-						m_pRoleUI->SetTexture("Role/Role_Hifumi.png");
-						m_pYukari->SetType(Yukari_Type::UnHappy);
-						break;
-					case RoleType::Shigoro:
-						m_pRoleUI->SetTexture("Role/Role_Shigoro.png");
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					case RoleType::Zorome:
-						m_pRoleUI->SetTexture("Role/Role_Zorome.png");
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					case RoleType::Pinzoro:
-						m_pRoleUI->SetTexture("Role/Role_Pinzoro.png");
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					case RoleType::Me:
-					{
-						char path[64];
-						sprintf_s(path, "Role/Role_Me%d.png", r.me);
-						m_pRoleUI->SetTexture(path);
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					}
-					default:
-						// å½¹ãªã—ãªã‚‰è¡¨ç¤ºæ¶ˆã™ or --- ã«ã™ã‚‹
-						break;
-					}
-					// è³­ã‘çµæœï¼ˆæ­¢ã¾ã£ãŸç¬é–“ã«ç¢ºå®šï¼‰
-					if (m_betState == BetState::Rolling)
-					{
-						// å…ˆæ‰•ã„æ–¹å¼ãªã®ã§ã€å‹ã£ãŸã‚‰æ‰•ã„æˆ»ã—ã¨ã—ã¦ä¸Šä¹—ã›ã™ã‚‹
-						// ä¾‹: mult=2 ãªã‚‰ 2å€æ‰•ã„æˆ»ã—ï¼ˆç´”åˆ©ç›Šã¯ +1betï¼‰
-						auto win = [&](int mult)
-							{
-								m_money += m_bet * mult;
-								if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-								// ãƒ©ã‚¦ãƒ³ãƒ‰çµ‚äº†
-								m_bet = 0;
-								m_rollUsed = 0;
-								m_betState = BetState::WaitingBet;
-							};
-
-						auto continueRoll = [&]()
-							{
-								// å½¹ãªã—ã§å›æ•°æ®‹ã£ã¦ã‚‹ãªã‚‰æ¬¡ã®ãƒ­ãƒ¼ãƒ«å¾…ã¡
-								m_betState = BetState::WaitingRoll;
-							};
-
-						auto loseRound = [&]()
-							{
-								// ã™ã§ã«å…ˆæ‰•ã„æ¸ˆã¿ãªã®ã§ã€ã“ã“ã§ã¯è¿½åŠ æ¸›ç®—ã—ãªã„
-								m_bet = 0;
-								m_rollUsed = 0;
-								m_betState = BetState::WaitingBet;
-							};
-
-						if (r.role == RoleType::None)
-						{
-							if (m_rollUsed >= 3) loseRound();
-							else continueRoll();
-						}
-						else if (r.role == RoleType::Hifumi)
-						{
-							// ãƒ’ãƒ•ãƒŸã¯å³è² ã‘ï¼ˆå…ˆæ‰•ã„ã ã‘ã§çµ‚ã‚ã‚Šï¼‰
-							loseRound();
-						}
-						else
-						{
-							int mult = 1;
-							switch (r.role)
-							{
-							case RoleType::Pinzoro: mult = 10; break;
-							case RoleType::Zorome:  mult = 3;  break;
-							case RoleType::Shigoro: mult = 2;  break;
-							case RoleType::Me:      mult = 2;  break;
-							default:                mult = 1;  break;
-							}
-							win(mult);
-						}
-					}
-
-
-					m_roleFixedThisRoll = true;
-				}
-			}
-		}
-		else
-		{
-			m_pCamera->LockPos(false);
-		}
-
-		// ãƒ™ãƒƒãƒˆé¸æŠï¼ˆWaitingBet ã®ã¨ãã ã‘ï¼‰
-		if (m_betState == BetState::WaitingBet)
-		{
-			int nextBet = 0;
-			if (IsKeyTrigger('1')) nextBet = 5;
-			if (IsKeyTrigger('2')) nextBet = 10;
-
-			if (nextBet > 0)
-			{
-				// æ‰€æŒé‡‘ä¸è¶³ãªã‚‰ç„¡è¦–ï¼ˆUIå‡ºã—ãŸã„ãªã‚‰å¾Œã§ï¼‰
-				if (m_money >= nextBet)
-				{
-					m_bet = nextBet;
-					m_rollUsed = 0;
-					m_betState = BetState::WaitingRoll;
-
-					// å½¹è¡¨ç¤ºã‚’ã„ã£ãŸã‚“ None ã«
-					if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
-				}
-			}
-		}
-
-		if (IsKeyTrigger('R'))
-		{
-			// ãƒ©ã‚¦ãƒ³ãƒ‰ä¸­ã ã‘æŒ¯ã‚Œã‚‹
-			if (m_betState == BetState::WaitingRoll)
-			{
-				if (m_rollUsed < 3 && m_pDice)
-				{
-					// å…ˆæ‰•ã„ï¼ˆæŒ¯ã£ã¦ã‚‹æœ€ä¸­ã«æ¸›ã£ã¦ã„ã‚‹çŠ¶æ…‹ã«ãªã‚‹ï¼‰
-					m_money -= m_bet;
-					if (m_money < 0) m_money = 0;
-					if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-					m_roleFixedThisRoll = false;
-					m_scoredThisRoll = false;
-
-					m_rollUsed++;
-					m_betState = BetState::Rolling;
-
-					m_pDice->RollRandom(0);
-					m_pDice->RollRandom(2);
-					m_pDice->RollRandom(3);
-				}
-				m_pYukari->SetType(Yukari_Type::Think);
-			}
-		}
-
-		// Shiftã‚’æŠ¼ã™ãŸã³ã«é–‹é–‰
-		if (IsKeyTrigger(VK_SHIFT))
-		{
-			m_roleListOpen = !m_roleListOpen;
-
-			//const float panelW = 520.0f;
-			//const float openX  = 1280.0f - panelW * 0.5f - 20.0f;
-			//const float closeX = 1280.0f + panelW * 0.5f + 20.0f;
-
-			m_roleListTargetX = m_roleListOpen ? openX : closeX;
-		}
-
-		// dtï¼ˆã‚ãªãŸã®ç’°å¢ƒã«åˆã‚ã›ã¦ï¼‰
-		const float dt = 1.0f / 120.0f;
-
-		// Lerpã§æ»‘ã‚‰ã‹ã«è¿½å¾“ï¼ˆæŒ‡æ•°è¿½å¾“ï¼‰
-		{
-			float t = 1.0f - expf(-m_roleListSpeed * dt);
-			m_roleListX = m_roleListX + (m_roleListTargetX - m_roleListX) * t;
-
-			m_role->SetPosition(m_roleListX, m_roleListY);
-		}
-
-		if (IsKeyTrigger(VK_ESCAPE))
-		{
-			SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
-		}
+		HandleDiceStop();
+		HandlePlayerAutoBet();
+		HandleBetInput();
+		HandleRollInput();
 	}
+
+	if (m_resultReady)
+	{
+		ApplyBetResult(m_cachedRole);
+		m_resultReady = false;
+	}
+
+	UpdateRoleListPanel(kRolePanelLerpDt);
+
+	if (IsKeyTrigger(VK_ESCAPE))
+	{
+		SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
+	}
+}
+
+void SceneGame::UpdateEnemyTurn()
+{
+	if (m_turnPhase == TurnPhase::Betting || m_turnPhase == TurnPhase::WaitingRoll)
+	{
+		if (m_rollUsed >= 3)
+		{
+			return;
+		}
+
+		m_enemyWaitSec -= StepSec60fps();
+		if (m_enemyWaitSec > 0.0f)
+			return;
+
+		if (m_bet <= 0)
+		{
+			m_bet = 5;
+		}
+
+		m_turnPhase = TurnPhase::Rolling;
+		m_betState = BetState::Rolling;
+		m_roleFixedThisRoll = false;
+		m_scoredThisRoll = false;
+		m_rollUsed++;
+
+		if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
+		if (m_pDice)
+		{
+			m_pDice->RollRandom(0);
+			m_pDice->RollRandom(2);
+			m_pDice->RollRandom(3);
+		}
+		if (m_pYukari) m_pYukari->SetType(Yukari_Type::Think);
+	}
+
+	HandleDiceStop();
+}
+void SceneGame::HandleDiceStop()
+{
+	if (!m_pDice->IsStop())
+	{
+		m_pCamera->LockPos(false);
+		return;
+	}
+
+	m_pCamera->LockPos(true);
+
+	if (m_betState != BetState::Rolling)
+		return;
+
+	if (m_roleFixedThisRoll)
+		return;
+
+	TRAN_INS;
+	const int a = tran.dice.currentFaceNumber[0];
+	const int b = tran.dice.currentFaceNumber[2];
+	const int c = tran.dice.currentFaceNumber[3];
+	if (a < 1 || a > 6 || b < 1 || b > 6 || c < 1 || c > 6)
+		return;
+
+	RoleResult r = CalcRole(a, b, c);
+
+	// E½XE½RE½AE½E½E½Z
+	m_pScore->AddScore(r.addScore);
+
+	// E½ğ–¼•\E½E½
+	UpdateRoleUI(r);
+
+	// E½qE½E½E½E½E½ÊiE½~E½Ü‚ï¿½E½E½E½uE½Ô‚ÉŠmE½E½j
+	m_cachedRole = r;
+	m_resultReady = true;
+
+	m_roleFixedThisRoll = true;
+}
+
+void SceneGame::UpdateRoleUI(const RoleResult& r)
+{
+	switch (r.role)
+	{
+	case RoleType::None:
+		m_pRoleUI->SetTexture("Role/Role_None.png");
+		m_pYukari->SetType(Yukari_Type::UnHappy);
+		break;
+	case RoleType::Hifumi:
+		m_pRoleUI->SetTexture("Role/Role_Hifumi.png");
+		m_pYukari->SetType(Yukari_Type::UnHappy);
+		break;
+	case RoleType::Shigoro:
+		m_pRoleUI->SetTexture("Role/Role_Shigoro.png");
+		m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	case RoleType::Zorome:
+		m_pRoleUI->SetTexture("Role/Role_Zorome.png");
+		m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	case RoleType::Pinzoro:
+		m_pRoleUI->SetTexture("Role/Role_Pinzoro.png");
+		m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	case RoleType::Me:
+	{
+		char path[64];
+		sprintf_s(path, "Role/Role_Me%d.png", r.me);
+		m_pRoleUI->SetTexture(path);
+		m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	}
+	default:
+		// E½E½E½È‚ï¿½E½È‚ï¿½\E½E½E½E½E½E½ or --- E½É‚ï¿½E½E½
+		break;
+	}
+}
+
+void SceneGame::ApplyBetResult(const RoleResult& r)
+{
+	bool roundEnded = false;
+
+	auto win = [&](int mult, int damageMult)
+	{
+		const int damage = m_bet * damageMult;
+		if (m_turnOwner == TurnOwner::Player)
+		{
+			m_money += m_bet * mult;
+			if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
+		}
+
+		// E½E½E½EE½E½E½hE½IE½E½
+		m_bet = 0;
+		m_rollUsed = 0;
+		m_betState = BetState::WaitingBet;
+		m_turnPhase = TurnPhase::TurnEnd;
+		m_damageThisTurn = damage;
+		roundEnded = true;
+	};
+
+	auto continueRoll = [&]()
+	{
+		// E½E½E½È‚ï¿½E½Å‰ñ”cE½E½E½Ä‚ï¿½È‚çŸE½ÌE¿½E½[E½E½E½Ò‚ï¿½
+		m_betState = BetState::WaitingRoll;
+		m_turnPhase = TurnPhase::WaitingRoll;
+	};
+
+	auto loseRound = [&]()
+	{
+		// E½E½E½Å‚Éæ•¥E½E½E½Ï‚İ‚È‚Ì‚ÅAE½E½E½E½E½Å‚Í’Ç‰ï¿½E½E½E½ZE½E½E½È‚ï¿½
+		m_bet = 0;
+		m_rollUsed = 0;
+		m_betState = BetState::WaitingBet;
+		m_turnPhase = TurnPhase::TurnEnd;
+		m_damageThisTurn = 0;
+		roundEnded = true;
+	};
+
+	if (r.role == RoleType::None)
+	{
+		if (m_rollUsed >= 3) loseRound();
+		else continueRoll();
+	}
+	else if (r.role == RoleType::Hifumi)
+	{
+		// E½qE½tE½~E½Í‘ï¿½E½E½E½E½E½iE½æ•¥E½E½E½E½E½E½E½ÅIE½E½E½j
+		loseRound();
+	}
+	else
+	{
+		int mult = 1;
+		int damageMult = 0;
+		switch (r.role)
+		{
+		case RoleType::Pinzoro: mult = 10; damageMult = 6; break;
+		case RoleType::Zorome:  mult = 3;  damageMult = 4; break;
+		case RoleType::Shigoro: mult = 2;  damageMult = 3; break;
+		case RoleType::Me:      mult = 2;  damageMult = 2; break;
+		default:                mult = 1;  damageMult = 1; break;
+		}
+		win(mult, damageMult);
+	}
+
+	if (roundEnded)
+	{
+		EndTurn();
+	}
+}
+
+void SceneGame::HandlePlayerAutoBet()
+{
+	if (m_turnOwner != TurnOwner::Player)
+		return;
+
+	if (m_betState != BetState::WaitingBet)
+		return;
+
+	const int kMinBet = 5;
+	if (m_money < kMinBet)
+		return;
+
+	m_bet = kMinBet;
+	m_rollUsed = 0;
+	m_betState = BetState::WaitingRoll;
+	m_turnPhase = TurnPhase::WaitingRoll;
+
+	if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
+}
+
+void SceneGame::HandleBetInput()
+{
+	// E½xE½bE½gE½IE½E½E½iWaitingBet E½Ì‚Æ‚ï¿½E½E½E½E½E½j
+	if (m_betState != BetState::WaitingBet)
+		return;
+
+	int nextBet = 0;
+	if (IsKeyTrigger('1')) nextBet = 5;
+	if (IsKeyTrigger('2')) nextBet = 10;
+
+	if (nextBet <= 0)
+		return;
+
+	// E½E½E½E½E½E½E½sE½E½E½È‚ç–³E½E½E½iUIE½oE½E½E½E½E½E½E½È‚ï¿½E½Åj
+	if (m_money < nextBet)
+		return;
+
+	m_bet = nextBet;
+	m_rollUsed = 0;
+	m_betState = BetState::WaitingRoll;
+	m_turnPhase = TurnPhase::WaitingRoll;
+
+	// E½E½\E½E½E½E½E½E½E½E½E½E½E½E½ None E½E½
+	if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
+}
+
+void SceneGame::HandleRollInput()
+{
+	if (m_turnOwner != TurnOwner::Player)
+		return;
+
+	if (!IsKeyTrigger('R'))
+		return;
+
+	// E½E½E½EE½E½E½hE½E½E½E½E½E½E½UE½E½E½
+	if (m_betState != BetState::WaitingRoll)
+		return;
+
+	if (m_rollUsed < 3 && m_pDice)
+	{
+		// E½æ•¥E½E½E½iE½UE½E½E½Ä‚ï¿½Å’ï¿½E½ÉŒï¿½E½E½E½Ä‚ï¿½E½E½E½Ô‚É‚È‚ï¿½j
+		m_money -= m_bet;
+		if (m_money < 0) m_money = 0;
+		if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
+
+		m_roleFixedThisRoll = false;
+		m_scoredThisRoll = false;
+
+		m_rollUsed++;
+		m_betState = BetState::Rolling;
+		m_turnPhase = TurnPhase::Rolling;
+
+		m_pDice->RollRandom(0);
+		m_pDice->RollRandom(2);
+		m_pDice->RollRandom(3);
+	}
+	m_pYukari->SetType(Yukari_Type::Think);
+}
+
+void SceneGame::UpdateRoleListPanel(float dt)
+{
+	// ShiftE½E½E½E½E½E½E½E½E½Ñ‚ÉŠJE½E½
+	if (IsKeyTrigger(VK_RSHIFT))
+	{
+		m_roleListOpen = !m_roleListOpen;
+
+		m_roleListTargetX = m_roleListOpen ? kRolePanelOpenX : kRolePanelCloseX;
+	}
+
+	// LerpE½ÅŠï¿½E½ç‚©E½É’Ç]E½iE½wE½E½E½Ç]E½j
+	float t = 1.0f - expf(-m_roleListSpeed * dt);
+	m_roleListX = m_roleListX + (m_roleListTargetX - m_roleListX) * t;
+
+	m_role->SetPosition(m_roleListX, m_roleListY);
 }
 
 void SceneGame::Draw()
 {
 	{
 
-		// é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã«æ¸¡ã™å¤‰æ›è¡Œåˆ—ã®å¤‰æ•°ã‚’å®£è¨€ 
-		DirectX::XMFLOAT4X4 fWVP[3];    // World,View,Projectionã®ç•¥  
-		DirectX::XMMATRIX world, view, proj; // å„å¤‰æ›è¡Œåˆ—ã®æ ¼ç´å…ˆ 
+		// E½E½E½_E½VE½FE½[E½_E½[E½É“nE½E½E½ÏŠï¿½E½sE½E½Ì•Ïï¿½E½E½éŒ¾ 
+		DirectX::XMFLOAT4X4 fWVP[3];    // World,View,ProjectionE½Ì—ï¿½  
+		DirectX::XMMATRIX world, view, proj; // E½eE½ÏŠï¿½E½sE½E½ÌŠiE½[E½E½ 
 
-		// ä½œæˆã—ãŸè¡Œåˆ—ã‚’å„å¤‰æ•°ã¸æ ¼ç´ 
+		// E½E¬E½E½E½E½E½sE½E½E½E½eE½Ïï¿½E½ÖŠiE½[ 
 		world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
 		view = DirectX::XMMatrixLookAtLH(
 			DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
@@ -463,84 +626,72 @@ void SceneGame::Draw()
 			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
 		proj =
 			DirectX::XMMatrixOrthographicOffCenterLH(
-				-640, 640,	// æ¨ªä¸‹é™ä¸Šé™å€¤
-				-360, 360,	// ç¸¦ä¸‹é™ä¸Šé™å€¤
-				0.001f,		// Near
-				1000.0f);	// Far
+				-640, 640,  // E½E½E½E½E½E½E½E½E½E½l
+				-360, 360,  // E½cE½E½E½E½E½E½E½E½l
+				0.001f,     // Near
+				1000.0f);   // Far
 		proj = DirectX::XMMatrixPerspectiveFovLH(
-			// DirectXMathã«ç”¨æ„ã•ã‚Œã¦ã„ã‚‹è§’åº¦ã‚’ãƒ©ã‚¸ã‚¢ãƒ³è§’ã«å¤‰æ›ã™ã‚‹é–¢æ•°
-			DirectX::XMConvertToRadians(70.0f),	//è§’åº¦
-			16.0f / 9.0f,						//ã‚¢ã‚¹æ¯”
-			0.1f,								//æœ€å°æç”»è·é›¢
-			100.0f);							//æœ€é•·æç”»è·é›¢
+			// DirectXMathE½É—pE½Ó‚ï¿½E½E½Ä‚ï¿½E½E½pE½xE½E½E½E½E½WE½AE½E½E½pE½É•ÏŠï¿½E½E½E½E½Öï¿½
+			DirectX::XMConvertToRadians(70.0f), //E½pE½x
+			16.0f / 9.0f,                      //E½AE½XE½E½
+			0.1f,                              //E½Åï¿½E½`E½æ‹—ï¿½E½
+			100.0f);                           //E½Å’ï¿½E½`E½æ‹—ï¿½E½
 
 
 
-		// è¨ˆç®—ç”¨ã®ãƒ‡ãƒ¼ã‚¿ã‹ã‚‰èª­ã¿å–ã‚Šç”¨ã®ãƒ‡ãƒ¼ã‚¿ã«å¤‰æ› 
+		// E½vE½ZE½pE½ÌƒfE½[E½^E½E½E½E½Ç‚İï¿½E½pE½ÌƒfE½[E½^E½É•ÏŠï¿½ 
 		DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
 		DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
 		DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
 
-		// ãƒ¢ãƒ‡ãƒ«ã«å¤‰æ›è¡Œåˆ—ã‚’è¨­å®š 
+		// E½E½E½fE½E½E½É•ÏŠï¿½E½sE½E½E½İ’ï¿½ 
 		fWVP[1] = m_pCamera->GetViewMatrix();
 		fWVP[2] = m_pCamera->GetProjectionMatrix();
 
-		// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¸å¤‰æ›è¡Œåˆ—ã‚’è¨­å®š 
-		ShaderList::SetWVP(fWVP); // SetWVPé–¢æ•°ã®å¼•æ•°ã«ã¯XMFLOAT4X4å‹ã§è¦ç´ æ•°ï¼“ã®é…åˆ—ã®ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’æ¸¡ã™ 
+		// E½VE½FE½[E½_E½[E½Ö•ÏŠï¿½E½sE½E½E½İ’ï¿½ 
+		ShaderList::SetWVP(fWVP); // SetWVPE½Öï¿½E½Ìˆï¿½E½E½E½É‚ï¿½XMFLOAT4X4E½^E½Å—vE½fE½E½E½RE½Ì”zE½E½ÌƒAE½hE½E½E½XE½E½nE½E½ 
 
 
-		// ãƒ¢ãƒ‡ãƒ«ã«ä½¿ç”¨ã™ã‚‹é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã€ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’è¨­å®š 
-		m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
-		m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
+		// E½E½E½fE½E½E½ÉgE½pE½E½E½é’¸E½_E½VE½FE½[E½_E½[E½AE½sE½NE½ZE½E½E½VE½FE½[E½_E½[E½E½İ’ï¿½ 
+		//m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+		//m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
-		// ä»®ç½®ãã—ã¦ã„ã‚‹ãƒœãƒƒã‚¯ã‚¹ã«ã‚«ãƒ¡ãƒ©ã‚’è¨­å®š
+		// E½E½E½uE½E½E½E½E½Ä‚ï¿½E½E½{E½bE½NE½XE½ÉƒJE½E½E½E½E½E½İ’ï¿½
 		Geometory::SetView(fWVP[1]);
 		Geometory::SetProjection(fWVP[2]);
 
-		// ä»®ç½®ãã—ã¦ã„ã‚‹ãƒœãƒƒã‚¯ã‚¹ã«ã‚«ãƒ¡ãƒ©ã‚’è¨­å®š 
+		// E½E½E½uE½E½E½E½E½Ä‚ï¿½E½E½{E½bE½NE½XE½ÉƒJE½E½E½E½E½E½İ’ï¿½ 
 		Geometory::SetView(m_pCamera->GetViewMatrix());
 		Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
 
-		// Spriteã¸ã‚«ãƒ¡ãƒ©ã®è¡Œåˆ—ã‚’è¨­å®š 
+		// SpriteE½ÖƒJE½E½E½E½E½ÌsE½E½E½İ’ï¿½ 
 		Sprite::SetView(m_pCamera->GetViewMatrix());
 		Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
 	}
-	// ãƒ¢ãƒ‡ãƒ«ã®æç”» åŸºæœ¬ãã‚Œãã‚Œã®Drawã§å‡ºåŠ›ã•ã›ã‚‹ã®ã§ã„ã‚‰ãªã„ãŒã‚µãƒ³ãƒ—ãƒ«ã¨ã—ã¦æ®‹ã™
-	if(false)
-	{
-		// ãƒãƒ†ãƒªã‚¢ãƒ«åˆ¥ã«ãƒ¡ãƒƒã‚·ãƒ¥ã‚’è¡¨ç¤º 
-		for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
-			// ãƒ¢ãƒ‡ãƒ«ã®ãƒ¡ãƒƒã‚·ãƒ¥ã‚’å–å¾— 
-			const Model::Mesh* mesh = m_pModel->GetMesh(i);
-			// ãƒ¡ãƒƒã‚·ãƒ¥ã«å‰²ã‚Šå½“ã¦ã‚‰ã‚Œã¦ã„ã‚‹ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å–å¾— 
-			Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
-			// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¸ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’è¨­å®š 
-			ShaderList::SetMaterial(material);
-			// ãƒ¢ãƒ‡ãƒ«ã®æç”» 
-			m_pModel->Draw(i);
-		}
-	}
+	// E½E½E½fE½E½E½Ì•`E½E½ E½E½{E½E½E½ê‚¼E½E½E½DrawE½ÅoE½Í‚ï¿½E½E½E½E½Ì‚Å‚ï¿½E½E½È‚ï¿½E½E½E½TE½E½E½vE½E½E½Æ‚ï¿½E½ÄcE½E½
+	//if(false)
+	//{
+	//	// E½}E½eE½E½E½AE½E½E½Ê‚ÉE¿½E½bE½VE½E½E½E½\E½E½ 
+	//	for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
+	//		// E½E½E½fE½E½E½ÌE¿½E½bE½VE½E½E½E½E½æ“¾ 
+	//		const Model::Mesh* mesh = m_pModel->GetMesh(i);
+	//		// E½E½E½bE½VE½E½E½ÉŠï¿½E½è“–ï¿½Ä‚ï¿½E½Ä‚ï¿½E½E½}E½eE½E½E½AE½E½E½E½E½æ“¾ 
+	//		Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
+	//		// E½VE½FE½[E½_E½[E½Öƒ}E½eE½E½E½AE½E½E½E½İ’ï¿½ 
+	//		ShaderList::SetMaterial(material);
+	//		// E½E½E½fE½E½E½Ì•`E½E½ 
+	//		m_pModel->Draw(i);
+	//	}
+	//}
 
-	if(!OnlyDice)
+	if(OnlyDice)
 	{
-		if (m_pBlock)
-			m_pBlock->Draw();
-		if (m_pPlayer)
-			m_pPlayer->Draw();
-		SetDepthTest(false);
-		if (m_pGaugeUI)
-			m_pGaugeUI->Draw();
-		SetDepthTest(true);
-	}
-	else
-	{
-		// å‚ç…§ç”¨ã®ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’å–å¾—
+		// E½QE½Æ—pE½ÌƒCE½E½E½XE½^E½E½E½XE½E½E½æ“¾
 		TRAN_INS;
 
 		if (m_pDice)
 		{
 			m_pDice->Draw();
-			//m_pDice->TestDraw();
 		}
 
 		if (m_role)
@@ -549,15 +700,35 @@ void SceneGame::Draw()
 		}
 		if (m_pScore)
 		{
-			m_pScore->Draw();
+			// m_pScore->Draw();
 		}
 		if (m_pRoleUI)
 		{
 			m_pRoleUI->Draw();
 		}
+		if (m_pTurnUI)
+		{
+			m_pTurnUI->Draw();
+		}
 		if (m_pMoneyUI)
 		{
 			m_pMoneyUI->Draw();
+		}
+		if (m_pPlayerHp)
+		{
+			if (m_pPlayerHpIcon)
+			{
+				m_pPlayerHpIcon->Draw();
+			}
+			m_pPlayerHp->Draw();
+		}
+		if (m_pEnemyHp)
+		{
+			if (m_pEnemyHpIcon)
+			{
+				m_pEnemyHpIcon->Draw();
+			}
+			m_pEnemyHp->Draw();
 		}
 		if (m_pYukari && isUsedYukari)
 		{
@@ -565,3 +736,28 @@ void SceneGame::Draw()
 		}
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

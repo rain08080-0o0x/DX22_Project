@@ -1,6 +1,55 @@
 #include "Texture.h"
 #include "DirectXTex/TextureLoad.h"
+#include <Windows.h>
+#include <string>
 
+namespace
+{
+	bool FileExists(const char* path)
+	{
+		DWORD attr = GetFileAttributesA(path);
+		return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+	}
+
+	std::string GetExecutableDir()
+	{
+		char buffer[MAX_PATH] = {};
+		DWORD len = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+		if (len == 0 || len == MAX_PATH)
+			return std::string();
+
+		std::string full(buffer, len);
+		size_t pos = full.find_last_of("\\/");
+		if (pos == std::string::npos)
+			return std::string();
+
+		return full.substr(0, pos + 1);
+	}
+
+	std::string ResolveAssetPath(const char* path)
+	{
+		if (FileExists(path))
+			return std::string(path);
+
+		std::string exeDir = GetExecutableDir();
+		if (!exeDir.empty())
+		{
+			std::string candidate = exeDir + path;
+			if (FileExists(candidate.c_str()))
+				return candidate;
+
+			candidate = exeDir + "..\\..\\" + path;
+			if (FileExists(candidate.c_str()))
+				return candidate;
+
+			candidate = exeDir + "..\\..\\DX22_Project\\" + path;
+			if (FileExists(candidate.c_str()))
+				return candidate;
+		}
+
+		return std::string(path);
+	}
+}
 /// <summary>
 /// テクスチャ
 /// </summary>
@@ -19,15 +68,16 @@ HRESULT Texture::Create(const char* fileName)
 {
 	HRESULT hr = S_OK;
 
+		const std::string resolvedPath = ResolveAssetPath(fileName);
+
 	// 文字変換
 	wchar_t wPath[MAX_PATH];
-	size_t wLen = 0;
-	MultiByteToWideChar(0, 0, fileName, -1, wPath, MAX_PATH);
+	MultiByteToWideChar(0, 0, resolvedPath.c_str(), -1, wPath, MAX_PATH);
 
 	// ファイル別読み込み
 	DirectX::TexMetadata mdata;
 	DirectX::ScratchImage image;
-	if (strstr(fileName, ".tga"))
+	if (strstr(resolvedPath.c_str(), ".tga"))
 		hr = DirectX::LoadFromTGAFile(wPath, &mdata, image);
 	else
 		hr = DirectX::LoadFromWICFile(wPath, DirectX::WIC_FLAGS::WIC_FLAGS_IGNORE_SRGB, &mdata, image);
@@ -219,3 +269,5 @@ HRESULT DepthStencil::CreateResource(D3D11_TEXTURE2D_DESC& desc, const void* pDa
 	// 生成
 	return GetDevice()->CreateDepthStencilView(m_pTex, &dsvDesc, &m_pDSV);
 }
+
+

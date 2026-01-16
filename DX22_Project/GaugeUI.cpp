@@ -1,4 +1,4 @@
-﻿#include "GaugeUI.h"
+#include "GaugeUI.h"
 #include "DirectXMath.h"
 #include "Defines.h"
 #include "ShaderList.h"
@@ -11,12 +11,12 @@ GaugeUI::GaugeUI()
 	//  
 	m_pFrameTex = new Texture();
 	if (FAILED(m_pFrameTex->Create("Assets/Texture/UIFrame.png"))) {
-		MessageBox(NULL, "Texture load failed.¥nUI.cpp", "Error", MB_OK);
+		MessageBox(NULL, "Texture load failed.\nUI.cpp", "Error", MB_OK);
 	}
 	//  
 	m_pGaugeTex = new Texture();
 	if (FAILED(m_pGaugeTex->Create("Assets/Texture/UIGauge.png"))) {
-		MessageBox(NULL, "Texture load failed.¥nUI.cpp", "Error", MB_OK);
+		MessageBox(NULL, "Texture load failed.\nUI.cpp", "Error", MB_OK);
 	}
 }
 

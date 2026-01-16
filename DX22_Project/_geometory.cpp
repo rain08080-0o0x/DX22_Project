@@ -1,4 +1,4 @@
-ï»¿#include "Geometory.h"
+#include "Geometory.h"
 #include<cmath>
 #include<vector>
 using namespace std;
@@ -7,56 +7,56 @@ const int VERTEX_CYLINDER = 10;
 
 void Geometory::MakeBox()
 {
-	//--- é ‚ç‚¹ã®ä½œæˆ
+	//--- ’¸“_‚Ìì¬
 
 	Vertex vtx[] = {
-	// -Zé¢
-	{{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f}}, // 0:å·¦ä¸Š
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f}}, // 1:å³ä¸Š
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}}, // 2:å·¦ä¸‹
-	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}}, // 3:å³ä¸‹
+	// -Z–Ê
+	{{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f}}, // 0:¶ã
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f}}, // 1:‰Eã
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}}, // 2:¶‰º
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}}, // 3:‰E‰º
 
-	// +Zé¢ï¼ˆå¥¥ï¼‰
-	{{ 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}}, // 4:å·¦ä¸Š
-	{{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}}, // 5:å³ä¸Š
-	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}}, // 6:å·¦ä¸‹
-	{{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}}, // 7:å³ä¸‹
+	// +Z–Êi‰œj
+	{{ 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}}, // 4:¶ã
+	{{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}}, // 5:‰Eã
+	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}}, // 6:¶‰º
+	{{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}}, // 7:‰E‰º
 
-	// +Xé¢ï¼ˆå³ï¼‰
-	{{ 0.5f,  0.5f, -0.5f}, {0.0f, 0.0f}}, // 8:å·¦ä¸Š
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}}, // 9:å³ä¸Š
-	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}}, // 10:å·¦ä¸‹
-	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}}, // 11:å³ä¸‹
+	// +X–Êi‰Ej
+	{{ 0.5f,  0.5f, -0.5f}, {0.0f, 0.0f}}, // 8:¶ã
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}}, // 9:‰Eã
+	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}}, // 10:¶‰º
+	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}}, // 11:‰E‰º
 
-	// -Xé¢ï¼ˆå·¦ï¼‰
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}}, // 12:å·¦ä¸Š
-	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f}}, // 13:å³ä¸Š
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}}, // 14:å·¦ä¸‹
-	{{-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}}, // 15:å³ä¸‹
+	// -X–Êi¶j
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}}, // 12:¶ã
+	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f}}, // 13:‰Eã
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}}, // 14:¶‰º
+	{{-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}}, // 15:‰E‰º
 
-	// +Yé¢ï¼ˆä¸Šï¼‰
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}}, // 16:å·¦ä¸Š
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}}, // 17:å³ä¸Š
-	{{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}}, // 18:å·¦ä¸‹
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}}, // 19:å³ä¸‹
+	// +Y–Êiãj
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}}, // 16:¶ã
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}}, // 17:‰Eã
+	{{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}}, // 18:¶‰º
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}}, // 19:‰E‰º
 
-	// -Yé¢ï¼ˆä¸‹ï¼‰
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}}, // 20:å·¦ä¸Š
-	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}}, // 21:å³ä¸Š
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}}, // 22:å·¦ä¸‹
-	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}}, // 23:å³ä¸‹
+	// -Y–Êi‰ºj
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}}, // 20:¶ã
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}}, // 21:‰Eã
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}}, // 22:¶‰º
+	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}}, // 23:‰E‰º
 	};
-	//--- ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®ä½œæˆ
+	//--- ƒCƒ“ƒfƒbƒNƒX‚Ìì¬
 	int idx[] =
 	{
-		0, 1, 2,   1, 3, 2,   // -Zé¢
-		4, 5, 6,   5, 7, 6,   // +Zé¢
-		8, 9, 10,  9, 11, 10,  // +Xé¢
-		12, 13, 14, 13, 15, 14, // -Xé¢
-		16, 17, 18, 17, 19, 18, // +Yé¢
-		20, 21, 22, 21, 23, 22  // -Yé¢
+		0, 1, 2,   1, 3, 2,   // -Z–Ê
+		4, 5, 6,   5, 7, 6,   // +Z–Ê
+		8, 9, 10,  9, 11, 10,  // +X–Ê
+		12, 13, 14, 13, 15, 14, // -X–Ê
+		16, 17, 18, 17, 19, 18, // +Y–Ê
+		20, 21, 22, 21, 23, 22  // -Y–Ê
 	};
-	// ãƒãƒƒãƒ•ã‚¡ã®ä½œæˆ
+	// ƒoƒbƒtƒ@‚Ìì¬
 	MeshBuffer::Description desc = {};
 	desc.pVtx = vtx;
 	desc.vtxCount = 24;
@@ -71,36 +71,36 @@ void Geometory::MakeBox()
 
 void Geometory::MakeCylinder()
 {
-	//--- å††æŸ±ã®é ‚ç‚¹ã¨ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®ä½œæˆ
-	const int circleVtx = 16; // å††å‘¨ã®åˆ†å‰²æ•°
+	//--- ‰~’Œ‚Ì’¸“_‚ÆƒCƒ“ƒfƒbƒNƒX‚Ìì¬
+	const int circleVtx = 16; // ‰~ü‚Ì•ªŠ„”
 	const float radius = 0.5f;
 	const float height = 1.0f;
 
 	std::vector<Vertex> vtxVec;
 	std::vector<int> idxVec;
 
-	// é ‚ç‚¹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹:
-	// 0: ä¸Šé¢ä¸­å¤®
-	// 1ï½circleVtx: ä¸Šé¢à¾ƒä‹ç¼˜
-	// circleVtx+1ï½circleVtx*2+1: ä¸‹é¢ä¸­å¤®ã¨ä¸‹é¢ç¼˜
-	// circleVtx*2+2ï½circleVtx*3+1: å´é¢ä¸Šè¾º
-	// circleVtx*3+2ï½circleVtx*4+1: å´é¢ä¸‹è¾º
+	// ’¸“_ƒCƒ“ƒfƒbƒNƒX:
+	// 0: ã–Ê’†‰›
+	// 1`circleVtx: ã–Ê???
+	// circleVtx+1`circleVtx*2+1: ‰º–Ê’†‰›‚Æ‰º–Ê?
+	// circleVtx*2+2`circleVtx*3+1: ‘¤–Êã•Ó
+	// circleVtx*3+2`circleVtx*4+1: ‘¤–Ê‰º•Ó
 
-	// ä¸Šé¢ä¸­å¤®
+	// ã–Ê’†‰›
 	vtxVec.push_back({ {0.0f, height / 2.0f, 0.0f}, {0.5f, 0.5f} });
-	// ä¸Šé¢å¤–å‘¨
+	// ã–ÊŠOü
 	for (int i = 0; i < circleVtx; ++i)
 	{
 		float angle = 2.0f * 3.14159f * i / circleVtx;
 		float x = radius * cosf(angle);
 		float z = radius * sinf(angle);
-		// UV: ä¸Šé¢ã¯ä¸­å¤®ã‹ã‚‰å¤–å´ã¸åŒå¿ƒå††çŠ¶ã«
+		// UV: ã–Ê‚Í’†‰›‚©‚çŠO‘¤‚Ö“¯S‰~ó‚É
 		float u = 0.5f + 0.5f * cosf(angle);
 		float v = 0.5f + 0.5f * sinf(angle);
 		vtxVec.push_back({ {x, height / 2.0f, z}, {u, v} });
 	}
 
-	// ä¸Šé¢ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ï¼ˆæ‰‡å‹ï¼‰
+	// ã–Ê‚ÌƒCƒ“ƒfƒbƒNƒXiîŒ^j
 	for (int i = 1; i < circleVtx; ++i)
 	{
 		idxVec.push_back(0);
@@ -111,26 +111,26 @@ void Geometory::MakeCylinder()
 	idxVec.push_back(1);
 	idxVec.push_back(circleVtx);
 
-	// ä¸‹é¢ä¸­å¤®
-	int bottomCenterIdx = vtxVec.size();
+	// ‰º–Ê’†‰›
+	int bottomCenterIdx = static_cast<int>(vtxVec.size());
 	vtxVec.push_back({ {0.0f, -height / 2.0f, 0.0f}, {0.5f, 0.5f} });
-	// ä¸‹é¢å¤–å‘¨
+	// ‰º–ÊŠOü
 	for (int i = 0; i < circleVtx; ++i)
 	{
 		float angle = 2.0f * 3.14159f * i / circleVtx;
 		float x = radius * cosf(angle);
 		float z = radius * sinf(angle);
-		// UV: ä¸‹é¢ã‚‚ä¸­å¤®ã‹ã‚‰å¤–å´ã¸åŒå¿ƒå††çŠ¶ã«
+		// UV: ‰º–Ê‚à’†‰›‚©‚çŠO‘¤‚Ö“¯S‰~ó‚É
 		float u = 0.5f + 0.5f * cosf(-angle);
 		float v = 0.5f + 0.5f * sinf(-angle);
 
-		//float u = 0.5f - cosf(angle) * 0.5f;  // Xè»¸ã‚’åè»¢
-		//float v = 0.5f - sinf(angle) * 0.5f;  // Yè»¸ã‚’åè»¢
+		//float u = 0.5f - cosf(angle) * 0.5f;  // X²‚ğ”½“]
+		//float v = 0.5f - sinf(angle) * 0.5f;  // Y²‚ğ”½“]
 
 		vtxVec.push_back({ {x, -height / 2.0f, z}, {u, v} });
 	}
 
-	// ä¸‹é¢ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ï¼ˆæ‰‡å‹ï¼‰
+	// ‰º–Ê‚ÌƒCƒ“ƒfƒbƒNƒXiîŒ^j
 	int bottomStart = bottomCenterIdx + 1;
 	for (int i = bottomStart; i < bottomStart + circleVtx - 1; ++i)
 	{
@@ -142,50 +142,50 @@ void Geometory::MakeCylinder()
 	idxVec.push_back(bottomStart);
 	idxVec.push_back(bottomStart + circleVtx - 1);
 
-	// å´é¢ã®ä¸Šã®é ‚ç‚¹
-	int sideTopStart = vtxVec.size();
+	// ‘¤–Ê‚Ìã‚Ì’¸“_
+	int sideTopStart = static_cast<int>(vtxVec.size());
 	for (int i = 0; i < circleVtx; ++i)
 	{
 		float angle = 2.0f * 3.14159f * i / circleVtx;
 		float x = radius * cosf(angle);
 		float z = radius * sinf(angle);
-		// UV: Uæ–¹å‘ã¯å††å‘¨æ–¹å‘(0ï½1)ã€Væ–¹å‘ã¯é«˜ã•1.0
+		// UV: U•ûŒü‚Í‰~ü•ûŒü(0`1)AV•ûŒü‚Í‚‚³1.0
 		vtxVec.push_back({ {x, height / 2.0f, z}, {i / (float)circleVtx, 1.0f} });
 	}
 
-	// å´é¢ã®ä¸‹ã®é ‚ç‚¹
-	int sideBottomStart = vtxVec.size();
+	// ‘¤–Ê‚Ì‰º‚Ì’¸“_
+	int sideBottomStart = static_cast<int>(vtxVec.size());
 	for (int i = 0; i < circleVtx; ++i)
 	{
 		float angle = 2.0f * 3.14159f * i / circleVtx;
 		float x = radius * cosf(angle);
 		float z = radius * sinf(angle);
-		// UV: Uæ–¹å‘ã¯å††å‘¨æ–¹å‘(0ï½1)ã€Væ–¹å‘ã¯é«˜ã•0.0
+		// UV: U•ûŒü‚Í‰~ü•ûŒü(0`1)AV•ûŒü‚Í‚‚³0.0
 		vtxVec.push_back({ {x, -height / 2.0f, z}, {i / (float)circleVtx, 0.0f} });
 	}
 
-	// å´é¢ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+	// ‘¤–Ê‚ÌƒCƒ“ƒfƒbƒNƒX
 	for (int i = 0; i < circleVtx; ++i)
 	{
 		int next = (i + 1) % circleVtx;
-		// å››è§’å½¢ã‚’2ã¤ã®ä¸‰è§’å½¢ã«åˆ†å‰²
-		// ä¸Šå´ã®ä¸‰è§’å½¢
+		// lŠpŒ`‚ğ2‚Â‚ÌOŠpŒ`‚É•ªŠ„
+		// ã‘¤‚ÌOŠpŒ`
 		idxVec.push_back(sideTopStart + i);
 		idxVec.push_back(sideTopStart + next);
 		idxVec.push_back(sideBottomStart + i);
-		// ä¸‹å´ã®ä¸‰è§’å½¢
+		// ‰º‘¤‚ÌOŠpŒ`
 		idxVec.push_back(sideTopStart + next);
 		idxVec.push_back(sideBottomStart + next);
 		idxVec.push_back(sideBottomStart + i);
 	}
 
-	//--- ãƒãƒƒãƒ•ã‚¡ã®ä½œæˆ
+	//--- ƒoƒbƒtƒ@‚Ìì¬
 	MeshBuffer::Description desc = {};
 	desc.pVtx = vtxVec.data();
-	desc.vtxCount = vtxVec.size();
+	desc.vtxCount = static_cast<UINT>(vtxVec.size());
 	desc.vtxSize = sizeof(Vertex);
 	desc.pIdx = idxVec.data();
-	desc.idxCount = idxVec.size();
+	desc.idxCount = static_cast<UINT>(idxVec.size());
 	desc.idxSize = sizeof(int);
 	desc.topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	m_pCylinder = new MeshBuffer();
@@ -194,9 +194,9 @@ void Geometory::MakeCylinder()
 
 void Geometory::MakeSphere()
 {
-	//--- é ‚ç‚¹ã®ä½œæˆ
+	//--- ’¸“_‚Ìì¬
 
-	//--- ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®ä½œæˆ
+	//--- ƒCƒ“ƒfƒbƒNƒX‚Ìì¬
 
-	// ãƒãƒƒãƒ•ã‚¡ã®ä½œæˆ
+	// ƒoƒbƒtƒ@‚Ìì¬
 }
