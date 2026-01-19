@@ -1,7 +1,6 @@
 #pragma once
 #include "Scene.h"
-
-class UIObject;
+#include "ECS.h"
 
 class SceneTitle : public Scene
 {
@@ -13,7 +12,8 @@ public:
     void Draw() override;
 
 private:
-    UIObject* m_pLogo;
-    UIObject* m_pStart;
-    UIObject* m_pHint;
+    ECS::World m_world;
+    ECS::Entity m_logo = ECS::kInvalidEntity;
+    ECS::Entity m_start = ECS::kInvalidEntity;
+    ECS::Entity m_hint = ECS::kInvalidEntity;
 };

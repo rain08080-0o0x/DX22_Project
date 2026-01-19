@@ -8,6 +8,14 @@ public:
     {
         SCENE_TITLE = 0,
         SCENE_GAME,
+        SCENE_RESULT,
+    };
+
+    enum ResultType
+    {
+        None,
+        Win,
+        Lose,
     };
 
 public:
@@ -19,10 +27,14 @@ public:
     static void ChangeScene(SceneType next);
     static SceneType GetCurrent() { return m_current; }
 
+    static ResultType GetResultType();
+    static void ChangeResult(ResultType set);
+
 private:
     static void CreateScene(SceneType type);
 
 private:
+    static ResultType m_result;
     static Scene* m_pScene;
     static SceneType m_current;
     static SceneType m_next;

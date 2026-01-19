@@ -1,6 +1,6 @@
 #include "SceneManager.h"
 #include "SceneTitle.h"
-#include "SceneGame.h"
+#include "SceneGameECS.h"
 #include "SceneResult.h"
 
 Scene* SceneManager::m_pScene = nullptr;
@@ -54,7 +54,7 @@ void SceneManager::CreateScene(SceneType type)
 
 void SceneManager::ChangeScene(SceneType next)
 {
-    // 同じシーンに変えるのは無視
+    // Ignore switching to the same scene.
     if (next == m_current) return;
 
     m_next = next;
@@ -75,8 +75,7 @@ void SceneManager::Update()
 {
     if (m_isChanging)
     {
-        // ここにフェード等を入れたいなら後で追加できる
-        // 今は即切り替え
+        // Immediate switch; add fades later if needed.
         m_current = m_next;
         CreateScene(m_current);
         m_isChanging = false;
@@ -90,6 +89,4 @@ void SceneManager::Draw()
 {
     if (m_pScene)
         m_pScene->RootDraw();
-
-    // フェード等を入れるなら、ここで上描き
 }

@@ -135,6 +135,9 @@ private:
 
 	// Resolve ópÇ…ï€éù
 	RoleResult m_cachedRole;
+
+	Model* m_pTyawan;
+	Model* m_pTyabu;
 };
 
 #endif // __SCENE_GAME_H__
