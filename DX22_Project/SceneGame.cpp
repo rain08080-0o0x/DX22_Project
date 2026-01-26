@@ -741,7 +741,7 @@ void SceneGame::Draw()
 	// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ描・ｽ・ｽ ・ｽ・ｽ{・ｽ・ｽ・ｽ黷ｼ・ｽ・ｽ・ｽDraw・ｽﾅ出・ｽﾍゑｿｽ・ｽ・ｽ・ｽ・ｽﾌでゑｿｽ・ｽ・ｽﾈゑｿｽ・ｽ・ｽ・ｽT・ｽ・ｽ・ｽv・ｽ・ｽ・ｽﾆゑｿｽ・ｽﾄ残・ｽ・ｽ
 	ShaderList::SetWVP(fWVP); // SetWVP・ｽﾖ撰ｿｽ・ｽﾌ茨ｿｽ・ｽ・ｽ・ｽﾉゑｿｽXMFLOAT4X4・ｽ^・ｽﾅ要・ｽf・ｽ・ｽ・ｽR・ｽﾌ配・ｽ・ｽﾌア・ｽh・ｽ・ｽ・ｽX・ｽ・ｽn・ｽ・ｽ 
 
-	if(false)
+	if(true)
 	{
 		// ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽﾊに・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ\・ｽ・ｽ 
 		for (unsigned int i = 0; i < m_pTyawan->GetMeshNum(); ++i) {
@@ -769,7 +769,7 @@ void SceneGame::Draw()
 	Sprite::SetView(m_pCamera->GetViewMatrix());
 	Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
 	ShaderList::SetWVP(fWVP); // SetWVP・ｽﾖ撰ｿｽ・ｽﾌ茨ｿｽ・ｽ・ｽ・ｽﾉゑｿｽXMFLOAT4X4・ｽ^・ｽﾅ要・ｽf・ｽ・ｽ・ｽR・ｽﾌ配・ｽ・ｽﾌア・ｽh・ｽ・ｽ・ｽX・ｽ・ｽn・ｽ・ｽ 
-	if(false)
+	if(true)
 	{
 		// ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽﾊに・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ\・ｽ・ｽ 
 		for (unsigned int i = 0; i < m_pTyabu->GetMeshNum(); ++i) {
@@ -876,28 +876,3 @@ void SceneGame::Draw()
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

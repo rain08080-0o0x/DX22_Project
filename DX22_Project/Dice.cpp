@@ -1003,12 +1003,3 @@ void Dice::SetDiceTexture(int count, int num)
 	// 2回目以降：テクスチャ差し替え（UIObjectにその機能が必要）
 	m_pDiceUI[count]->SetTexture(DiceTex.c_str());
 }
-
-
-
-
-
-
-
-
-

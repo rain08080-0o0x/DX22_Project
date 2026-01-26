@@ -15,6 +15,7 @@ bool UIObject::s_is2DBegin = false;
 RenderTarget* UIObject::s_prevRTV = nullptr;
 DepthStencil* UIObject::s_prevDSV = nullptr;
 
+#if !defined(__cpp_lib_clamp)
 namespace std
 {
 	template <typename T> T clamp( const T &v, const T &lo, const T &hi )
@@ -22,6 +23,7 @@ namespace std
 		return ( v < lo ) ? lo : ( v > hi ) ? hi : v;
 	}
 }  // namespace std
+#endif
 
 UIObject::UIObject()
 		: UIObject( "Placeholder.png" ) {};
