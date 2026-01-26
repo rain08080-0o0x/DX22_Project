@@ -1,4 +1,4 @@
-#ifndef __SCENE_GAME_H__
+ï»¿#ifndef __SCENE_GAME_H__
 #define __SCENE_GAME_H__
 
 #include "Scene.h"
@@ -20,22 +20,22 @@ enum class RoleType
 	Shigoro,
 	Zorome,
 	Pinzoro,
-	Me,        // ’Êí–ği2ŒÂ“¯‚¶ + 1ŒÂˆá‚¤j
+	Me,        // ï¿½Êï¿½ï¿½ï¿½i2ï¿½Â“ï¿½ï¿½ï¿½ + 1ï¿½Âˆá‚¤ï¿½j
 };
 
 struct RoleResult
 {
 	RoleType role;
 	int addScore;
-	int me;   // RoleType::Me ‚Ì‚Æ‚«‚¾‚¯ 1`6A‚»‚êˆÈŠO‚Í 0
+	int me;   // RoleType::Me ï¿½Ì‚Æ‚ï¿½ï¿½ï¿½ï¿½ï¿½ 1ï¿½`6ï¿½Aï¿½ï¿½ï¿½ï¿½ÈŠOï¿½ï¿½ 0
 };
-// “q‚¯ƒVƒXƒeƒ€
+// ï¿½qï¿½ï¿½ï¿½Vï¿½Xï¿½eï¿½ï¿½
 enum class BetState
 {
-	WaitingBet,     // ƒxƒbƒg‘I‘ğ‘Ò‚¿
-	WaitingRoll,    // Ÿ‚Ìƒ[ƒ‹“ü—Í‘Ò‚¿iRj
-	Rolling,        // •¨—‚Å“]‚ª‚è’†
-	Result          // Ÿ”sŠm’è•\¦’†iŸ‚Ìƒxƒbƒg‚Öj
+	WaitingBet,     // ï¿½xï¿½bï¿½gï¿½Iï¿½ï¿½Ò‚ï¿½
+	WaitingRoll,    // ï¿½ï¿½ï¿½Ìƒï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½Í‘Ò‚ï¿½ï¿½iRï¿½j
+	Rolling,        // ï¿½ï¿½ï¿½ï¿½ï¿½Å“]ï¿½ï¿½ï¿½è’†
+	Result          // ï¿½ï¿½ï¿½sï¿½mï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½Ìƒxï¿½bï¿½gï¿½Öj
 };
 
 class SceneGame : public Scene
@@ -49,6 +49,7 @@ public:
 
 private:
 	Model* m_pModel;
+	Model* m_pTyawan;
 	Camera* m_pCamera;
 	Player* m_pPlayer;
 	Block* m_pBlock;
@@ -57,89 +58,77 @@ private:
 	Dice* m_pDice;
 	bool OnlyDice = true;
 
-	UIObject* m_role;	// –ğ‚ğ•\¦‚·‚é‚â‚Â
+	UIObject* m_role;	// ï¿½ï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 private:
 	ScoreLite* m_pScore = nullptr;
 	bool m_scoredThisRoll = false;
 
 	UIObject* m_pRoleUI = nullptr;
-	bool m_roleFixedThisRoll = false; // ƒXƒRƒA‚Ì‘½d‰ÁZ‚ğ‚³‚¹‚È‚¢‚æ‚¤‚É‚·‚é•Ï”
+	bool m_roleFixedThisRoll = false;
 
-	// –ğˆê——ƒXƒ‰ƒCƒh—p
+	// ï¿½ï¿½ï¿½ê——ï¿½Xï¿½ï¿½ï¿½Cï¿½hï¿½p
 	bool  m_roleListOpen;
-	float m_roleListX;        // Œ»İX
-	float m_roleListTargetX;  // –Ú•WX
-	float m_roleListY;        // ŒÅ’èY
-	float m_roleListSpeed;    // ’Ç]‘¬“xi‘å‚«‚¢‚Ù‚Ç‘¬‚¢j
+	float m_roleListX;        // ï¿½ï¿½ï¿½ï¿½X
+	float m_roleListTargetX;  // ï¿½Ú•WX
+	float m_roleListY;        // ï¿½Å’ï¿½Y
+	float m_roleListSpeed;    // ï¿½Ç]ï¿½ï¿½ï¿½xï¿½iï¿½å‚«ï¿½ï¿½ï¿½Ù‚Ç‘ï¿½ï¿½ï¿½ï¿½j
 
 
-	int m_money = 200;       // ‰ŠúŠ‹àiŒÅ’è200‚ÅOKBŒã‚Å’è”‰»/JSON‰»j
-	int m_bet = 0;           // Œ»İ‚ÌƒxƒbƒgŠzi5 or 10j
-	int m_rollUsed = 0;      // g‚Á‚½‰ñ”i0..3j
+	int m_money = 200;       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½Å’ï¿½200ï¿½ï¿½OKï¿½Bï¿½ï¿½Å’è”ï¿½ï¿½/JSONï¿½ï¿½ï¿½j
+	int m_bet = 0;           // ï¿½ï¿½ï¿½İ‚Ìƒxï¿½bï¿½gï¿½zï¿½i5 or 10ï¿½j
+	int m_rollUsed = 0;      // ï¿½gï¿½ï¿½ï¿½ï¿½ï¿½ñ”i0..3ï¿½j
 	BetState m_betState = BetState::WaitingBet;
-	// Š‹à•\¦
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½\ï¿½ï¿½
 	ScoreLite* m_pMoneyUI = nullptr;
 
 	Yukari* m_pYukari;
 
 	bool isUsedYukari = false;
 public:
-	// ƒ^[ƒ“§
+	// ï¿½^ï¿½[ï¿½ï¿½ï¿½ï¿½
 	enum class TurnOwner
 	{
 		Player,
 		Enemy
 	};
 
-	enum class TurnPhase
-	{
-		TurnStart,     // ƒ^[ƒ“ŠJni‰Šú‰»j
-		Betting,       // ƒxƒbƒg‘I‘ğ
-		WaitingRoll,   // ƒ[ƒ‹“ü—Í‘Ò‚¿i“G‚Í©“®‚Åi‚Şj
-		Rolling,       // “]‚ª‚è’†
-		Resolve,       // o–ÚŠm’èŒã‚Ìˆ—
-		TurnEnd        // Ÿ‚Ìƒ^[ƒ“‚Ö
-	};
-
-private:
 
 	void EndTurn();
 	void BeginTurn(TurnOwner owner);
 
-	void TurnUpdate();
+	// BetState handlers
+	void UpdateBetFlow(TurnOwner owner);
+	void HandleWaitingBet(TurnOwner owner);
+	void HandleWaitingRoll(TurnOwner owner);
+	void HandleRolling(TurnOwner owner);
 
-	void TurnStart();     // ƒ^[ƒ“ŠJni‰Šú‰»j
-	void Betting();       // ƒxƒbƒg‘I‘ğ
-	void WaitingRoll();   // ƒ[ƒ‹“ü—Í‘Ò‚¿i“G‚Í©“®‚Åi‚Şj
-	void Rolling();       // “]‚ª‚è’†
-	void Resolve();       // o–ÚŠm’èŒã‚Ìˆ—
-	void TurnEnd();        // Ÿ‚Ìƒ^[ƒ“‚Ö
+	// Helpers
+	void StartRoll(TurnOwner owner);
+	bool TryResolveStoppedRoll(RoleResult& outRole);
+	void ApplyRoleVisuals(const RoleResult& r);
+	void ResolveBetOutcomeAndMaybeEndTurn(const RoleResult& r);
 
 private:
 
 	TurnOwner m_turnOwner = TurnOwner::Player;
-	TurnPhase m_turnPhase = TurnPhase::TurnStart;
-
-	TurnOwner m_nowOwner;
-	TurnOwner m_oldOwner;
 
 	int m_playerHP = 300;
 	int m_enemyHP = 300;
 
-	int m_damageThisTurn = 0;     // ‚±‚Ìƒ^[ƒ“‚Ìƒ_ƒ[ƒWŠm’è’liŸ‚Á‚½‚¾‚¯“ü‚éj
-	bool m_resultReady = false;   // IsStopŒã‚É1‰ñ‚¾‚¯Resolve‚·‚é‚½‚ß‚Ìƒtƒ‰ƒO
+	int m_damageThisTurn = 0;     // ï¿½ï¿½ï¿½Ìƒ^ï¿½[ï¿½ï¿½ï¿½Ìƒ_ï¿½ï¿½ï¿½[ï¿½Wï¿½mï¿½ï¿½lï¿½iï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½j
 
-	// “GAI—p‚ÌŠÈ’Pƒ^ƒCƒ}[i©“®‚Åƒeƒ“ƒ|—Ç‚­‚·‚éj
+	// ï¿½GAIï¿½pï¿½ÌŠÈ’Pï¿½^ï¿½Cï¿½}ï¿½[ï¿½iï¿½ï¿½ï¿½ï¿½ï¿½Åƒeï¿½ï¿½ï¿½|ï¿½Ç‚ï¿½ï¿½ï¿½ï¿½ï¿½j
 	float m_enemyWaitSec = 0.0f;
 
-	// Resolve —p‚É•Û
-	RoleResult m_cachedRole;
+	// Rollingä¸­ã®ã€Œå³åœæ­¢ã€èª¤åˆ¤å®šå¯¾ç­–
+	int   m_stopGuardFrames = 0;   // Rollç›´å¾Œã¯åœæ­¢åˆ¤å®šã‚’ç„¡è¦–
+	int   m_stopStableFrames = 0;  // IsStop()==true ãŒé€£ç¶šã—ãŸãƒ•ãƒ¬ãƒ¼ãƒ æ•°
+	float m_rollElapsedSec = 0.0f; // Rollé–‹å§‹ã‹ã‚‰ã®çµŒéç§’
+
 
 	ScoreLite* m_pPlayerHp;
 	ScoreLite* m_pEnemyHp;
-	UIObject* m_pPlayerUI;
-	UIObject* m_pEnemyUI;
 };
 
 #endif // __SCENE_GAME_H__

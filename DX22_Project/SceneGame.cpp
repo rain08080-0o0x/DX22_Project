@@ -1,7 +1,7 @@
 ﻿/*****************************************************************//**
  * \file   SceneGame.cpp
  * \brief  ゲームシーン
- * 
+ *
  * \author 山本郁也
  * \date   January 2026
  *********************************************************************/
@@ -12,6 +12,10 @@
 #include"CameraDebug.h"
 #include "Transfer.h"
 #include "SceneManager.h"
+
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
 
 
 static void Sort3(int& a, int& b, int& c)
@@ -53,273 +57,24 @@ static RoleResult CalcRole(int d0, int d1, int d2)
 }
 static float StepSec60fps()
 {
-	return 1.0f / 60.0f;
+	return 1.0f / 120.0f;
 }
 
 void SceneGame::BeginTurn(TurnOwner owner)
 {
 	m_turnOwner = owner;
-	m_turnPhase = TurnPhase::Betting;
 
 	m_bet = 0;
 	m_rollUsed = 0;
 	m_damageThisTurn = 0;
-	m_resultReady = false;
-
-	// ターン開始時に必ず初期化
-	m_betState = BetState::WaitingBet;
-	m_roleFixedThisRoll = false;
-	m_scoredThisRoll = false;
 
 	if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
 
-	m_enemyWaitSec = 0.25f;
+	m_enemyWaitSec = 1.0f;
+	m_stopGuardFrames = 0;
+	m_stopStableFrames = 0;
+	m_rollElapsedSec = 0.0f;
 }
-
-void SceneGame::TurnUpdate()
-{
-	switch (m_turnPhase)
-	{
-	case SceneGame::TurnPhase::TurnStart:
-		TurnStart();
-		break;
-	case SceneGame::TurnPhase::Betting:
-		Betting();
-		break;
-	case SceneGame::TurnPhase::WaitingRoll:
-		WaitingRoll();
-		break;
-	case SceneGame::TurnPhase::Rolling:
-		Rolling();
-		break;
-	case SceneGame::TurnPhase::Resolve:
-		Resolve();
-		break;
-	case SceneGame::TurnPhase::TurnEnd:
-		EndTurn();
-		break;
-	default:
-		break;
-	}
-}
-
-void SceneGame::TurnStart()
-{
-	switch (m_turnOwner)
-	{
-	case SceneGame::TurnOwner::Player:
-		break;
-	case SceneGame::TurnOwner::Enemy:
-		break;
-	default:
-		break;
-	}
-}
-
-void SceneGame::Betting()
-{
-	switch (m_turnOwner)
-	{
-	case SceneGame::TurnOwner::Player:
-		break;
-	case SceneGame::TurnOwner::Enemy:
-		break;
-	default:
-		break;
-	}
-}
-
-void SceneGame::WaitingRoll()
-{
-	switch (m_turnOwner)
-	{
-	case SceneGame::TurnOwner::Player:
-		// Rollフェーズ
-		if (IsKeyTrigger('R'))
-		{
-			// ラウンド中だけ振れる
-			if (m_betState == BetState::WaitingRoll)
-			{
-				// プレイヤーのターンの場合
-				if (m_turnOwner == TurnOwner::Player)
-				{
-					if (m_rollUsed < 3 && m_pDice)
-					{
-						// 先払い（振ってる最中に減っている状態になる）
-						m_money -= m_bet;
-						if (m_money < 0) m_money = 0;
-						if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-						m_roleFixedThisRoll = false;
-						m_scoredThisRoll = false;
-
-						m_rollUsed++;
-						m_betState = BetState::Rolling;
-
-						m_pDice->RollRandom(0);
-						m_pDice->RollRandom(2);
-						m_pDice->RollRandom(3);
-					}
-					m_pYukari->SetType(Yukari_Type::Think);
-					if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
-				}
-			}
-		}
-		break;
-	case SceneGame::TurnOwner::Enemy:
-
-		static int counter;
-		if (counter >= fFPS * 1.5f)
-		{
-			if (m_rollUsed < 3 && m_pDice)
-			{
-				// 先払い（振ってる最中に減っている状態になる）
-				m_money -= m_bet;
-				if (m_money < 0) m_money = 0;
-				if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-				m_roleFixedThisRoll = false;
-				m_scoredThisRoll = false;
-
-				m_rollUsed++;
-				m_betState = BetState::Rolling;
-
-				m_pDice->RollRandom(0);
-				m_pDice->RollRandom(2);
-				m_pDice->RollRandom(3);
-				counter = 0;
-			}
-			if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
-		}
-		counter++;
-
-		break;
-	default:
-		break;
-	}
-}
-
-void SceneGame::Rolling()
-{
-	TRAN_INS;
-
-	const int a = tran.dice.currentFaceNumber[0];
-	const int b = tran.dice.currentFaceNumber[2];
-	const int c = tran.dice.currentFaceNumber[3];
-
-	RoleResult r = CalcRole(a, b, c);
-
-	// 賭け結果（止まった瞬間に確定）
-	if (m_betState == BetState::Rolling)
-	{
-		bool roundEnded = false;
-
-		// 先払い方式なので、勝ったら払い戻しとして上乗せする
-		// 例: mult=2 なら 2倍払い戻し（純利益は +1bet）
-		auto win = [&](int mult)
-			{
-				m_money += m_bet * mult;
-				if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-				// ラウンド終了
-				m_bet = 0;
-				m_rollUsed = 0;
-				m_betState = BetState::WaitingBet;
-
-				roundEnded = true;
-			};
-
-		auto continueRoll = [&]()
-			{
-				// 役なしで回数残ってるなら次のロール待ち（同ターン継続）
-				m_betState = BetState::WaitingRoll;
-			};
-
-		auto loseRound = [&]()
-			{
-				// すでに先払い済みなので、ここでは追加減算しない
-				m_bet = 0;
-				m_rollUsed = 0;
-				m_betState = BetState::WaitingBet;
-
-				roundEnded = true;
-			};
-
-		// ---- 役による分岐 ----
-		if (r.role == RoleType::None)
-		{
-			// 3回目で役なしが確定した瞬間だけラウンド終了 → ターン終了
-			if (m_rollUsed >= 3) loseRound();
-			else continueRoll();
-		}
-		else if (r.role == RoleType::Hifumi)
-		{
-			// ヒフミは即負け → ラウンド終了 → ターン終了
-			loseRound();
-		}
-		else
-		{
-			int mult = 1;
-			switch (r.role)
-			{
-			case RoleType::Pinzoro: mult = 10; break;
-			case RoleType::Zorome:  mult = 3;  break;
-			case RoleType::Shigoro: mult = 2;  break;
-			case RoleType::Me:      mult = 2;  break;
-			default:                mult = 1;  break;
-			}
-			win(mult);
-		}
-
-		// ラウンドが終わった瞬間だけターンを切り替える
-		if (roundEnded)
-		{
-			m_turnPhase = TurnPhase::TurnEnd;
-			EndTurn();
-		}
-	}
-
-
-
-	switch (m_turnOwner)
-	{
-	case SceneGame::TurnOwner::Player:
-		break;
-	case SceneGame::TurnOwner::Enemy:
-		break;
-	default:
-		break;
-	}
-}
-
-void SceneGame::Resolve()
-{
-
-	switch (m_turnOwner)
-	{
-	case SceneGame::TurnOwner::Player:
-		break;
-	case SceneGame::TurnOwner::Enemy:
-		break;
-	default:
-		break;
-	}
-}
-
-void SceneGame::TurnEnd()
-{
-	switch (m_turnOwner)
-	{
-	case SceneGame::TurnOwner::Player:
-		break;
-	case SceneGame::TurnOwner::Enemy:
-		break;
-	default:
-		break;
-	}
-	EndTurn();
-}
-
 
 void SceneGame::EndTurn()
 {
@@ -328,31 +83,298 @@ void SceneGame::EndTurn()
 		if (m_turnOwner == TurnOwner::Player)
 		{
 			m_enemyHP -= m_damageThisTurn;
-			if (m_enemyHP < 0) 
-			{
-				m_enemyHP = 0;
-				SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
-				SceneManager::ChangeResult(SceneManager::ResultType::Win);
-			}
+			m_pEnemyHp->SetScore(m_enemyHP);
+			if (m_enemyHP < 0) m_enemyHP = 0;
 		}
 		else
 		{
 			m_playerHP -= m_damageThisTurn;
-			if (m_playerHP < 0) 
-			{
-				SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
-				SceneManager::ChangeResult(SceneManager::ResultType::Lose);
-				m_playerHP = 0;
-			}
+			m_pPlayerHp->SetScore(m_playerHP);
+			if (m_playerHP < 0) m_playerHP = 0;
 		}
 	}
 
 	TurnOwner next = (m_turnOwner == TurnOwner::Player) ? TurnOwner::Enemy : TurnOwner::Player;
-
-	if (m_pPlayerHp) m_pPlayerHp->SetScore(m_playerHP);
-	if (m_pEnemyHp)  m_pEnemyHp->SetScore(m_enemyHP);
-
 	BeginTurn(next);
+}
+
+// ---------------------------
+// BetState handlers
+// ---------------------------
+void SceneGame::UpdateBetFlow(TurnOwner owner)
+{
+	switch (m_betState)
+	{
+	case BetState::WaitingBet:
+		HandleWaitingBet(owner);
+		break;
+	case BetState::WaitingRoll:
+		HandleWaitingRoll(owner);
+		break;
+	case BetState::Rolling:
+		HandleRolling(owner);
+		break;
+	case BetState::Result:
+	default:
+		break;
+	}
+}
+
+void SceneGame::HandleWaitingBet(TurnOwner owner)
+{
+	int nextBet = 0;
+
+	if (owner == TurnOwner::Player)
+	{
+		nextBet = 5;
+		// NOTE: if you want strict 5 only, keep only this line.
+		if (IsKeyTrigger('1')) nextBet = 5;
+		if (IsKeyTrigger('2')) nextBet = 10;
+		if (nextBet == 0) return;
+	}
+	else
+	{
+		nextBet = 5;
+	}
+
+	if (nextBet <= 0) return;
+	if (m_money < nextBet) return;
+
+	m_bet = nextBet;
+	m_rollUsed = 0;
+	m_betState = BetState::WaitingRoll;
+}
+
+void SceneGame::HandleWaitingRoll(TurnOwner owner)
+{
+	if (owner == TurnOwner::Player)
+	{
+		if (IsKeyTrigger('R'))
+		{
+			StartRoll(owner);
+		}
+		return;
+	}
+
+	// Enemy: auto roll after a short delay
+	m_enemyWaitSec -= StepSec60fps();
+	if (m_enemyWaitSec <= 0.0f)
+	{
+		StartRoll(owner);
+		m_enemyWaitSec = 3.0f;
+	}
+}
+
+void SceneGame::StartRoll(TurnOwner owner)
+{
+	(void)owner;
+	if (m_betState != BetState::WaitingRoll) return;
+	if (m_rollUsed >= 3) return;
+	if (m_bet <= 0) return;
+	if (!m_pDice) return;
+
+	// Pre-pay
+	m_money -= m_bet;
+	if (m_money < 0) m_money = 0;
+	if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
+
+	m_roleFixedThisRoll = false;
+	m_scoredThisRoll = false;
+
+	m_rollUsed++;
+	m_betState = BetState::Rolling;
+
+	// Roll直後の「即IsStop」誤判定対策
+	// 1) 直後は数フレーム停止判定を見ない
+	// 2) IsStop()==true が数フレーム連続するまで確定しない
+	// 3) Roll開始から最低時間(閾値)が経つまでは確定しない
+	m_stopGuardFrames = 8;      // 120fps想定で約0.067s
+	m_stopStableFrames = 0;
+	m_rollElapsedSec = 0.0f;
+
+	if (m_pYukari) m_pYukari->SetType(Yukari_Type::Think);
+	if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
+
+	// Roll
+	m_pDice->RollRandom(0);
+	m_pDice->RollRandom(2);
+	m_pDice->RollRandom(3);
+}
+
+void SceneGame::HandleRolling(TurnOwner owner)
+{
+	(void)owner;
+	if (!m_pDice) return;
+
+	// Roll開始からの経過時間（固定120fps想定）
+	m_rollElapsedSec += StepSec60fps();
+
+	// Roll直後は数フレームだけ停止判定を見ない
+	if (m_stopGuardFrames > 0)
+	{
+		m_stopGuardFrames--;
+		return;
+	}
+
+	// 最低限の時間が経つまでは停止確定させない（敵の即停止対策）
+	// ここは好みで調整していい（0.25〜0.5秒が無難）
+	if (m_rollElapsedSec < 1.f)
+	{
+		return;
+	}
+
+	if (!m_pDice->IsStop())
+	{
+		m_stopStableFrames = 0;
+		if (m_pCamera) m_pCamera->LockPos(false);
+		return;
+	}
+
+	// IsStop()==true が連続したら「本当に止まった」とみなす
+	// （1フレームだけtrueになるブレを吸収）
+	{
+		m_stopStableFrames++;
+		if (m_stopStableFrames < 6)
+		{
+			return;
+		}
+	}
+
+	if (m_pCamera) m_pCamera->LockPos(true);
+	if (m_roleFixedThisRoll) return;
+
+	RoleResult r{};
+	if (!TryResolveStoppedRoll(r))
+	{
+		// Face values are not ready
+		return;
+	}
+
+	ApplyRoleVisuals(r);
+	ResolveBetOutcomeAndMaybeEndTurn(r);
+
+	m_roleFixedThisRoll = true;
+}
+
+bool SceneGame::TryResolveStoppedRoll(RoleResult& outRole)
+{
+	TRAN_INS;
+	const int a = tran.dice.currentFaceNumber[0];
+	const int b = tran.dice.currentFaceNumber[2];
+	const int c = tran.dice.currentFaceNumber[3];
+
+	if (!(a >= 1 && a <= 6 && b >= 1 && b <= 6 && c >= 1 && c <= 6))
+		return false;
+
+	outRole = CalcRole(a, b, c);
+
+	// Score
+	if (m_pScore) m_pScore->AddScore(outRole.addScore);
+
+	// Damage (avoid negative -> heal)
+	m_damageThisTurn = (outRole.addScore > 0) ? outRole.addScore : 0;
+
+	return true;
+}
+
+void SceneGame::ApplyRoleVisuals(const RoleResult& r)
+{
+	if (!m_pRoleUI) return;
+
+	switch (r.role)
+	{
+	case RoleType::None:
+		m_pRoleUI->SetTexture("Role/Role_None.png");
+		if (m_pYukari) m_pYukari->SetType(Yukari_Type::UnHappy);
+		break;
+	case RoleType::Hifumi:
+		m_pRoleUI->SetTexture("Role/Role_Hifumi.png");
+		if (m_pYukari) m_pYukari->SetType(Yukari_Type::UnHappy);
+		break;
+	case RoleType::Shigoro:
+		m_pRoleUI->SetTexture("Role/Role_Shigoro.png");
+		if (m_pYukari) m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	case RoleType::Zorome:
+		m_pRoleUI->SetTexture("Role/Role_Zorome.png");
+		if (m_pYukari) m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	case RoleType::Pinzoro:
+		m_pRoleUI->SetTexture("Role/Role_Pinzoro.png");
+		if (m_pYukari) m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	case RoleType::Me:
+	{
+		char path[64];
+		sprintf_s(path, "Role/Role_Me%d.png", r.me);
+		m_pRoleUI->SetTexture(path);
+		if (m_pYukari) m_pYukari->SetType(Yukari_Type::Happy);
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void SceneGame::ResolveBetOutcomeAndMaybeEndTurn(const RoleResult& r)
+{
+	if (m_betState != BetState::Rolling) return;
+
+	bool roundEnded = false;
+
+	auto win = [&](int mult)
+		{
+			m_money += m_bet * mult;
+			if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
+
+			m_bet = 0;
+			m_rollUsed = 0;
+			m_betState = BetState::WaitingBet;
+
+			roundEnded = true;
+		};
+
+	auto continueRoll = [&]()
+		{
+			m_betState = BetState::WaitingRoll;
+		};
+
+	auto loseRound = [&]()
+		{
+			m_bet = 0;
+			m_rollUsed = 0;
+			m_betState = BetState::WaitingBet;
+
+			roundEnded = true;
+		};
+
+	if (r.role == RoleType::None)
+	{
+		if (m_rollUsed >= 3) loseRound();
+		else continueRoll();
+	}
+	else if (r.role == RoleType::Hifumi)
+	{
+		loseRound();
+	}
+	else
+	{
+		int mult = 1;
+		switch (r.role)
+		{
+		case RoleType::Pinzoro: mult = 10; break;
+		case RoleType::Zorome:  mult = 3;  break;
+		case RoleType::Shigoro: mult = 2;  break;
+		case RoleType::Me:      mult = 2;  break;
+		default:                mult = 1;  break;
+		}
+		win(mult);
+	}
+
+	if (roundEnded)
+	{
+		EndTurn();
+	}
 }
 
 
@@ -371,9 +393,13 @@ SceneGame::SceneGame()
 
 	//if (!m_pModel->Load("Assets/Model/Furina/furina.pmx", 0.1f,Model::None)) { // 倍率と反転は省
 	m_pCamera = new CameraDebug();
-// 略可
-	if (!m_pModel->Load("Assets/Model/KayKit/Assets/fbx/green/platform_1x1x1_green.fbx", 1.f,Model::ZFlip)) { // 倍率と反転は省略可
-		MessageBox(NULL, "Branch_01","Error", MB_OK); // エラーメッセージの表示
+	// 略可
+	if (!m_pModel->Load("Assets/Model/Object/tyabudai.fbx", 1.f, Model::ZFlip)) { // 倍率と反転は省略可
+		MessageBox(NULL, "Branch_01", "Error", MB_OK); // エラーメッセージの表示
+	}
+	m_pTyawan = new Model();
+	if (!m_pTyawan->Load("Assets/Model/Object/tyawan.fbx", 1.f, Model::ZFlip)) { // 倍率と反転は省略可
+		MessageBox(NULL, "Branch_01", "Error", MB_OK); // エラーメッセージの表示
 	}
 	//--- モデルの描画
 	RenderTarget* pRTV = GetDefaultRTV(); // デフォルトのRenderTargetViewを取得
@@ -392,7 +418,11 @@ SceneGame::SceneGame()
 	m_pDice->SetCamera(m_pCamera);
 	TRAN_INS;
 
+	tran.tyabu.pos = { 0,-2.7f,0 };
+	tran.tyabu.size = { 15.0f,0.4f,15.0f };
 
+	tran.tyawan.pos = { 0,0.5f,0 };
+	tran.tyawan.size = { 4,1.5f,4 };
 
 	m_pScore = new ScoreLite("Number/number.png", 360.0f, 40.0f, 48.0f, 64.0f, 56.0f);
 	m_pScore->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -426,8 +456,8 @@ SceneGame::SceneGame()
 	// 速度（1秒でほぼ到達するくらい）
 	m_roleListSpeed = 14.0f;
 
-	tran.diceui.role.pos = { m_roleListX ,m_roleListY};
-	tran.diceui.role.size = {panelW,panelH};
+	tran.diceui.role.pos = { m_roleListX ,m_roleListY };
+	tran.diceui.role.size = { panelW,panelH };
 
 	// 生成
 	m_role = new UIObject("tintiro.png",
@@ -453,17 +483,10 @@ SceneGame::SceneGame()
 
 	isUsedYukari = false;
 
-	m_pPlayerHp = new ScoreLite("Number/number.png", SCREEN_WIDTH - 100.0f, 60.0f, 48.0f, 64.0f, 56.0f);
+	m_pPlayerHp = new ScoreLite("Number/number.png", SCREEN_WIDTH - 200.0f, 60.0f, 48.0f, 64.0f, 56.0f);
 	m_pPlayerHp->SetScore(m_playerHP);
-	m_pEnemyHp  = new ScoreLite("Number/number.png", SCREEN_WIDTH - 100.0f, 120.0f, 48.0f, 64.0f, 56.0f);
+	m_pEnemyHp = new ScoreLite("Number/number.png", SCREEN_WIDTH - 200.0f, 120.0f, 48.0f, 64.0f, 56.0f);
 	m_pEnemyHp->SetScore(m_enemyHP);
-	m_pPlayerUI = new UIObject("Character/anata.png", SCREEN_WIDTH - 350.0f, 60.0f, 192.0f, 64.0f);
-	m_pEnemyUI = new UIObject("Character/Enemy.png",SCREEN_WIDTH - 350.0f, 120.0f, 80.0f, 64.0f);
-
-	m_turnOwner = TurnOwner::Player;
-
-	m_oldOwner = m_nowOwner = m_turnOwner;
-
 }
 
 SceneGame::~SceneGame()
@@ -482,7 +505,7 @@ SceneGame::~SceneGame()
 	}
 	if (m_pBlock) {
 		delete m_pBlock;
-		m_pBlock= nullptr;
+		m_pBlock = nullptr;
 	}
 	if (m_pDice)
 	{
@@ -499,7 +522,7 @@ SceneGame::~SceneGame()
 		delete m_role;
 		m_role = nullptr;
 	}
-	if(m_pScore)
+	if (m_pScore)
 	{
 		delete m_pScore;
 		m_pScore = nullptr;
@@ -519,26 +542,6 @@ SceneGame::~SceneGame()
 		delete m_pYukari;
 		m_pYukari = nullptr;
 	}
-	if (m_pPlayerUI)
-	{
-		delete m_pPlayerUI;
-		m_pPlayerUI = nullptr;
-	}
-	if (m_pPlayerHp)
-	{
-		delete m_pPlayerHp;
-		m_pPlayerHp = nullptr;
-	}
-	if (m_pEnemyUI)
-	{
-		delete m_pEnemyUI;
-		m_pEnemyUI = nullptr;
-	}
-	if (m_pEnemyHp)
-	{
-		delete m_pEnemyHp;
-		m_pEnemyHp = nullptr;
-	}
 }
 
 void SceneGame::Update()
@@ -553,386 +556,111 @@ void SceneGame::Update()
 		SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
 		SceneManager::ChangeResult(SceneManager::ResultType::Win);
 	}
-	m_pCamera->Update();
-	if(OnlyDice)
+
+	if (m_pCamera) m_pCamera->Update();
+
+	if (!OnlyDice) return;
+
+	if (m_pDice)
 	{
 		m_pDice->Update(1);
 		m_pDice->SetCamera(m_pCamera);
-
-		m_pYukari->Update();
-
-		if (m_pDice->IsStop())
-		{
-			m_pCamera->LockPos(true);
-
-			TRAN_INS;
-			const int a = tran.dice.currentFaceNumber[0];
-			const int b = tran.dice.currentFaceNumber[2];
-			const int c = tran.dice.currentFaceNumber[3];
-			if (!m_roleFixedThisRoll)
-			{
-
-				if (a >= 1 && a <= 6 && b >= 1 && b <= 6 && c >= 1 && c <= 6)
-				{
-					RoleResult r = CalcRole(a, b, c);
-
-					// スコア加算
-					m_pScore->AddScore(r.addScore);
-
-
-
-					// ダメージ確定（負数は回復事故になるので 0 扱い）
-					m_damageThisTurn = (r.addScore > 0) ? r.addScore : 0;
-
-					// 役名表示
-					switch (r.role)
-					{
-					case RoleType::None:
-						m_pRoleUI->SetTexture("Role/Role_None.png");
-						m_pYukari->SetType(Yukari_Type::UnHappy);
-						break;
-					case RoleType::Hifumi:
-						m_pRoleUI->SetTexture("Role/Role_Hifumi.png");
-						m_pYukari->SetType(Yukari_Type::UnHappy);
-						break;
-					case RoleType::Shigoro:
-						m_pRoleUI->SetTexture("Role/Role_Shigoro.png");
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					case RoleType::Zorome:
-						m_pRoleUI->SetTexture("Role/Role_Zorome.png");
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					case RoleType::Pinzoro:
-						m_pRoleUI->SetTexture("Role/Role_Pinzoro.png");
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					case RoleType::Me:
-					{
-						char path[64];
-						sprintf_s(path, "Role/Role_Me%d.png", r.me);
-						m_pRoleUI->SetTexture(path);
-						m_pYukari->SetType(Yukari_Type::Happy);
-						break;
-					}
-					default:
-						// 役なしなら表示消す or --- にする
-						break;
-					}
-					// 賭け結果（止まった瞬間に確定）
-					if (m_betState == BetState::Rolling)
-					{
-						bool roundEnded = false;
-
-						// 先払い方式なので、勝ったら払い戻しとして上乗せする
-						// 例: mult=2 なら 2倍払い戻し（純利益は +1bet）
-						auto win = [&](int mult)
-							{
-								m_money += m_bet * mult;
-								if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-								// ラウンド終了
-								m_bet = 0;
-								m_rollUsed = 0;
-								m_betState = BetState::WaitingBet;
-
-								roundEnded = true;
-							};
-
-						auto continueRoll = [&]()
-							{
-								// 役なしで回数残ってるなら次のロール待ち（同ターン継続）
-								m_betState = BetState::WaitingRoll;
-							};
-
-						auto loseRound = [&]()
-							{
-								// すでに先払い済みなので、ここでは追加減算しない
-								m_bet = 0;
-								m_rollUsed = 0;
-								m_betState = BetState::WaitingBet;
-
-								roundEnded = true;
-							};
-
-						// ---- 役による分岐 ----
-						if (r.role == RoleType::None)
-						{
-							// 3回目で役なしが確定した瞬間だけラウンド終了 → ターン終了
-							if (m_rollUsed >= 3) loseRound();
-							else continueRoll();
-						}
-						else if (r.role == RoleType::Hifumi)
-						{
-							// ヒフミは即負け → ラウンド終了 → ターン終了
-							loseRound();
-						}
-						else
-						{
-							int mult = 1;
-							switch (r.role)
-							{
-							case RoleType::Pinzoro: mult = 10; break;
-							case RoleType::Zorome:  mult = 3;  break;
-							case RoleType::Shigoro: mult = 2;  break;
-							case RoleType::Me:      mult = 2;  break;
-							default:                mult = 1;  break;
-							}
-							win(mult);
-						}
-
-						// ラウンドが終わった瞬間だけターンを切り替える
-						if (roundEnded)
-						{
-							EndTurn();
-						}
-					}
-				}
-				m_roleFixedThisRoll = true;
-			}
-		}
-		else
-		{
-			m_pCamera->LockPos(false);
-		}
-
-		// ベット選択（WaitingBet のときだけ）
-		if (m_betState == BetState::WaitingBet)
-		{
-			// プレイヤーのターンの場合
-			if (m_turnOwner == TurnOwner::Player)
-			{
-				int nextBet = 0;
-				if (IsKeyTrigger('1')) nextBet = 5;
-				if (IsKeyTrigger('2')) nextBet = 10;
-				nextBet = 5;
-				if (nextBet > 0)
-				{
-					// 所持金不足なら無視（UI出したいなら後で）
-					if (m_money >= nextBet)
-					{
-						m_bet = nextBet;
-						m_rollUsed = 0;
-						m_betState = BetState::WaitingRoll;
-
-						// 役表示をいったん None に
-						//if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
-					}
-				}
-			}
-			// 敵のターンの場合
-			if (m_turnOwner == TurnOwner::Enemy)
-			{
-				int nextBet;
-				nextBet = 5;
-				if (nextBet > 0)
-				{
-					// 所持金不足なら無視（UI出したいなら後で）
-					if (m_money >= nextBet)
-					{
-						m_bet = nextBet;
-						m_rollUsed = 0;
-						m_betState = BetState::WaitingRoll;
-
-						// 役表示をいったん None に
-						//if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
-					}
-				}
-			}
-		}
-
-		// Rollフェーズ
-		if (IsKeyTrigger('R'))
-		{
-			// ラウンド中だけ振れる
-			if (m_betState == BetState::WaitingRoll)
-			{
-				// プレイヤーのターンの場合
-				if(m_turnOwner == TurnOwner::Player)
-				{
-					if (m_rollUsed < 3 && m_pDice)
-					{
-						// 先払い（振ってる最中に減っている状態になる）
-						m_money -= m_bet;
-						if (m_money < 0) m_money = 0;
-						if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-						m_roleFixedThisRoll = false;
-						m_scoredThisRoll = false;
-
-						m_rollUsed++;
-						m_betState = BetState::Rolling;
-
-						m_pDice->RollRandom(0);
-						m_pDice->RollRandom(2);
-						m_pDice->RollRandom(3);
-					}
-					m_pYukari->SetType(Yukari_Type::Think); 
-					if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
-				}
-			}
-		}
-		if (m_betState == BetState::WaitingRoll)
-		{
-			if(m_turnOwner == TurnOwner::Enemy)
-			{
-				static int counter;
-				if (counter >= fFPS * 1)
-				{
-					if (m_rollUsed < 3 && m_pDice)
-					{
-						// 先払い（振ってる最中に減っている状態になる）
-						m_money -= m_bet;
-						if (m_money < 0) m_money = 0;
-						if (m_pMoneyUI) m_pMoneyUI->SetScore(m_money);
-
-						m_roleFixedThisRoll = false;
-						m_scoredThisRoll = false;
-
-						m_rollUsed++;
-						m_betState = BetState::Rolling;
-
-						m_pDice->RollRandom(0);
-						m_pDice->RollRandom(2);
-						m_pDice->RollRandom(3);
-						counter = 0;
-					}
-					if (m_pRoleUI) m_pRoleUI->SetTexture("Role/Role_None.png");
-				}
-				counter++;
-			}
-		}
-
-		// Shiftを押すたびに開閉
-		if (IsKeyTrigger(VK_RSHIFT))
-		{
-			m_roleListOpen = !m_roleListOpen;
-
-			m_roleListTargetX = m_roleListOpen ? openX : closeX;
-		}
-
-		// dt（あなたの環境に合わせて）
-		const float dt = 1.0f / 120.0f;
-
-		// Lerpで滑らかに追従（指数追従）
-		{
-			float t = 1.0f - expf(-m_roleListSpeed * dt);
-			m_roleListX = m_roleListX + (m_roleListTargetX - m_roleListX) * t;
-
-			m_role->SetPosition(m_roleListX, m_roleListY);
-		}
-
-		if (IsKeyTrigger(VK_ESCAPE))
-		{
-			SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
-		}
-
-		if (IsKeyTrigger('P'))
-		{
-			m_playerHP = 0;
-		}
-
-		if (IsKeyTrigger('O'))
-		{
-			m_enemyHP = 0;
-		}
 	}
-	m_nowOwner = m_turnOwner;
-	if (m_oldOwner != m_nowOwner)
+
+	if (m_pYukari) m_pYukari->Update();
+
+	// BetState per-turn handling
+	UpdateBetFlow(m_turnOwner);
+
+	// Shift toggle: role list panel
+	if (IsKeyTrigger(VK_RSHIFT))
 	{
-		m_oldOwner = m_nowOwner;
-		//m_pDice->isActive = true;
+		m_roleListOpen = !m_roleListOpen;
+		m_roleListTargetX = m_roleListOpen ? openX : closeX;
 	}
 
+	const float dt = 1.0f / 120.0f;
+	{
+		float t = 1.0f - expf(-m_roleListSpeed * dt);
+		m_roleListX = m_roleListX + (m_roleListTargetX - m_roleListX) * t;
+		if (m_role) m_role->SetPosition(m_roleListX, m_roleListY);
+	}
+
+	if (IsKeyTrigger(VK_ESCAPE))
+	{
+		SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
+	}
+
+	// debug
+	if (IsKeyTrigger('P')) m_playerHP = 0;
+	if (IsKeyTrigger('O')) m_enemyHP = 0;
 }
 
 
 
 void SceneGame::Draw()
 {
-	{
-		// 頂点シェーダーに渡す変換行列の変数を宣言 
-		DirectX::XMFLOAT4X4 fWVP[3];    // World,View,Projectionの略  
-		DirectX::XMMATRIX world, view, proj; // 各変換行列の格納先 
+	using namespace DirectX;
 
-		// 作成した行列を各変数へ格納 
-		world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-		view = DirectX::XMMatrixLookAtLH(
-			DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
-			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
-		proj =
-			DirectX::XMMatrixOrthographicOffCenterLH(
-				-640, 640,	// 横下限上限値
-				-360, 360,	// 縦下限上限値
-				0.001f,		// Near
-				1000.0f);	// Far
-		proj = DirectX::XMMatrixPerspectiveFovLH(
-			// DirectXMathに用意されている角度をラジアン角に変換する関数
-			DirectX::XMConvertToRadians(70.0f),	//角度
-			16.0f / 9.0f,						//アス比
-			0.1f,								//最小描画距離
-			100.0f);							//最長描画距離
+	// 頂点シェーダーに渡す変換行列の変数を宣言 
+	DirectX::XMFLOAT4X4 fWVP[3];    // World,View,Projectionの略  
+	DirectX::XMMATRIX world, view, proj; // 各変換行列の格納先 
+	TRAN_INS;
+	// 作成した行列を各変数へ格納 
+	world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
 
+	XMFLOAT3 pos = tran.tyabu.pos;
+	XMFLOAT3 size = tran.tyabu.size;
+	DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
+	DirectX::XMMATRIX S = DirectX::XMMatrixScaling(size.x, size.y, size.z);
 
+	world = S * T;
 
-		// 計算用のデータから読み取り用のデータに変換 
-		DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
-		DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
-		DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
-
-		// モデルに変換行列を設定 
-		fWVP[1] = m_pCamera->GetViewMatrix();
-		fWVP[2] = m_pCamera->GetProjectionMatrix();
-
-		// シェーダーへ変換行列を設定 
-		ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
+	view = DirectX::XMMatrixLookAtLH(
+		DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
+		DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+	proj =
+		DirectX::XMMatrixOrthographicOffCenterLH(
+			-640, 640,	// 横下限上限値
+			-360, 360,	// 縦下限上限値
+			0.001f,		// Near
+			1000.0f);	// Far
+	proj = DirectX::XMMatrixPerspectiveFovLH(
+		// DirectXMathに用意されている角度をラジアン角に変換する関数
+		DirectX::XMConvertToRadians(70.0f),	//角度
+		16.0f / 9.0f,						//アス比
+		0.1f,								//最小描画距離
+		100.0f);							//最長描画距離
 
 
-		// モデルに使用する頂点シェーダー、ピクセルシェーダーを設定 
-		m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
-		m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
 
-		// 仮置きしているボックスにカメラを設定
-		Geometory::SetView(fWVP[1]);
-		Geometory::SetProjection(fWVP[2]);
+	// 計算用のデータから読み取り用のデータに変換 
+	DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
+	DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
+	DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
 
-		// 仮置きしているボックスにカメラを設定 
-		Geometory::SetView(m_pCamera->GetViewMatrix());
-		Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
+	// モデルに変換行列を設定 
+	fWVP[1] = m_pCamera->GetViewMatrix();
+	fWVP[2] = m_pCamera->GetProjectionMatrix();
 
-		// Spriteへカメラの行列を設定 
-		Sprite::SetView(m_pCamera->GetViewMatrix());
-		Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
-	}
-	// モデルの描画 基本それぞれのDrawで出力させるのでいらないがサンプルとして残す
-	if(false)
-	{
-		// マテリアル別にメッシュを表示 
-		for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
-			// モデルのメッシュを取得 
-			const Model::Mesh* mesh = m_pModel->GetMesh(i);
-			// メッシュに割り当てられているマテリアルを取得 
-			Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
-			// シェーダーへマテリアルを設定 
-			ShaderList::SetMaterial(material);
-			// モデルの描画 
-			m_pModel->Draw(i);
-		}
-	}
+	// 仮置きしているボックスにカメラを設定
+	Geometory::SetView(fWVP[1]);
+	Geometory::SetProjection(fWVP[2]);
 
-	if(!OnlyDice)
-	{
-		if (m_pBlock)
-			m_pBlock->Draw();
-		if (m_pPlayer)
-			m_pPlayer->Draw();
-		SetDepthTest(false);
-		if (m_pGaugeUI)
-			m_pGaugeUI->Draw();
-		SetDepthTest(true);
-	}
-	else
+	// 仮置きしているボックスにカメラを設定 
+	Geometory::SetView(m_pCamera->GetViewMatrix());
+	Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
+
+	// Spriteへカメラの行列を設定 
+	Sprite::SetView(m_pCamera->GetViewMatrix());
+	Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
+
+
+	SetDepthTest(true);
+
+
+	if (OnlyDice && false)
 	{
 		// 参照用のインスタンスを取得
 		TRAN_INS;
@@ -971,25 +699,100 @@ void SceneGame::Draw()
 		{
 			m_pEnemyHp->Draw();
 		}
+	}
+	// モデルの描画 基本それぞれのDrawで出力させるのでいらないがサンプルとして残す
 
+	// シェーダーへ変換行列を設定 
+	ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
+
+	// モデルに使用する頂点シェーダー、ピクセルシェーダーを設定 
+	m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+	m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
+
+	// マテリアル別にメッシュを表示 
+	for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
+		// モデルのメッシュを取得 
+		const Model::Mesh* mesh = m_pModel->GetMesh(i);
+		// メッシュに割り当てられているマテリアルを取得 
+		Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
+		// シェーダーへマテリアルを設定 
+		ShaderList::SetMaterial(material);
+		// モデルの描画 
+		m_pModel->Draw(i);
+	}
+	pos = tran.tyawan.pos;
+	size = tran.tyawan.size;
+	T = XMMatrixTranslation(pos.x, pos.y, pos.z);
+	S = XMMatrixScaling(size.x, size.y, size.z);
+	world = S * T;
+
+	DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
+
+	ShaderList::SetWVP(fWVP); // SetWVP関数の引数にはXMFLOAT4X4型で要素数３の配列のアドレスを渡す 
+
+	// モデルに使用する頂点シェーダー、ピクセルシェーダーを設定 
+	m_pTyawan->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+	m_pTyawan->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
+
+	// マテリアル別にメッシュを表示 
+	for (unsigned int i = 0; i < m_pTyawan->GetMeshNum(); ++i) {
+		// モデルのメッシュを取得 
+		const Model::Mesh* mesh = m_pTyawan->GetMesh(i);
+		// メッシュに割り当てられているマテリアルを取得 
+		Model::Material material = *m_pTyawan->GetMaterial(mesh->materialID);
+		// シェーダーへマテリアルを設定 
+		ShaderList::SetMaterial(material);
+		// モデルの描画 
+		m_pTyawan->Draw(i);
+	}
+	if (OnlyDice)
+	{
+		// 参照用のインスタンスを取得
+		TRAN_INS;
+
+		if (m_pDice)
+		{
+			m_pDice->Draw();
+			//m_pDice->TestDraw();
+		}
+
+		if (m_role)
+		{
+			m_role->Draw();
+		}
+		if (m_pScore)
+		{
+			m_pScore->Draw();
+		}
+		if (m_pRoleUI)
+		{
+			m_pRoleUI->Draw();
+		}
+		if (m_pMoneyUI)
+		{
+			m_pMoneyUI->Draw();
+		}
+		if (m_pYukari && isUsedYukari)
+		{
+			m_pYukari->Draw();
+		}
 		if (m_turnOwner == TurnOwner::Player)
 		{
-			m_pPlayerUI->SetColor({1,0,0,1});
-			m_pEnemyUI->SetColor({1,1,1,1});
+			m_pPlayerHp->SetColor(1, 0, 0, 1);
+			m_pEnemyHp->SetColor(1, 1, 1, 1);
 		}
 		else
 		{
-			m_pPlayerUI->SetColor({ 1,1,1,1 });
-			m_pEnemyUI->SetColor({ 1,0,0,1 });
+			m_pPlayerHp->SetColor(1,1,1,1);
+			m_pEnemyHp->SetColor(1,0,0,1);
 		}
-
-		if (m_pPlayerUI)
+		if (m_pPlayerHp)
 		{
-			m_pPlayerUI->Draw();
+			m_pPlayerHp->Draw();
 		}
-		if (m_pEnemyUI)
+		if (m_pEnemyHp)
 		{
-			m_pEnemyUI->Draw();
+			m_pEnemyHp->Draw();
 		}
 	}
 }

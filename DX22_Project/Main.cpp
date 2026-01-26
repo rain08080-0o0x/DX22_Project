@@ -196,6 +196,19 @@ void Draw()
 
 				EndTabItem();
 			}
+			if (BeginTabItem("Tyabudai"))
+			{
+				tran.tyabu.pos;
+				DragFloat3("Tyabudai pos", reinterpret_cast<float*>(&tran.tyabu.pos),0.1f);
+				DragFloat3("Tyabudai size", reinterpret_cast<float*>(&tran.tyabu.size),0.1f);
+
+				DragFloat3("Tyawan pos", reinterpret_cast<float*>(&tran.tyawan.pos),0.1f);
+				DragFloat3("Tyawan size", reinterpret_cast<float*>(&tran.tyawan.size),0.1f);
+
+				EndTabItem();
+			}
+
+
 			EndTabBar();
 		}
 

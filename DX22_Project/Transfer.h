@@ -60,6 +60,12 @@ private:
 	{
 		UIobj role;
 	};
+	struct Tyabudai
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 size;
+		DirectX::XMFLOAT3 rotate;
+	};
 public:
 	static Transfer& GetInstance()
 	{
@@ -75,4 +81,6 @@ public:
 	DirectX::XMFLOAT2 mousePos;
 	UIobj yukari;
 	UIobj fuki;
+	Tyabudai tyabu;
+	Tyabudai tyawan;
 };

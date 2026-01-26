@@ -7,7 +7,7 @@ const float CameraDefaultDistance = -2.0f;
 
 CameraDebug::CameraDebug()
 	: m_radXZ(0.0f)
-	, m_radY(0.50f)
+	, m_radY(0.7f)
 	, m_radius(10.0f)
 {
     TRAN_INS;
