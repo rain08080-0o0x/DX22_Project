@@ -215,6 +215,30 @@ SceneGame::SceneGame()
 
 	isUsedYukari = false;
 
+
+
+	tran.tyabu.pos = {0,0,0};
+	tran.tyabu.size = {10,0.4f,10};
+
+	tran.tyawan.pos = {0,0.8f,0};
+	tran.tyawan.size = {4,0.9f,4};
+
+
+
+	m_pTyawan = new Model();
+	if (!m_pTyawan->Load("Assets/Model/Dice/tyawan.fbx", 1.0f))
+	{
+		MessageBox(NULL, "not found model tyawan", "error", MB_OK);
+		"Assets/Model/Dice/tyawan.fbx";
+	}
+
+	m_pTyabu = new Model();
+	if (!m_pTyabu->Load("Assets/Model/Dice/tyabudai.fbx", 1.0f))
+	{
+		MessageBox(NULL, "not found model tyabudai", "error", MB_OK);
+	}
+
+
 	BeginTurn(TurnOwner::Player);
 }
 
@@ -280,6 +304,8 @@ SceneGame::~SceneGame()
 		delete m_pYukari;
 		m_pYukari = nullptr;
 	}
+	SAFE_DELETE(m_pTyabu);
+	SAFE_DELETE(m_pTyawan);
 }
 
 void SceneGame::Update()
@@ -612,77 +638,112 @@ void SceneGame::UpdateRoleListPanel(float dt)
 
 void SceneGame::Draw()
 {
+	
+	// ・ｽ・ｽ・ｽ_・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽﾉ渡・ｽ・ｽ・ｽﾏ奇ｿｽ・ｽs・ｽ・ｽﾌ変撰ｿｽ・ｽ・ｽ骭ｾ 
+	DirectX::XMFLOAT4X4 fWVP[3];    // World,View,Projection・ｽﾌ暦ｿｽ  
+	DirectX::XMMATRIX world, view, proj; // ・ｽe・ｽﾏ奇ｿｽ・ｽs・ｽ・ｽﾌ格・ｽ[・ｽ・ｽ 
+
+	// ・ｽ・ｬ・ｽ・ｽ・ｽ・ｽ・ｽs・ｽ・ｽ・ｽ・ｽe・ｽﾏ撰ｿｽ・ｽﾖ格・ｽ[ 
+	world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+	view = DirectX::XMMatrixLookAtLH(
+		DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
+		DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+	proj =
+		DirectX::XMMatrixOrthographicOffCenterLH(
+			-640, 640,  // ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽl
+			-360, 360,  // ・ｽc・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽl
+			0.001f,     // Near
+			1000.0f);   // Far
+	proj = DirectX::XMMatrixPerspectiveFovLH(
+		// DirectXMath・ｽﾉ用・ｽﾓゑｿｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽp・ｽx・ｽ・ｽ・ｽ・ｽ・ｽW・ｽA・ｽ・ｽ・ｽp・ｽﾉ変奇ｿｽ・ｽ・ｽ・ｽ・ｽﾖ撰ｿｽ
+		DirectX::XMConvertToRadians(70.0f), //・ｽp・ｽx
+		16.0f / 9.0f,                      //・ｽA・ｽX・ｽ・ｽ
+		0.1f,                              //・ｽﾅ擾ｿｽ・ｽ`・ｽ諡暦ｿｽ・ｽ
+		100.0f);                           //・ｽﾅ抵ｿｽ・ｽ`・ｽ諡暦ｿｽ・ｽ
+
+
+
+	// ・ｽv・ｽZ・ｽp・ｽﾌデ・ｽ[・ｽ^・ｽ・ｽ・ｽ・ｽﾇみ趣ｿｽ・ｽp・ｽﾌデ・ｽ[・ｽ^・ｽﾉ変奇ｿｽ 
+	DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
+	DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
+	DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
+
+	// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾉ変奇ｿｽ・ｽs・ｽ・ｽ・ｽﾝ抵ｿｽ 
+	fWVP[1] = m_pCamera->GetViewMatrix();
+	fWVP[2] = m_pCamera->GetProjectionMatrix();
+
+	// ・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽﾖ変奇ｿｽ・ｽs・ｽ・ｽ・ｽﾝ抵ｿｽ 
+	ShaderList::SetWVP(fWVP); // SetWVP・ｽﾖ撰ｿｽ・ｽﾌ茨ｿｽ・ｽ・ｽ・ｽﾉゑｿｽXMFLOAT4X4・ｽ^・ｽﾅ要・ｽf・ｽ・ｽ・ｽR・ｽﾌ配・ｽ・ｽﾌア・ｽh・ｽ・ｽ・ｽX・ｽ・ｽn・ｽ・ｽ 
+
+
+	// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾉ使・ｽp・ｽ・ｽ・ｽ髓ｸ・ｽ_・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽA・ｽs・ｽN・ｽZ・ｽ・ｽ・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽ・ｽﾝ抵ｿｽ 
+	m_pTyabu->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+	m_pTyabu->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
+
+	// ・ｽ・ｽ・ｽu・ｽ・ｽ・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ{・ｽb・ｽN・ｽX・ｽﾉカ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽﾝ抵ｿｽ
+	Geometory::SetView(fWVP[1]);
+	Geometory::SetProjection(fWVP[2]);
+
+	// ・ｽ・ｽ・ｽu・ｽ・ｽ・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ{・ｽb・ｽN・ｽX・ｽﾉカ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽﾝ抵ｿｽ 
+	Geometory::SetView(m_pCamera->GetViewMatrix());
+	Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
+
+	// Sprite・ｽﾖカ・ｽ・ｽ・ｽ・ｽ・ｽﾌ行・ｽ・ｽ・ｽﾝ抵ｿｽ 
+	Sprite::SetView(m_pCamera->GetViewMatrix());
+	Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
+	
+	TRAN_INS;
+	
+
+	world = 
+		DirectX::XMMatrixScaling(tran.tyabu.size.x,tran.tyabu.size.y,tran.tyabu.size.z) * 
+		DirectX::XMMatrixTranslation(tran.tyabu.pos.x,tran.tyabu.pos.y,tran.tyabu.pos.z);
+	DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
+
+
+	ShaderList::SetWVP(fWVP);
+
+	m_pTyawan->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+	m_pTyawan->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
+	if(true)
 	{
-
-		// ・ｽ・ｽ・ｽ_・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽﾉ渡・ｽ・ｽ・ｽﾏ奇ｿｽ・ｽs・ｽ・ｽﾌ変撰ｿｽ・ｽ・ｽ骭ｾ 
-		DirectX::XMFLOAT4X4 fWVP[3];    // World,View,Projection・ｽﾌ暦ｿｽ  
-		DirectX::XMMATRIX world, view, proj; // ・ｽe・ｽﾏ奇ｿｽ・ｽs・ｽ・ｽﾌ格・ｽ[・ｽ・ｽ 
-
-		// ・ｽ・ｬ・ｽ・ｽ・ｽ・ｽ・ｽs・ｽ・ｽ・ｽ・ｽe・ｽﾏ撰ｿｽ・ｽﾖ格・ｽ[ 
-		world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-		view = DirectX::XMMatrixLookAtLH(
-			DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
-			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
-		proj =
-			DirectX::XMMatrixOrthographicOffCenterLH(
-				-640, 640,  // ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽl
-				-360, 360,  // ・ｽc・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽl
-				0.001f,     // Near
-				1000.0f);   // Far
-		proj = DirectX::XMMatrixPerspectiveFovLH(
-			// DirectXMath・ｽﾉ用・ｽﾓゑｿｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽp・ｽx・ｽ・ｽ・ｽ・ｽ・ｽW・ｽA・ｽ・ｽ・ｽp・ｽﾉ変奇ｿｽ・ｽ・ｽ・ｽ・ｽﾖ撰ｿｽ
-			DirectX::XMConvertToRadians(70.0f), //・ｽp・ｽx
-			16.0f / 9.0f,                      //・ｽA・ｽX・ｽ・ｽ
-			0.1f,                              //・ｽﾅ擾ｿｽ・ｽ`・ｽ諡暦ｿｽ・ｽ
-			100.0f);                           //・ｽﾅ抵ｿｽ・ｽ`・ｽ諡暦ｿｽ・ｽ
-
-
-
-		// ・ｽv・ｽZ・ｽp・ｽﾌデ・ｽ[・ｽ^・ｽ・ｽ・ｽ・ｽﾇみ趣ｿｽ・ｽp・ｽﾌデ・ｽ[・ｽ^・ｽﾉ変奇ｿｽ 
-		DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
-		DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
-		DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
-
-		// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾉ変奇ｿｽ・ｽs・ｽ・ｽ・ｽﾝ抵ｿｽ 
-		fWVP[1] = m_pCamera->GetViewMatrix();
-		fWVP[2] = m_pCamera->GetProjectionMatrix();
-
-		// ・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽﾖ変奇ｿｽ・ｽs・ｽ・ｽ・ｽﾝ抵ｿｽ 
-		ShaderList::SetWVP(fWVP); // SetWVP・ｽﾖ撰ｿｽ・ｽﾌ茨ｿｽ・ｽ・ｽ・ｽﾉゑｿｽXMFLOAT4X4・ｽ^・ｽﾅ要・ｽf・ｽ・ｽ・ｽR・ｽﾌ配・ｽ・ｽﾌア・ｽh・ｽ・ｽ・ｽX・ｽ・ｽn・ｽ・ｽ 
-
-
-		// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾉ使・ｽp・ｽ・ｽ・ｽ髓ｸ・ｽ_・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽA・ｽs・ｽN・ｽZ・ｽ・ｽ・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽ・ｽﾝ抵ｿｽ 
-		//m_pModel->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
-		//m_pModel->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
-
-		// ・ｽ・ｽ・ｽu・ｽ・ｽ・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ{・ｽb・ｽN・ｽX・ｽﾉカ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽﾝ抵ｿｽ
-		Geometory::SetView(fWVP[1]);
-		Geometory::SetProjection(fWVP[2]);
-
-		// ・ｽ・ｽ・ｽu・ｽ・ｽ・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ{・ｽb・ｽN・ｽX・ｽﾉカ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽﾝ抵ｿｽ 
-		Geometory::SetView(m_pCamera->GetViewMatrix());
-		Geometory::SetProjection(m_pCamera->GetProjectionMatrix());
-
-		// Sprite・ｽﾖカ・ｽ・ｽ・ｽ・ｽ・ｽﾌ行・ｽ・ｽ・ｽﾝ抵ｿｽ 
-		Sprite::SetView(m_pCamera->GetViewMatrix());
-		Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
+		// ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽﾊに・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ\・ｽ・ｽ 
+		for (unsigned int i = 0; i < m_pTyabu->GetMeshNum(); ++i) {
+			// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ・ｽ謫ｾ 
+			const Model::Mesh* mesh = m_pTyabu->GetMesh(i);
+			// ・ｽ・ｽ・ｽb・ｽV・ｽ・ｽ・ｽﾉ奇ｿｽ・ｽ闢厄ｿｽﾄゑｿｽ・ｽﾄゑｿｽ・ｽ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽ・ｽ・ｽ謫ｾ 
+			Model::Material material = *m_pTyabu->GetMaterial(mesh->materialID);
+			// ・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽﾖマ・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽ・ｽﾝ抵ｿｽ 
+			ShaderList::SetMaterial(material);
+			// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ描・ｽ・ｽ 
+			m_pTyabu->Draw(i);
+		}
 	}
-	// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ描・ｽ・ｽ ・ｽ・ｽ{・ｽ・ｽ・ｽ黷ｼ・ｽ・ｽ・ｽDraw・ｽﾅ出・ｽﾍゑｿｽ・ｽ・ｽ・ｽ・ｽﾌでゑｿｽ・ｽ・ｽﾈゑｿｽ・ｽ・ｽ・ｽT・ｽ・ｽ・ｽv・ｽ・ｽ・ｽﾆゑｿｽ・ｽﾄ残・ｽ・ｽ
-	//if(false)
-	//{
-	//	// ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽﾊに・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ\・ｽ・ｽ 
-	//	for (unsigned int i = 0; i < m_pModel->GetMeshNum(); ++i) {
-	//		// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ・ｽ謫ｾ 
-	//		const Model::Mesh* mesh = m_pModel->GetMesh(i);
-	//		// ・ｽ・ｽ・ｽb・ｽV・ｽ・ｽ・ｽﾉ奇ｿｽ・ｽ闢厄ｿｽﾄゑｿｽ・ｽﾄゑｿｽ・ｽ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽ・ｽ・ｽ謫ｾ 
-	//		Model::Material material = *m_pModel->GetMaterial(mesh->materialID);
-	//		// ・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽﾖマ・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽ・ｽﾝ抵ｿｽ 
-	//		ShaderList::SetMaterial(material);
-	//		// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ描・ｽ・ｽ 
-	//		m_pModel->Draw(i);
-	//	}
-	//}
+
+	world =
+		DirectX::XMMatrixScaling(tran.tyawan.size.x, tran.tyawan.size.y, tran.tyawan.size.z) *
+		DirectX::XMMatrixTranslation(tran.tyawan.pos.x, tran.tyawan.pos.y, tran.tyawan.pos.z);
+	DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
+
+	ShaderList::SetWVP(fWVP);
+
+	m_pTyawan->SetVertexShader(ShaderList::GetVS(ShaderList::VS_WORLD));
+	m_pTyawan->SetPixelShader(ShaderList::GetPS(ShaderList::PS_LAMBERT));
+	if(true)
+	{
+		// ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽﾊに・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ\・ｽ・ｽ 
+		for (unsigned int i = 0; i < m_pTyawan->GetMeshNum(); ++i) {
+			// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ・ｿｽ・ｽb・ｽV・ｽ・ｽ・ｽ・ｽ・ｽ謫ｾ 
+			const Model::Mesh* mesh = m_pTyawan->GetMesh(i);
+			// ・ｽ・ｽ・ｽb・ｽV・ｽ・ｽ・ｽﾉ奇ｿｽ・ｽ闢厄ｿｽﾄゑｿｽ・ｽﾄゑｿｽ・ｽ・ｽ}・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽ・ｽ・ｽ謫ｾ 
+			Model::Material material = *m_pTyawan->GetMaterial(mesh->materialID);
+			// ・ｽV・ｽF・ｽ[・ｽ_・ｽ[・ｽﾖマ・ｽe・ｽ・ｽ・ｽA・ｽ・ｽ・ｽ・ｽﾝ抵ｿｽ 
+			ShaderList::SetMaterial(material);
+			// ・ｽ・ｽ・ｽf・ｽ・ｽ・ｽﾌ描・ｽ・ｽ 
+			m_pTyawan->Draw(i);
+		}
+	}
 
 	if(OnlyDice)
 	{
@@ -712,7 +773,7 @@ void SceneGame::Draw()
 		}
 		if (m_pMoneyUI)
 		{
-			m_pMoneyUI->Draw();
+			//m_pMoneyUI->Draw();
 		}
 		if (m_pPlayerHp)
 		{

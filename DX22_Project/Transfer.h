@@ -60,6 +60,11 @@ private:
 	{
 		UIobj role;
 	};
+	struct Model3DInfo
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 size;
+	};
 public:
 	static Transfer& GetInstance()
 	{
@@ -75,4 +80,6 @@ public:
 	DirectX::XMFLOAT2 mousePos;
 	UIobj yukari;
 	UIobj fuki;
+	Model3DInfo tyabu;
+	Model3DInfo tyawan;
 };

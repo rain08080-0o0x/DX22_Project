@@ -146,6 +146,21 @@ namespace
 
 				EndTabItem();
 			}
+			if (BeginTabItem("Field"))
+			{
+				PushID(1);
+				SeparatorText("Tyabudai");
+				DragFloat3("Pos", reinterpret_cast<float*>(&tran.tyabu.pos),0.1f);
+				DragFloat3("Size", reinterpret_cast<float*>(&tran.tyabu.size),0.1f);
+				PopID();
+				SeparatorText("Tyawan");
+
+				PushID(2);
+				DragFloat3("Pos", reinterpret_cast<float*>(&tran.tyawan.pos),0.1f);
+				DragFloat3("Size", reinterpret_cast<float*>(&tran.tyawan.size),0.1f);
+				PopID();
+				EndTabItem();
+			}
 			EndTabBar();
 		}
 
