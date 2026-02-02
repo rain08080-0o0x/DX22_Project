@@ -1,66 +1,40 @@
 #pragma once
 #include "GameObject.h"
-#include "Camera.h"
-#include "Collision.h"
-#include "Sprite.h"
 #include "Texture.h"
+#include "Sprite.h"
+#include <DirectXMath.h>
 
-class Player :
-    public GameObject
+class Player : public GameObject
 {
 public:
-    //--- バウンド方向の定義 
-    enum BoundAxis 
-    {
-        BoundX,
-        BoundY,
-        BoundZ,
-    };
-    enum eShotStep
-    {
-        SHOT_WAIT,  // 球を打つのを待つ 
-        SHOT_KEEP,  // キー入力開始 
-        SHOT_RELEASE, // キー入力をやめた（球を打つ 
-    };
-public:
-    //--- 基本の処理 
     Player();
     ~Player();
 
-    // 更新処理 
-    void Update()override;
+    void Update() override;
+    void Draw() override;
 
-    // 描画処理 
-    void Draw()override;
-        // カメラの設定 
-    void SetCamera(Camera* pCamera);
-    Collision::Box GetCollision();
-    void SetShadowPos(DirectX::XMFLOAT3 pos);
-
-    Collision::Box GetShadowCollision();
-
-    float GetPower();
-public:
-    void Bound(BoundAxis axis);
 private:
-    bool CheckStop();
-    void UpdateShot();
-    void UpdateMove();
+    void SyncFromTransfer();
+    void SyncToTransfer();
+    void ApplyMovement(float dt);
+    void ClampToStage();
+
 private:
-    //--- 各種メンバー変数 
-    Camera* m_pCamera;  // ボールを追いかけるカメラの情報 
-    DirectX::XMFLOAT3 m_move;   // ボールの移動速度 
-    bool     m_isStop;  // ボールの停止判定 
-    bool     m_isGround;  // 地面接地判定 
-    int     m_shotStep;  // ボールの処理手順 
-    float    m_shotPower;  // ボールの打ち出し強さ 
-    eShotStep m_shotstep;
+    Texture* m_pTexture;
+    DirectX::XMFLOAT3 m_size;
+    DirectX::XMFLOAT3 m_velocity;
+    DirectX::XMFLOAT4 m_color;
 
-    Collision::Box m_collision;
+    float m_hp;
+    float m_maxHp;
+    float m_moveSpeed;
+    float m_dashDistance;
+    float m_dashCooldown;
+    float m_dashDuration;
+    float m_dashTimer;
+    float m_dashCooldownTimer;
+    DirectX::XMFLOAT3 m_dashDir;
+    bool m_isDashing;
 
-    Texture* m_pShadowTex; // 影の見た目 
-    DirectX::XMFLOAT3 m_shadowPos;  // 影の位置 
-    Collision::Box  m_shadowCollision; //  
-
+    float m_stageSize;
 };
-

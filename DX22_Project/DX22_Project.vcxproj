@@ -149,6 +149,7 @@
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="Dice.cpp" />
     <ClCompile Include="DirectX.cpp" />
+    <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="Fade.cpp" />
     <ClCompile Include="FadeBlack.cpp" />
     <ClCompile Include="GameObject.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Transfer.cpp" />
     <ClCompile Include="UIManager.cpp" />
+    <ClCompile Include="UIObjectManager.cpp" />
     <ClCompile Include="UIObject.cpp" />
     <ClCompile Include="Yukari.cpp" />
     <ClCompile Include="_geometory.cpp" />
@@ -193,6 +195,7 @@
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Dice.h" />
     <ClInclude Include="DirectX.h" />
+    <ClInclude Include="Enemy.h" />
     <ClInclude Include="Fade.h" />
     <ClInclude Include="FadeBlack.h" />
     <ClInclude Include="GameObject.h" />
@@ -224,6 +227,7 @@
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Transfer.h" />
     <ClInclude Include="UIManager.h" />
+    <ClInclude Include="UIObjectManager.h" />
     <ClInclude Include="UIObject.h" />
     <ClInclude Include="Yukari.h" />
   </ItemGroup>

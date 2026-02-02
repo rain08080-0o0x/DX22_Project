@@ -31,6 +31,13 @@ private:
 		DirectX::XMFLOAT3 pos;
 		DirectX::XMFLOAT3 size;
 		DirectX::XMFLOAT3 velocity;
+		float hp = 0.0f;
+		float maxHp = 0.0f;
+		float moveSpeed = 0.0f;
+		float dashDistance = 0.0f;
+		float dashCooldown = 0.0f;
+		float dashDuration = 0.0f;
+		float stageSize = 0.0f;
 		DirectX::XMFLOAT4 color;
 		DirectX::XMFLOAT2 lcokColor;
 	};

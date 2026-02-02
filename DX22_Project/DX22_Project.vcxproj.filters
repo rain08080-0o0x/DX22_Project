@@ -1,291 +1,297 @@
-ï»¿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«">
+    <Filter Include="ƒ\[ƒX ƒtƒ@ƒCƒ‹">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«">
+    <Filter Include="ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="ãƒªã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«">
+    <Filter Include="ƒŠƒ\[ƒX ƒtƒ@ƒCƒ‹">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System">
+    <Filter Include="ƒ\[ƒX ƒtƒ@ƒCƒ‹\System">
       <UniqueIdentifier>{cefddf4c-25f8-4c1d-8607-61de56336227}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\Application">
+    <Filter Include="ƒ\[ƒX ƒtƒ@ƒCƒ‹\Application">
       <UniqueIdentifier>{d673194b-5c9e-4080-b67b-7f46a1565ba8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System">
+    <Filter Include="ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System">
       <UniqueIdentifier>{5858150b-de72-4b6e-8ecf-8f81d5d8b4f6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\Application">
+    <Filter Include="ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\Application">
       <UniqueIdentifier>{5c1a610b-1606-4f4a-817c-d5b1c7d94851}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\Work">
+    <Filter Include="ƒ\[ƒX ƒtƒ@ƒCƒ‹\Work">
       <UniqueIdentifier>{d40b6216-14f8-474d-bd1d-053eaf07e0c5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX">
+    <Filter Include="ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\DirectX">
       <UniqueIdentifier>{f3668724-0776-4a81-bfe4-460b3b211f3f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX">
+    <Filter Include="ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\DirectX">
       <UniqueIdentifier>{36a071c1-5faa-4aab-876a-ec9bef09e703}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui">
+    <Filter Include="ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\ImGui">
       <UniqueIdentifier>{a7d8498b-158b-4c14-8cd2-ca76879773fc}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui">
+    <Filter Include="ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\ImGui">
       <UniqueIdentifier>{a864f8a1-dd25-41b8-aaf4-b5b1fb13f454}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Startup.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Sprite.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System</Filter>
     </ClCompile>
     <ClCompile Include="Input.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System</Filter>
     </ClCompile>
     <ClCompile Include="Geometory.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System</Filter>
     </ClCompile>
     <ClCompile Include="SceneGame.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\Application</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\Application</Filter>
     </ClCompile>
     <ClCompile Include="Main.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\Application</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\Application</Filter>
     </ClCompile>
     <ClCompile Include="_model.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\Work</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\Work</Filter>
     </ClCompile>
     <ClCompile Include="_geometory.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\Work</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\Work</Filter>
     </ClCompile>
     <ClCompile Include="Model.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System</Filter>
     </ClCompile>
     <ClCompile Include="Scene.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System</Filter>
     </ClCompile>
     <ClCompile Include="DirectX.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="MeshBuffer.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="Shader.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="ShaderList.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="Texture.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="CameraDebug.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Collision.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="GameObject.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Block.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Player.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="imgui.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="imgui_draw.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="imgui_impl_dx11.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="imgui_impl_win32.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="imgui_tables.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="imgui_widgets.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="Transfer.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Dice.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="GaugeUI.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Sound.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="UIObject.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="UIManager.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
+    </ClCompile>
+    <ClCompile Include="UIObjectManager.cpp">
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="ScoreLite.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="SceneTitle.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Yukari.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="SceneResult.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="Fade.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
     <ClCompile Include="FadeBlack.cpp">
-      <Filter>ã‚½ãƒ¼ã‚¹ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒ\[ƒX ƒtƒ@ƒCƒ‹</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defines.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Geometory.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System</Filter>
     </ClInclude>
     <ClInclude Include="Input.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System</Filter>
     </ClInclude>
     <ClInclude Include="Sprite.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System</Filter>
     </ClInclude>
     <ClInclude Include="Main.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\Application</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\Application</Filter>
     </ClInclude>
     <ClInclude Include="SceneGame.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\Application</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\Application</Filter>
     </ClInclude>
     <ClInclude Include="Model.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System</Filter>
     </ClInclude>
     <ClInclude Include="Scene.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System</Filter>
     </ClInclude>
     <ClInclude Include="DirectX.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="MeshBuffer.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="ShaderList.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="Texture.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\DirectX</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="CameraDebug.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Collision.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="GameObject.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Block.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Player.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="imconfig.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="imgui.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="imgui_impl_dx11.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="imgui_impl_win32.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="imgui_internal.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«\System\ImGui</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹\System\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="imstb_rectpack.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="imstb_textedit.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="imstb_truetype.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Transfer.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Dice.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="GaugeUI.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Sound.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="UIObject.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="UIManager.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
+    </ClInclude>
+    <ClInclude Include="UIObjectManager.h">
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="ScoreLite.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="SceneManager.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="SceneTitle.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="DebugUtil.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Yukari.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="SceneResult.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="Fade.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
     <ClInclude Include="FadeBlack.h">
-      <Filter>ãƒ˜ãƒƒãƒ€ãƒ¼ ãƒ•ã‚¡ã‚¤ãƒ«</Filter>
+      <Filter>ƒwƒbƒ_[ ƒtƒ@ƒCƒ‹</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

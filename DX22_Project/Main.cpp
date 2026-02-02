@@ -78,7 +78,7 @@ void Draw()
 	static bool show_dice_window;
 	static bool show_dice4x4_window;
 
-	if(IsKeyTrigger(VK_LSHIFT))show_main_window = !show_main_window;
+	if(IsKeyTrigger(VK_TAB))show_main_window = !show_main_window;
 
 	using namespace ImGui;
 	using namespace std;
@@ -104,6 +104,19 @@ void Draw()
 				tran.camera.eye = { eye[0],eye[1],eye[2] };
 				tran.camera.look = { look[0],look[1],look[2] };
 
+				EndTabItem();
+			}
+			if (BeginTabItem("Player"))
+			{
+				DragFloat3("Position", reinterpret_cast<float*>(&tran.player.pos), 0.05f);
+				DragFloat3("Size", reinterpret_cast<float*>(&tran.player.size), 0.05f);
+				DragFloat3("Velocity", reinterpret_cast<float*>(&tran.player.velocity), 0.05f);
+				DragFloat("Move Speed", &tran.player.moveSpeed, 0.01f, 0.0f, 10.0f);
+				DragFloat("Dash Distance", &tran.player.dashDistance, 0.05f, 0.0f, 10.0f);
+				DragFloat("Dash Cooldown", &tran.player.dashCooldown, 0.01f, 0.0f, 5.0f);
+				DragFloat("Dash Duration", &tran.player.dashDuration, 0.01f, 0.01f, 1.0f);
+				DragFloat("Stage Size", &tran.player.stageSize, 0.1f, 1.0f, 20.0f);
+				ColorEdit4("Color", reinterpret_cast<float*>(&tran.player.color));
 				EndTabItem();
 			}
 			if (BeginTabItem("Dice"))
