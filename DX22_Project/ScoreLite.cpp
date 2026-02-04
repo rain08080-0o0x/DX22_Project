@@ -41,6 +41,12 @@ int ScoreLite::GetScore() const
     return m_score;
 }
 
+void ScoreLite::SetPosition(float x, float y)
+{
+    m_x = x;
+    m_y = y;
+}
+
 void ScoreLite::SetColor(float r, float g, float b, float a)
 {
     m_colorR = r;

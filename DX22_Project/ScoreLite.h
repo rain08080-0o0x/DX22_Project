@@ -11,6 +11,7 @@ public:
     void SetScore(int v);
     void AddScore(int v);
     int GetScore() const;
+    void SetPosition(float x, float y);
 
     void SetColor(float r, float g, float b, float a);
     void Draw();

@@ -3,15 +3,21 @@
 #include "Texture.h"
 #include "Sprite.h"
 #include <DirectXMath.h>
+#include "TrailEffect.h"
+#include "Camera.h"
+
+class TrailEffect;
 
 class Player : public GameObject
 {
 public:
-    Player();
+    Player(Camera*);
     ~Player();
 
     void Update() override;
     void Draw() override;
+
+    void SetCamera(Camera*set);
 
 private:
     void SyncFromTransfer();
@@ -20,6 +26,7 @@ private:
     void ClampToStage();
 
 private:
+    Camera* m_pCamera;
     Texture* m_pTexture;
     DirectX::XMFLOAT3 m_size;
     DirectX::XMFLOAT3 m_velocity;
@@ -37,4 +44,7 @@ private:
     bool m_isDashing;
 
     float m_stageSize;
+
+    TrailEffect* m_pTrail;
+    Texture* m_pTrailEffectTexture;
 };

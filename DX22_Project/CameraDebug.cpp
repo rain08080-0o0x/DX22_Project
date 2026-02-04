@@ -7,8 +7,8 @@ const float CameraDefaultDistance = -2.0f;
 
 CameraDebug::CameraDebug()
 	: m_radXZ(0.0f)
-	, m_radY(0.7f)
-	, m_radius(10.0f)
+	, m_radY(-0.7f)
+	, m_radius(-10.0f)
 {
     TRAN_INS;
     m_look = { 0.0f,0.0f,0.0f };
@@ -64,9 +64,9 @@ void CameraDebug::Update()
         if (IsKeyPress(VK_RIGHT)) delta += right * CameraSpeed;
         if (IsKeyPress(VK_LEFT))  delta -= right * CameraSpeed;
 
-        // 上下移動（ワールドY）
-        //if (IsKeyPress(VK_SHIFT))   delta += up * CameraSpeed;
-        //if (IsKeyPress(VK_CONTROL)) delta -= up * CameraSpeed;
+         //上下移動（ワールドY）
+        if (IsKeyPress(VK_LSHIFT))   delta += up * CameraSpeed;
+        if (IsKeyPress(VK_LCONTROL)) delta -= up * CameraSpeed;
 
         // 視線を維持したまま平行移動：pos と look を同じだけ動かす
         pos += delta;
@@ -77,10 +77,10 @@ void CameraDebug::Update()
         XMStoreFloat3(&m_look, look);
         //--- カメラ位置の移動 
         // 回り込み
-        if (IsKeyPress('A')) { m_radXZ += CameraDebugRotate; }
-        if (IsKeyPress('D')) { m_radXZ -= CameraDebugRotate; }
-        if (IsKeyPress('W')) { m_radY -= CameraDebugRotate; }
-        if (IsKeyPress('S')) { m_radY += CameraDebugRotate; }
+        if (IsKeyPress('J')) { m_radXZ += CameraDebugRotate; }
+        if (IsKeyPress('L')) { m_radXZ -= CameraDebugRotate; }
+        if (IsKeyPress('I')) { m_radY -= CameraDebugRotate; }
+        if (IsKeyPress('K')) { m_radY += CameraDebugRotate; }
 
         // --- カメラの距離
         if (IsKeyPress('E')) { m_radius += CameraSpeed; }
@@ -91,6 +91,8 @@ void CameraDebug::Update()
         m_pos.y = m_look.y + m_radius * sinf(m_radY);
         m_pos.z = m_look.z + m_radius * cosf(m_radY) * cosf(m_radXZ);
         // Transferの更新
+        tran.camera.eye = m_pos;
+        tran.camera.look = m_look;
     }
     else
     {

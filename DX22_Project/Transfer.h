@@ -67,6 +67,19 @@ private:
 	{
 		UIobj role;
 	};
+	struct ModelInfo
+	{
+		DirectX::XMFLOAT3 subAngle;
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 size;
+		DirectX::XMFLOAT3 rotate;
+	};
+	struct ModelEditer
+	{
+		ModelInfo arm;
+		ModelInfo body;
+		ModelInfo leg;
+	};
 	struct Tyabudai
 	{
 		DirectX::XMFLOAT3 pos;
@@ -90,4 +103,5 @@ public:
 	UIobj fuki;
 	Tyabudai tyabu;
 	Tyabudai tyawan;
+	ModelEditer modelediter;
 };

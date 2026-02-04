@@ -4,6 +4,7 @@
 #include "Sprite.h"
 #include "Collision.h"
 #include <DirectXMath.h>
+#include "Camera.h"
 
 class Enemy : public GameObject
 {
@@ -15,11 +16,23 @@ public:
     void Draw() override;
 
     void SetSize(const DirectX::XMFLOAT3& size);
+    void SetStageSize(float size);
+    void SetMoveSpeed(float speed);
     DirectX::XMFLOAT3 GetSize() const;
     Collision::Box GetCollision() const;
-
+    void Damage(int amount);
+    bool IsAlive() const;
+    int GetHp() const;
+    int GetMaxHp() const;
+    void SetCamera(Camera*);
 private:
+    Camera* m_pCamera;
     Texture* m_pTexture;
     DirectX::XMFLOAT3 m_size;
     DirectX::XMFLOAT4 m_color;
+    float m_moveSpeed;
+    float m_stageSize;
+    float m_moveDirX;
+    int m_hp;
+    int m_maxHp;
 };

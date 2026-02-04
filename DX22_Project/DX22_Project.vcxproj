@@ -155,6 +155,7 @@
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GaugeUI.cpp" />
     <ClCompile Include="Geometory.cpp" />
+    <ClCompile Include="Goal.cpp" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
     <ClCompile Include="imgui_impl_dx11.cpp" />
@@ -165,8 +166,11 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MeshBuffer.cpp" />
     <ClCompile Include="Model.cpp" />
+    <ClCompile Include="ModelAnimeEditer.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="PolylineEffect.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="Scene3DEditor.cpp" />
     <ClCompile Include="SceneGame.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SceneResult.cpp" />
@@ -178,10 +182,11 @@
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="Startup.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="TrailEffect.cpp" />
     <ClCompile Include="Transfer.cpp" />
     <ClCompile Include="UIManager.cpp" />
-    <ClCompile Include="UIObjectManager.cpp" />
     <ClCompile Include="UIObject.cpp" />
+    <ClCompile Include="UIObjectManager.cpp" />
     <ClCompile Include="Yukari.cpp" />
     <ClCompile Include="_geometory.cpp" />
     <ClCompile Include="_model.cpp" />
@@ -195,12 +200,14 @@
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Dice.h" />
     <ClInclude Include="DirectX.h" />
+    <ClInclude Include="Easing.h" />
     <ClInclude Include="Enemy.h" />
     <ClInclude Include="Fade.h" />
     <ClInclude Include="FadeBlack.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GaugeUI.h" />
     <ClInclude Include="Geometory.h" />
+    <ClInclude Include="Goal.h" />
     <ClInclude Include="imconfig.h" />
     <ClInclude Include="imgui.h" />
     <ClInclude Include="imgui_impl_dx11.h" />
@@ -213,8 +220,11 @@
     <ClInclude Include="Main.h" />
     <ClInclude Include="MeshBuffer.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="ModelAnimeEditer.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="PolylineEffect.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="Scene3DEditor.h" />
     <ClInclude Include="SceneGame.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SceneResult.h" />
@@ -225,11 +235,17 @@
     <ClInclude Include="Sound.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="TrailEffect.h" />
     <ClInclude Include="Transfer.h" />
     <ClInclude Include="UIManager.h" />
     <ClInclude Include="UIObjectManager.h" />
     <ClInclude Include="UIObject.h" />
     <ClInclude Include="Yukari.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="DirectX.cpp" />
+    <Text Include="_geometory.cpp" />
+    <Text Include="_model.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

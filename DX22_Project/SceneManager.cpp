@@ -2,6 +2,7 @@
 #include "SceneTitle.h"
 #include "SceneGame.h"
 #include "SceneResult.h"
+#include "Scene3DEditor.h"
 
 Scene* SceneManager::m_pScene = nullptr;
 SceneManager::SceneType SceneManager::m_current = SceneManager::SCENE_GAME;
@@ -45,6 +46,9 @@ void SceneManager::CreateScene(SceneType type)
         break;
     case SCENE_RESULT:
         m_pScene = new SceneResult();
+        break;
+    case SCENE_3DEDITOR:
+        m_pScene = new Scene3DEditor();
         break;
     default:
         m_pScene = new SceneTitle();

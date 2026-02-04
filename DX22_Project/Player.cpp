@@ -2,6 +2,7 @@
 #include "Input.h"
 #include "Transfer.h"
 #include <cmath>
+#include "Defines.h"
 
 namespace
 {
@@ -22,7 +23,8 @@ namespace
     }
 }
 
-Player::Player()
+
+Player::Player(Camera*camera)
     : m_pTexture(nullptr)
     , m_size(0.5f, 1.0f, 0.5f)
     , m_velocity(0.0f, 0.0f, 0.0f)
@@ -38,11 +40,21 @@ Player::Player()
     , m_dashDir(0.0f, 0.0f, 1.0f)
     , m_isDashing(false)
     , m_stageSize(kDefaultStageSize)
+    , m_pTrail(new TrailEffect(this))
+    , m_pCamera(camera)
+    , m_pTrailEffectTexture(nullptr)
 {
+    m_pTrail->AddLine(20);
     m_pos = { 0.0f, 0.0f, 0.0f };
 
     m_pTexture = new Texture();
     if (FAILED(m_pTexture->Create(kPlayerTexture)))
+    {
+        MessageBox(NULL, "Texture load failed.\nPlayer.cpp", "Error", MB_OK);
+    }
+
+    m_pTrailEffectTexture = new Texture();
+    if (FAILED(m_pTrailEffectTexture->Create("Assets/Texture/Chracter/genbaneko.png")))
     {
         MessageBox(NULL, "Texture load failed.\nPlayer.cpp", "Error", MB_OK);
     }
@@ -52,10 +64,20 @@ Player::Player()
 
 Player::~Player()
 {
+    if (m_pTrail)
+    {
+        delete m_pTrail;
+        m_pTrail = nullptr;
+    }
     if (m_pTexture)
     {
         delete m_pTexture;
         m_pTexture = nullptr;
+    }
+    if (m_pTrailEffectTexture)
+    {
+        delete m_pTrailEffectTexture;
+        m_pTrailEffectTexture = nullptr;
     }
 }
 
@@ -73,13 +95,45 @@ void Player::Update()
 #endif
 
     SyncToTransfer();
+    m_pTrail->Update();
 }
 
 void Player::Draw()
 {
     if (!m_pTexture) return;
 
-    DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(
+    using namespace DirectX;
+    // ---- ビルボード行列計算 ----
+    XMMATRIX billboard = XMMatrixIdentity();
+
+    if (m_pCamera)
+    {
+        // 転置していないカメラの View 行列を取得
+        XMFLOAT4X4 viewFloat;
+        //XMStoreFloat4x4(&viewFloat, m_pCamera->GetViewMatrix());
+        viewFloat = m_pCamera->GetViewMatrix(false);
+
+        // 読み取り用 → 計算用
+        XMMATRIX viewMat = XMLoadFloat4x4(&viewFloat);
+
+        // 逆行列（回転 + 移動を打ち消す）
+        XMMATRIX invView = XMMatrixInverse(nullptr, viewMat);
+
+        // 計算用 → 読み取り用
+        XMFLOAT4X4 invViewFloat;
+        XMStoreFloat4x4(&invViewFloat, invView);
+
+        // 移動成分を削除（回転のみ残す）
+        invViewFloat._41 = 0.0f;
+        invViewFloat._42 = 0.0f;
+        invViewFloat._43 = 0.0f;
+
+        // 読み取り用 → 計算用
+        billboard = XMLoadFloat4x4(&invViewFloat);
+    }
+
+    DirectX::XMMATRIX T = billboard *
+        DirectX::XMMatrixTranslation(
         m_pos.x,
         m_pos.y + (m_size.y * 0.5f),
         m_pos.z
@@ -95,6 +149,17 @@ void Player::Draw()
     Sprite::SetColor(m_color);
     Sprite::SetTexture(m_pTexture);
     Sprite::Draw();
+
+
+
+    if (m_pTrail)
+    {
+        m_pTrail->SetView(m_pCamera->GetViewMatrix());
+        m_pTrail->SetProjection(m_pCamera->GetProjectionMatrix());
+        // テクスチャの設定(設定なし)
+        //m_pTrail->SetTexture(m_pTrailEffectTexture);
+        m_pTrail->Draw();
+    }
 }
 
 void Player::SyncFromTransfer()

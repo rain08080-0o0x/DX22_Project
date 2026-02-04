@@ -9,6 +9,8 @@ public:
         SCENE_TITLE = 0,
         SCENE_GAME,
         SCENE_RESULT,
+        SCENE_3DEDITOR,
+        SCENE_MAX
     };
 
     enum ResultType

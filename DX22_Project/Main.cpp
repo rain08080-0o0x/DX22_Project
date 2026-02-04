@@ -16,6 +16,7 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
+#include "Easing.h"
 
 // デバッグ用
 #include "DebugUtil.h"
@@ -86,8 +87,63 @@ void Draw()
 	{
 		Begin("Main Setting Window",&show_main_window);
 
-		if (BeginTabBar("tabber"))
+		string sceneTxt;
+		switch (SceneManager::GetCurrent())
 		{
+		case SceneManager::SceneType::SCENE_TITLE:
+			sceneTxt = "Title";
+			break;
+		case SceneManager::SceneType::SCENE_GAME:
+			sceneTxt = "Game";
+			break;
+		case SceneManager::SceneType::SCENE_RESULT:
+			sceneTxt = "Result";
+			break;
+		case SceneManager::SceneType::SCENE_3DEDITOR:
+			sceneTxt = "3DEditor";
+			break;
+		default:
+			sceneTxt = "Unknown";
+			break;
+		}
+		sceneTxt = "Current Scene : " + sceneTxt;
+		Text(sceneTxt.c_str());
+
+		if (BeginTabBar("TabBar"))
+		{
+			if (BeginTabItem("Player"))
+			{
+				DragFloat3("Position", reinterpret_cast<float*>(&tran.player.pos), 0.05f);
+				DragFloat3("Size", reinterpret_cast<float*>(&tran.player.size), 0.05f);
+				DragFloat3("Velocity", reinterpret_cast<float*>(&tran.player.velocity), 0.05f);
+				DragFloat("Move Speed", &tran.player.moveSpeed, 0.01f, 0.0f, 10.0f);
+				DragFloat("Dash Distance", &tran.player.dashDistance, 0.05f, 0.0f, 10.0f);
+				DragFloat("Dash Cooldown", &tran.player.dashCooldown, 0.01f, 0.0f, 5.0f);
+				DragFloat("Dash Duration", &tran.player.dashDuration, 0.01f, 0.01f, 1.0f);
+				DragFloat("Stage Size", &tran.player.stageSize, 0.1f, 1.0f, 20.0f);
+				ColorEdit4("Color", reinterpret_cast<float*>(&tran.player.color));
+				EndTabItem();
+			}
+			if (BeginTabItem("ModelEditer"))
+			{
+				ImGui::SeparatorText("Arm");
+				ImGui::DragFloat3("Arm Angle", reinterpret_cast<float*>(&tran.modelediter.arm.subAngle),0.1f);
+				ImGui::DragFloat3("Arm Pos", reinterpret_cast<float*>(&tran.modelediter.arm.pos),0.1f);
+				ImGui::DragFloat3("Arm Size", reinterpret_cast<float*>(&tran.modelediter.arm.size),0.1f);
+				ImGui::DragFloat3("Arm Rotate", reinterpret_cast<float*>(&tran.modelediter.arm.rotate),0.1f);
+				ImGui::SeparatorText("Body");
+				ImGui::DragFloat3("Body Angle", reinterpret_cast<float*>(&tran.modelediter.body.subAngle), 0.1f);
+				ImGui::DragFloat3("Body Pos", reinterpret_cast<float*>(&tran.modelediter.body.pos),0.1f);
+				ImGui::DragFloat3("Body Size", reinterpret_cast<float*>(&tran.modelediter.body.size),0.1f);
+				ImGui::DragFloat3("Body Rotate", reinterpret_cast<float*>(&tran.modelediter.body.rotate),0.1f);
+				ImGui::SeparatorText("Leg");
+				ImGui::DragFloat3("Leg Angle", reinterpret_cast<float*>(&tran.modelediter.leg.subAngle), 0.1f);
+				ImGui::DragFloat3("Leg Pos", reinterpret_cast<float*>(&tran.modelediter.leg.pos),0.1f);
+				ImGui::DragFloat3("Leg Size", reinterpret_cast<float*>(&tran.modelediter.leg.size),0.1f);
+				ImGui::DragFloat3("Leg Rotate", reinterpret_cast<float*>(&tran.modelediter.leg.rotate),0.1f);
+
+				EndTabItem();
+			}
 			if (BeginTabItem("Camera"))
 			{
 
@@ -106,17 +162,101 @@ void Draw()
 
 				EndTabItem();
 			}
-			if (BeginTabItem("Player"))
+			if (BeginTabItem("Graph"))
 			{
-				DragFloat3("Position", reinterpret_cast<float*>(&tran.player.pos), 0.05f);
-				DragFloat3("Size", reinterpret_cast<float*>(&tran.player.size), 0.05f);
-				DragFloat3("Velocity", reinterpret_cast<float*>(&tran.player.velocity), 0.05f);
-				DragFloat("Move Speed", &tran.player.moveSpeed, 0.01f, 0.0f, 10.0f);
-				DragFloat("Dash Distance", &tran.player.dashDistance, 0.05f, 0.0f, 10.0f);
-				DragFloat("Dash Cooldown", &tran.player.dashCooldown, 0.01f, 0.0f, 5.0f);
-				DragFloat("Dash Duration", &tran.player.dashDuration, 0.01f, 0.01f, 1.0f);
-				DragFloat("Stage Size", &tran.player.stageSize, 0.1f, 1.0f, 20.0f);
-				ColorEdit4("Color", reinterpret_cast<float*>(&tran.player.color));
+				static float easing = 1;
+
+				DragFloat("Expf easing", &easing,0.1f);
+				Separator();
+
+				float target = 1000;
+				float current = 10;
+				float frame[100];
+				for (int i = 0; i < 100; i++)
+				{
+					current = current + (target - current) * expf(-easing);
+					frame[i] = current;
+				}
+
+				PlotLines("expf", frame, 100, 0, 0, 3.4028235E38F, 3.4028235E38F, { 100,100 }, 4);
+				Separator();
+				current = 0;
+				float PlanA[100];
+				for (int i = 0; i < 100; i++)
+				{
+					current += 0.01f;
+					PlanA[i] = current * current * current * current;
+				}
+
+				PlotLines("Plan A",PlanA,100, 0, 0, 3.4028235E38F, 3.4028235E38F, { 100,100 }, 4);
+				Separator();
+				const float PI = 3.14159265358979323846f;
+				float c4 = (2 * PI) / 3;
+
+				current = 0;
+				float  PlanB[100];
+				for (int i = 0; i < 100; i++)
+				{
+					current += 0.01f;
+					PlanB[i] = current == 0.0f ? 0.0f : current == 1.0f ? 1.0f : powf(2, -10 * current) * sinf((current * 10 - 0.75f) * c4) + 1.0f;
+				}
+				PlotLines("Plan B", PlanB, 100, 0, 0, 3.4028235E38F, 3.4028235E38F, { 100,100 }, 4);
+
+				Separator();
+
+				current = 0;
+
+				float n1 = 7.5625;
+				float d1 = 2.75;
+				float PlanC[100];
+				for(int i = 0; i < 100;i++)
+				{
+					current += 0.01f;
+					PlanC[i] = 1.0f - EaseOutBounce(current);
+				}
+
+				PlotLines("Plan C", PlanC, 100, 0, 0, 3.4028235E38F, 3.4028235E38F, { 100,100 }, 4);
+
+				EndTabItem();
+			}
+			if (BeginTabItem("Change Scene"))
+			{
+				static int sceneNum = 0;
+				if (ArrowButton("上", ImGuiDir_Up))
+					sceneNum++;
+				SameLine();
+				if (ArrowButton("下", ImGuiDir_Down))
+					sceneNum--;
+				if (sceneNum < 0)sceneNum = static_cast<int>(SceneManager::SceneType::SCENE_MAX) - 1;
+				sceneNum = sceneNum % static_cast<int>(SceneManager::SceneType::SCENE_MAX);
+				SceneManager::SceneType changeScene;
+				switch (sceneNum)
+				{
+				case 0:
+					sceneTxt = "Title";
+					changeScene = SceneManager::SceneType::SCENE_TITLE;
+					break;
+				case 1:
+					sceneTxt = "Game";
+					changeScene = SceneManager::SceneType::SCENE_GAME;
+					break;
+				case 2:
+					sceneTxt = "Result";
+					changeScene = SceneManager::SceneType::SCENE_RESULT;
+					break;
+				case 3:
+					sceneTxt = "3DEditor";
+					changeScene = SceneManager::SceneType::SCENE_3DEDITOR;
+					break;
+				default:
+					sceneTxt = "Unknown";
+					break;
+				}
+				sceneTxt = "Change Scene : " + sceneTxt;
+				SameLine();
+				Text(sceneTxt.c_str());
+				if (Button("Accept"))
+					SceneManager::ChangeScene(changeScene);
 				EndTabItem();
 			}
 			if (BeginTabItem("Dice"))
@@ -221,10 +361,9 @@ void Draw()
 				EndTabItem();
 			}
 
-
 			EndTabBar();
 		}
-
+		Separator();
 		Text("FPS: %.1f", GetIO().Framerate);
 		End();
 	}
