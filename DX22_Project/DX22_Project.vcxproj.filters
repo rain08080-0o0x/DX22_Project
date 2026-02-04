@@ -148,9 +148,6 @@
     <ClCompile Include="MeshBuffer.cpp">
       <Filter>ソースフォルダ</Filter>
     </ClCompile>
-    <ClCompile Include="ModelAnimeEditer.cpp">
-      <Filter>ソースフォルダ</Filter>
-    </ClCompile>
     <ClCompile Include="imgui.cpp">
       <Filter>ソースフォルダ</Filter>
     </ClCompile>
@@ -178,7 +175,9 @@
     <ClCompile Include="_model.cpp">
       <Filter>ソースフォルダ</Filter>
     </ClCompile>
-    <ClCompile Include="Scene3DEditor.cpp" />
+    <ClCompile Include="Scene3DEditor.cpp">
+      <Filter>ソースフォルダ</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defines.h">
@@ -317,9 +316,6 @@
       <Filter>ヘッダーフォルダ</Filter>
     </ClInclude>
     <ClInclude Include="Goal.h">
-      <Filter>ヘッダーフォルダ</Filter>
-    </ClInclude>
-    <ClInclude Include="ModelAnimeEditer.h">
       <Filter>ヘッダーフォルダ</Filter>
     </ClInclude>
     <ClInclude Include="Easing.h">

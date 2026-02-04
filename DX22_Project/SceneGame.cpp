@@ -268,7 +268,7 @@ void SceneGame::Update()
     if (m_pCamera) m_pCamera->Update();
     if (m_pPlayer) m_pPlayer->Update();
     if (m_pEnemy) m_pEnemy->Update();
-
+    if (m_pEnemy&&m_pPlayer)m_pEnemy->SetTargetPos(m_pPlayer->GetPos());
     if (m_pEnemy)
     {
         TRAN_INS;

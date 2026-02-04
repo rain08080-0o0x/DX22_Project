@@ -18,6 +18,7 @@ Enemy::Enemy()
     , m_moveDirX(1.0f)
     , m_hp(kDefaultEnemyHp)
     , m_maxHp(kDefaultEnemyHp)
+    , m_targetPos({2,0,0})
 {
     m_pos = { 0.0f, 0.0f, 0.0f };
 
@@ -39,31 +40,40 @@ Enemy::~Enemy()
 
 void Enemy::Update()
 {
-    const float stage = (m_stageSize > 0.0f) ? m_stageSize : kDefaultStageSize;
-    const float half = stage * 0.5f;
-    const float halfX = m_size.x * 0.5f;
-
-    float minX = -half + halfX;
-    float maxX = half - halfX;
-    if (minX > maxX)
+    bool isActive = false;
+    if(isActive)
     {
-        minX = 0.0f;
-        maxX = 0.0f;
+        const float stage = (m_stageSize > 0.0f) ? m_stageSize : kDefaultStageSize;
+        const float half = stage * 0.5f;
+        const float halfX = m_size.x * 0.5f;
+
+        float minX = -half + halfX;
+        float maxX = half - halfX;
+        if (minX > maxX)
+        {
+            minX = 0.0f;
+            maxX = 0.0f;
+        }
+
+        m_pos.x += m_moveDirX * m_moveSpeed * kMoveDt;
+
+        if (m_pos.x <= minX)
+        {
+            m_pos.x = minX;
+            m_moveDirX = 1.0f;
+        }
+        else if (m_pos.x >= maxX)
+        {
+            m_pos.x = maxX;
+            m_moveDirX = -1.0f;
+        }
     }
-
-    m_pos.x += m_moveDirX * m_moveSpeed * kMoveDt;
-
-    if (m_pos.x <= minX)
+    else
     {
-        m_pos.x = minX;
-        m_moveDirX = 1.0f;
+        // ターゲットの方向へ移動
+        m_pos.x += (m_targetPos.x - m_pos.x) * 0.02f;
+        m_pos.z += (m_targetPos.z - m_pos.z) * 0.02f;
     }
-    else if (m_pos.x >= maxX)
-    {
-        m_pos.x = maxX;
-        m_moveDirX = -1.0f;
-    }
-
     m_pos.y = 0.0f;
 }
 
@@ -175,4 +185,9 @@ int Enemy::GetMaxHp() const
 void Enemy::SetCamera(Camera* camera)
 {
     m_pCamera = camera;
+}
+
+void Enemy::SetTargetPos(DirectX::XMFLOAT3 get)
+{
+    m_targetPos = get;
 }

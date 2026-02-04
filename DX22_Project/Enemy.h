@@ -25,6 +25,8 @@ public:
     int GetHp() const;
     int GetMaxHp() const;
     void SetCamera(Camera*);
+
+    void SetTargetPos(DirectX::XMFLOAT3);
 private:
     Camera* m_pCamera;
     Texture* m_pTexture;
@@ -35,4 +37,5 @@ private:
     float m_moveDirX;
     int m_hp;
     int m_maxHp;
+    DirectX::XMFLOAT3 m_targetPos;
 };

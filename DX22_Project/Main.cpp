@@ -1,4 +1,4 @@
-#include "Main.h"
+Ôªø#include "Main.h"
 #include <memory>
 #include "DirectX.h"
 #include "Geometory.h"
@@ -8,7 +8,7 @@
 #include "Defines.h"
 #include "ShaderList.h"
 #include "Transfer.h"
-// randèâä˙âªóp
+// randÂàùÊúüÂåñÁî®
 #include <cstdlib>
 #include <ctime>
 
@@ -18,7 +18,7 @@
 #include "imgui_impl_dx11.h"
 #include "Easing.h"
 
-// ÉfÉoÉbÉOóp
+// „Éá„Éê„ÉÉ„Ç∞Áî®
 #include "DebugUtil.h"
 
 HRESULT Init(HWND hWnd, UINT width, UINT height)
@@ -26,19 +26,19 @@ HRESULT Init(HWND hWnd, UINT width, UINT height)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
 
 	HRESULT hr;
-	// DirectXèâä˙âª
+	// DirectXÂàùÊúüÂåñ
 	hr = InitDirectX(hWnd, width, height, false);
 	if (FAILED(hr)) { return hr; }
 
 	std::srand(static_cast<unsigned int>(std::time(NULL)));
 
-	// ëºã@î\èâä˙âª
+	// ‰ªñÊ©üËÉΩÂàùÊúüÂåñ
 	Geometory::Init();
 	Sprite::Init();
 	InitInput();
 	ShaderList::Init();
 
-	// ÉVÅ[Éì
+	// „Ç∑„Éº„É≥
 	SceneManager::Init();
 
 	return hr;
@@ -73,7 +73,7 @@ void Draw()
 #ifdef _DEBUG
 	TRAN_INS;
 
-	// ImGuiÇÃï`âÊ
+	// ImGui„ÅÆÊèèÁîª
 	static bool show_main_window = false;
 	static bool show_camera_window;
 	static bool show_dice_window;
@@ -107,7 +107,7 @@ void Draw()
 			break;
 		}
 		sceneTxt = "Current Scene : " + sceneTxt;
-		Text(sceneTxt.c_str());
+		ImGui::Text(sceneTxt.c_str());
 
 		if (BeginTabBar("TabBar"))
 		{
@@ -126,21 +126,83 @@ void Draw()
 			}
 			if (BeginTabItem("ModelEditer"))
 			{
-				ImGui::SeparatorText("Arm");
-				ImGui::DragFloat3("Arm Angle", reinterpret_cast<float*>(&tran.modelediter.arm.subAngle),0.1f);
-				ImGui::DragFloat3("Arm Pos", reinterpret_cast<float*>(&tran.modelediter.arm.pos),0.1f);
-				ImGui::DragFloat3("Arm Size", reinterpret_cast<float*>(&tran.modelediter.arm.size),0.1f);
-				ImGui::DragFloat3("Arm Rotate", reinterpret_cast<float*>(&tran.modelediter.arm.rotate),0.1f);
+				ImGui::SeparatorText(u8"ËÖï");
+				if(TreeNode("Arm"))
+				{
+					PushID(0);
+					if(TreeNode("Right"))
+					{
+						ImGui::DragFloat3("Right Arm1 Angle", reinterpret_cast<float*>(&tran.modelediter.armRight1.subAngle), 0.1f);
+						ImGui::DragFloat3("Right Arm1 Pos", reinterpret_cast<float*>(&tran.modelediter.armRight1.pos), 0.1f);
+						ImGui::DragFloat3("Right Arm1 Size", reinterpret_cast<float*>(&tran.modelediter.armRight1.size), 0.1f);
+						ImGui::DragFloat3("Right Arm1 Rotate", reinterpret_cast<float*>(&tran.modelediter.armRight1.rotate), 0.1f);
+						ImGui::SeparatorText("Right Arm2");
+						ImGui::DragFloat3("Right Arm2 Angle", reinterpret_cast<float*>(&tran.modelediter.armRight2.subAngle), 0.1f);
+						ImGui::DragFloat3("Right Arm2 Pos", reinterpret_cast<float*>(&tran.modelediter.armRight2.pos), 0.1f);
+						ImGui::DragFloat3("Right Arm2 Size", reinterpret_cast<float*>(&tran.modelediter.armRight2.size), 0.1f);
+						ImGui::DragFloat3("Right Arm2 Rotate", reinterpret_cast<float*>(&tran.modelediter.armRight2.rotate), 0.1f);
+						TreePop();
+					}
+					if(TreeNode("Left"))
+					{
+						ImGui::SeparatorText("Left Arm1");
+						ImGui::DragFloat3("Left Arm1 Angle", reinterpret_cast<float*>(&tran.modelediter.armLeft1.subAngle), 0.1f);
+						ImGui::DragFloat3("Left Arm1 Pos", reinterpret_cast<float*>(&tran.modelediter.armLeft1.pos), 0.1f);
+						ImGui::DragFloat3("Left Arm1 Size", reinterpret_cast<float*>(&tran.modelediter.armLeft1.size), 0.1f);
+						ImGui::DragFloat3("Left Arm1 Rotate", reinterpret_cast<float*>(&tran.modelediter.armLeft1.rotate), 0.1f);
+						ImGui::SeparatorText("Left Arm2");
+						ImGui::DragFloat3("Left Arm2 Angle", reinterpret_cast<float*>(&tran.modelediter.armLeft2.subAngle), 0.1f);
+						ImGui::DragFloat3("Left Arm2 Pos", reinterpret_cast<float*>(&tran.modelediter.armLeft2.pos), 0.1f);
+						ImGui::DragFloat3("Left Arm2 Size", reinterpret_cast<float*>(&tran.modelediter.armLeft2.size), 0.1f);
+						ImGui::DragFloat3("Left Arm2 Rotate", reinterpret_cast<float*>(&tran.modelediter.armLeft2.rotate), 0.1f);
+						TreePop();
+					}
+					TreePop();
+					PopID();
+				}
+				ImGui::SeparatorText("Leg ");
+				if(TreeNode("Leg "))
+				{
+					PushID(1);
+					if(TreeNode("Right"))
+					{ 
+						ImGui::DragFloat3("Right Leg 1 Angle", reinterpret_cast<float*>(&tran.modelediter.legRight1.subAngle), 0.1f);
+						ImGui::DragFloat3("Right Leg 1 Pos", reinterpret_cast<float*>(&tran.modelediter.legRight1.pos), 0.1f);
+						ImGui::DragFloat3("Right Leg 1 Size", reinterpret_cast<float*>(&tran.modelediter.legRight1.size), 0.1f);
+						ImGui::DragFloat3("Right Leg 1 Rotate", reinterpret_cast<float*>(&tran.modelediter.legRight1.rotate), 0.1f);
+						ImGui::SeparatorText("Right Leg 2");
+						ImGui::DragFloat3("Right Leg 2 Angle", reinterpret_cast<float*>(&tran.modelediter.legRight2.subAngle), 0.1f);
+						ImGui::DragFloat3("Right Leg 2 Pos", reinterpret_cast<float*>(&tran.modelediter.legRight2.pos), 0.1f);
+						ImGui::DragFloat3("Right Leg 2 Size", reinterpret_cast<float*>(&tran.modelediter.legRight2.size), 0.1f);
+						ImGui::DragFloat3("Right Leg 2 Rotate", reinterpret_cast<float*>(&tran.modelediter.legRight2.rotate), 0.1f);
+						TreePop();
+					}
+					if(TreeNode("Left"))
+					{ 
+						ImGui::SeparatorText("Left Leg 1");
+						ImGui::DragFloat3("Left Leg 1 Angle", reinterpret_cast<float*>(&tran.modelediter.legLeft1.subAngle), 0.1f);
+						ImGui::DragFloat3("Left Leg 1 Pos", reinterpret_cast<float*>(&tran.modelediter.legLeft1.pos), 0.1f);
+						ImGui::DragFloat3("Left Leg 1 Size", reinterpret_cast<float*>(&tran.modelediter.legLeft1.size), 0.1f);
+						ImGui::DragFloat3("Left Leg 1 Rotate", reinterpret_cast<float*>(&tran.modelediter.legLeft1.rotate), 0.1f);
+						ImGui::SeparatorText("Left Leg 2");
+						ImGui::DragFloat3("Left Leg 2 Angle", reinterpret_cast<float*>(&tran.modelediter.legLeft2.subAngle), 0.1f);
+						ImGui::DragFloat3("Left Leg 2 Pos", reinterpret_cast<float*>(&tran.modelediter.legLeft2.pos), 0.1f);
+						ImGui::DragFloat3("Left Leg 2 Size", reinterpret_cast<float*>(&tran.modelediter.legLeft2.size), 0.1f);
+						ImGui::DragFloat3("Left Leg 2 Rotate", reinterpret_cast<float*>(&tran.modelediter.legLeft2.rotate), 0.1f);
+						TreePop();
+					}
+					TreePop();
+					PopID();
+				}
+
 				ImGui::SeparatorText("Body");
-				ImGui::DragFloat3("Body Angle", reinterpret_cast<float*>(&tran.modelediter.body.subAngle), 0.1f);
-				ImGui::DragFloat3("Body Pos", reinterpret_cast<float*>(&tran.modelediter.body.pos),0.1f);
-				ImGui::DragFloat3("Body Size", reinterpret_cast<float*>(&tran.modelediter.body.size),0.1f);
-				ImGui::DragFloat3("Body Rotate", reinterpret_cast<float*>(&tran.modelediter.body.rotate),0.1f);
-				ImGui::SeparatorText("Leg");
-				ImGui::DragFloat3("Leg Angle", reinterpret_cast<float*>(&tran.modelediter.leg.subAngle), 0.1f);
-				ImGui::DragFloat3("Leg Pos", reinterpret_cast<float*>(&tran.modelediter.leg.pos),0.1f);
-				ImGui::DragFloat3("Leg Size", reinterpret_cast<float*>(&tran.modelediter.leg.size),0.1f);
-				ImGui::DragFloat3("Leg Rotate", reinterpret_cast<float*>(&tran.modelediter.leg.rotate),0.1f);
+				ImGui::DragFloat3("Body Pos", reinterpret_cast<float*>(&tran.modelediter.body.pos), 0.1f);
+				ImGui::DragFloat3("Body Size", reinterpret_cast<float*>(&tran.modelediter.body.size), 0.1f);
+				ImGui::DragFloat3("Body Rotate", reinterpret_cast<float*>(&tran.modelediter.body.angle), 0.1f);
+				ImGui::DragFloat3("Body Joint Right Arm", reinterpret_cast<float*>(&tran.modelediter.body.jointRightArmPos),0.1f);
+				ImGui::DragFloat3("Body Joint Left Arm", reinterpret_cast<float*>(&tran.modelediter.body.jointLeftArmPos),0.1f);
+				ImGui::DragFloat3("Body Joint Right Leg", reinterpret_cast<float*>(&tran.modelediter.body.jointRightLegPos),0.1f);
+				ImGui::DragFloat3("Body Joint Left Leg", reinterpret_cast<float*>(&tran.modelediter.body.jointLeftLegPos),0.1f);
 
 				EndTabItem();
 			}
@@ -190,7 +252,6 @@ void Draw()
 
 				PlotLines("Plan A",PlanA,100, 0, 0, 3.4028235E38F, 3.4028235E38F, { 100,100 }, 4);
 				Separator();
-				const float PI = 3.14159265358979323846f;
 				float c4 = (2 * PI) / 3;
 
 				current = 0;
@@ -222,10 +283,10 @@ void Draw()
 			if (BeginTabItem("Change Scene"))
 			{
 				static int sceneNum = 0;
-				if (ArrowButton("è„", ImGuiDir_Up))
+				if (ArrowButton("‰∏ä", ImGuiDir_Up))
 					sceneNum++;
 				SameLine();
-				if (ArrowButton("â∫", ImGuiDir_Down))
+				if (ArrowButton("‰∏ã", ImGuiDir_Down))
 					sceneNum--;
 				if (sceneNum < 0)sceneNum = static_cast<int>(SceneManager::SceneType::SCENE_MAX) - 1;
 				sceneNum = sceneNum % static_cast<int>(SceneManager::SceneType::SCENE_MAX);
@@ -257,6 +318,7 @@ void Draw()
 				Text(sceneTxt.c_str());
 				if (Button("Accept"))
 					SceneManager::ChangeScene(changeScene);
+
 				EndTabItem();
 			}
 			if (BeginTabItem("Dice"))
@@ -369,8 +431,8 @@ void Draw()
 	}
 
 
-	// é≤ê¸ÇÃï\é¶
-	// ÉOÉäÉbÉh
+	// Ëª∏Á∑ö„ÅÆË°®Á§∫
+	// „Ç∞„É™„ÉÉ„Éâ
 	DirectX::XMFLOAT4 lineColor(0.5f, 0.5f, 0.5f, 1.0f);
 	float size = DEBUG_GRID_NUM * DEBUG_GRID_MARGIN;
 	for (int i = 1; i <= DEBUG_GRID_NUM; ++i)
@@ -390,7 +452,7 @@ void Draw()
 		pos[0].z = pos[1].z = -grid;
 		Geometory::AddLine(pos[0], pos[1], lineColor);
 	}
-	// é≤
+	// Ëª∏
 	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(size,0,0), DirectX::XMFLOAT4(1,0,0,1));
 	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,size,0), DirectX::XMFLOAT4(0,1,0,1));
 	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,0,size), DirectX::XMFLOAT4(0,0,1,1));
@@ -399,7 +461,7 @@ void Draw()
 
 	Geometory::DrawLines();
 
-	// ÉJÉÅÉâÇÃíl
+	// „Ç´„É°„É©„ÅÆÂÄ§
 	static bool camAutoSwitch = false;
 	static bool camUpDownSwitch = true;
 	static float camAutoRotate = 1.0f;
@@ -420,7 +482,7 @@ void Draw()
 		sinf(camAutoRotate) * 5.0f,
 		0.0f);
 
-	// ÉWÉIÉÅÉgÉäópÉJÉÅÉâèâä˙âª
+	// „Ç∏„Ç™„É°„Éà„É™Áî®„Ç´„É°„É©ÂàùÊúüÂåñ
 	DirectX::XMFLOAT4X4 mat[2];
 	DirectX::XMStoreFloat4x4(&mat[0], DirectX::XMMatrixTranspose(
 		DirectX::XMMatrixLookAtLH(

@@ -282,3 +282,4 @@ void Player::ClampToStage()
     m_pos.z = ClampFloat(m_pos.z, minZ, maxZ);
     m_pos.y = 0.0f;
 }
+

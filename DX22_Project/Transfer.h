@@ -74,17 +74,39 @@ private:
 		DirectX::XMFLOAT3 size;
 		DirectX::XMFLOAT3 rotate;
 	};
+	struct ModelBodyInfo
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 size;
+		DirectX::XMFLOAT3 angle;
+		DirectX::XMFLOAT3 jointRightArmPos;
+		DirectX::XMFLOAT3 jointLeftArmPos;
+		DirectX::XMFLOAT3 jointRightLegPos;
+		DirectX::XMFLOAT3 jointLeftLegPos;
+	};
 	struct ModelEditer
 	{
-		ModelInfo arm;
-		ModelInfo body;
-		ModelInfo leg;
+		ModelInfo armRight1;
+		ModelInfo armRight2;
+		ModelInfo armLeft1;
+		ModelInfo armLeft2;
+		ModelInfo legRight1;
+		ModelInfo legRight2;
+		ModelInfo legLeft1;
+		ModelInfo legLeft2;
+		ModelBodyInfo body;
 	};
 	struct Tyabudai
 	{
 		DirectX::XMFLOAT3 pos;
 		DirectX::XMFLOAT3 size;
 		DirectX::XMFLOAT3 rotate;
+	};
+	struct Arrow
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 rotate;
+		DirectX::XMFLOAT3 scale;
 	};
 public:
 	static Transfer& GetInstance()
@@ -104,4 +126,5 @@ public:
 	Tyabudai tyabu;
 	Tyabudai tyawan;
 	ModelEditer modelediter;
+	Arrow arrow;
 };

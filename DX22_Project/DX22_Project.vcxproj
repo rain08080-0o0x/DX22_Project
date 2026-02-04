@@ -166,7 +166,6 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MeshBuffer.cpp" />
     <ClCompile Include="Model.cpp" />
-    <ClCompile Include="ModelAnimeEditer.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="PolylineEffect.cpp" />
     <ClCompile Include="Scene.cpp" />
@@ -220,7 +219,6 @@
     <ClInclude Include="Main.h" />
     <ClInclude Include="MeshBuffer.h" />
     <ClInclude Include="Model.h" />
-    <ClInclude Include="ModelAnimeEditer.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="PolylineEffect.h" />
     <ClInclude Include="Scene.h" />

@@ -377,7 +377,7 @@ void InitImGui(HWND hWnd)
 
 	ImGui_ImplWin32_Init(hWnd);
 	ImGui_ImplDX11_Init(g_pDevice, g_pContext);
-	float fontSize = 24.0f;
+	float fontSize = 18.0f;
 	ImFont* font = io.Fonts->AddFontFromFileTTF("Assets/Fonts/meiryob.ttc", fontSize, NULL, io.Fonts->GetGlyphRangesJapanese());
 
 	g_ImGuiInitialized = true;

@@ -25,6 +25,7 @@ private:
     void ApplyMovement(float dt);
     void ClampToStage();
 
+
 private:
     Camera* m_pCamera;
     Texture* m_pTexture;
