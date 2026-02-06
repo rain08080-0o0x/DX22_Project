@@ -207,23 +207,49 @@ void Draw()
 				EndTabItem();
 			}
 			if (BeginTabItem("Camera"))
-			{
+            {
 
-				static float min = 20.0f;
-				static float max = 80.0f;
+                static float min = 20.0f;
+                static float max = 80.0f;
 
-				DragFloatRange2("Kari", &min, &max, 0.1f, 0.0f, 100.0f);
+                DragFloatRange2("Kari", &min, &max, 0.1f, 0.0f, 100.0f);
 
-				float eye[3] = { tran.camera.eye.x,tran.camera.eye.y,tran.camera.eye.z };
-				float look[3] = { tran.camera.look.x,tran.camera.look.y,tran.camera.look.z };
-				DragFloat3("Camera Eye Position", eye);
-				DragFloat3("Camera Look Position", look);
+                const char* cameraModes[] = { "Game", "Debug" };
+                int mode = tran.cameraMode;
+                if (Combo("Camera Mode", &mode, cameraModes, IM_ARRAYSIZE(cameraModes)))
+                {
+                    tran.cameraMode = mode;
+                }
 
-				tran.camera.eye = { eye[0],eye[1],eye[2] };
-				tran.camera.look = { look[0],look[1],look[2] };
+                const char* activeLabel = (tran.cameraMode == 1) ? "Debug" : "Game";
+                Text("Active: %s", activeLabel);
 
-				EndTabItem();
-			}
+                SeparatorText("Game Camera");
+                float gameEye[3] = { tran.cameraGame.eye.x, tran.cameraGame.eye.y, tran.cameraGame.eye.z };
+                float gameLook[3] = { tran.cameraGame.look.x, tran.cameraGame.look.y, tran.cameraGame.look.z };
+                if (DragFloat3("Game Eye", gameEye, 0.05f))
+                {
+                    tran.cameraGame.eye = { gameEye[0], gameEye[1], gameEye[2] };
+                }
+                if (DragFloat3("Game Look", gameLook, 0.05f))
+                {
+                    tran.cameraGame.look = { gameLook[0], gameLook[1], gameLook[2] };
+                }
+
+                SeparatorText("Debug Camera");
+                float debugEye[3] = { tran.cameraDebug.eye.x, tran.cameraDebug.eye.y, tran.cameraDebug.eye.z };
+                float debugLook[3] = { tran.cameraDebug.look.x, tran.cameraDebug.look.y, tran.cameraDebug.look.z };
+                if (DragFloat3("Debug Eye", debugEye, 0.05f))
+                {
+                    tran.cameraDebug.eye = { debugEye[0], debugEye[1], debugEye[2] };
+                }
+                if (DragFloat3("Debug Look", debugLook, 0.05f))
+                {
+                    tran.cameraDebug.look = { debugLook[0], debugLook[1], debugLook[2] };
+                }
+
+                EndTabItem();
+            }
 			if (BeginTabItem("Graph"))
 			{
 				static float easing = 1;
@@ -503,3 +529,4 @@ void Draw()
 }
 
 // EOF
+

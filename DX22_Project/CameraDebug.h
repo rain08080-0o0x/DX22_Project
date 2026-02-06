@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Camera.h" 
 #include "Input.h" 
 
@@ -13,8 +13,11 @@ public:
 	void SetLook(DirectX::XMFLOAT3 set)final;
 	void SetPos(DirectX::XMFLOAT3 set)final;
 
+	void SetPose(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& look);
+
 	void LockPos(bool set)final;
 private:
+	void SyncOrbitFromPose();
 	float m_radXZ;
 	float m_radY;
 	float m_radius;

@@ -1,4 +1,4 @@
-#include "SceneGame.h"
+﻿#include "SceneGame.h"
 #include "Enemy.h"
 #include "CameraDebug.h"
 #include "Geometory.h"
@@ -26,6 +26,23 @@ namespace
     const float kEnemyHpBillboardOffsetScale = 0.7f;
     const float kEnemyHpBillboardMinWidth = 0.6f;
     const float kEnemyHpBillboardMinHeight = 0.1f;
+
+    const int kCameraModeGame = 0;
+    const int kCameraModeDebug = 1;
+
+    int NormalizeCameraMode(int mode)
+    {
+        return (mode == kCameraModeDebug) ? kCameraModeDebug : kCameraModeGame;
+    }
+
+    void ApplyCameraPose(CameraDebug* camera, const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& look)
+    {
+        if (camera)
+        {
+            camera->SetPose(eye, look);
+        }
+    }
+
 
     float Clamp01(float v)
     {
@@ -62,6 +79,109 @@ namespace
         Geometory::AddLine(v[5], v[7], color);
         Geometory::AddLine(v[7], v[6], color);
         Geometory::AddLine(v[6], v[4], color);
+
+        Geometory::AddLine(v[0], v[4], color);
+        Geometory::AddLine(v[1], v[5], color);
+        Geometory::AddLine(v[2], v[6], color);
+        Geometory::AddLine(v[3], v[7], color);
+    }
+
+    void AddCameraFrustumLines(const Camera& camera, const DirectX::XMFLOAT4& color)
+    {
+        using namespace DirectX;
+
+        const float nearZ = camera.GetNear();
+        const float farZ = camera.GetFar();
+        if (nearZ <= 0.0f || farZ <= 0.0f || farZ <= nearZ)
+        {
+            return;
+        }
+
+        const float fovy = camera.GetFovy();
+        const float aspect = camera.GetAspect();
+
+        XMFLOAT3 pos = camera.GetPos();
+        XMFLOAT3 look = camera.GetLook();
+        XMFLOAT3 up = camera.GetUp();
+
+        XMVECTOR vPos = XMLoadFloat3(&pos);
+        XMVECTOR vLook = XMLoadFloat3(&look);
+        XMVECTOR vUp = XMLoadFloat3(&up);
+
+        XMVECTOR forward = vLook - vPos;
+        if (XMVectorGetX(XMVector3LengthSq(forward)) < 1.0e-6f)
+        {
+            forward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+        }
+        else
+        {
+            forward = XMVector3Normalize(forward);
+        }
+
+        if (XMVectorGetX(XMVector3LengthSq(vUp)) < 1.0e-6f)
+        {
+            vUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+        }
+        else
+        {
+            vUp = XMVector3Normalize(vUp);
+        }
+
+        XMVECTOR right = XMVector3Cross(vUp, forward);
+        if (XMVectorGetX(XMVector3LengthSq(right)) < 1.0e-6f)
+        {
+            right = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+        }
+        else
+        {
+            right = XMVector3Normalize(right);
+        }
+
+        vUp = XMVector3Normalize(XMVector3Cross(forward, right));
+
+        const float tanHalfFovy = tanf(fovy * 0.5f);
+        const float nearH = tanHalfFovy * nearZ;
+        const float nearW = nearH * aspect;
+        const float farH = tanHalfFovy * farZ;
+        const float farW = farH * aspect;
+
+        XMVECTOR nearCenter = vPos + forward * nearZ;
+        XMVECTOR farCenter = vPos + forward * farZ;
+
+        XMVECTOR upNear = vUp * nearH;
+        XMVECTOR rightNear = right * nearW;
+        XMVECTOR upFar = vUp * farH;
+        XMVECTOR rightFar = right * farW;
+
+        XMVECTOR ntl = nearCenter + upNear - rightNear;
+        XMVECTOR ntr = nearCenter + upNear + rightNear;
+        XMVECTOR nbl = nearCenter - upNear - rightNear;
+        XMVECTOR nbr = nearCenter - upNear + rightNear;
+
+        XMVECTOR ftl = farCenter + upFar - rightFar;
+        XMVECTOR ftr = farCenter + upFar + rightFar;
+        XMVECTOR fbl = farCenter - upFar - rightFar;
+        XMVECTOR fbr = farCenter - upFar + rightFar;
+
+        XMFLOAT3 v[8];
+        XMStoreFloat3(&v[0], ntl);
+        XMStoreFloat3(&v[1], ntr);
+        XMStoreFloat3(&v[2], nbr);
+        XMStoreFloat3(&v[3], nbl);
+        XMStoreFloat3(&v[4], ftl);
+        XMStoreFloat3(&v[5], ftr);
+        XMStoreFloat3(&v[6], fbr);
+        XMStoreFloat3(&v[7], fbl);
+
+        Geometory::AddLine(v[0], v[1], color);
+        Geometory::AddLine(v[1], v[2], color);
+        Geometory::AddLine(v[2], v[3], color);
+        Geometory::AddLine(v[3], v[0], color);
+
+        Geometory::AddLine(v[4], v[5], color);
+        Geometory::AddLine(v[5], v[6], color);
+        Geometory::AddLine(v[6], v[7], color);
+        Geometory::AddLine(v[7], v[4], color);
 
         Geometory::AddLine(v[0], v[4], color);
         Geometory::AddLine(v[1], v[5], color);
@@ -116,6 +236,9 @@ namespace
 
 SceneGame::SceneGame()
     : m_pCamera(nullptr)
+    , m_pCameraGame(nullptr)
+    , m_pCameraDebug(nullptr)
+    , m_cameraMode(0)
     , m_pPlayer(nullptr)
     , m_pEnemy(nullptr)
     , m_enemyWasOverlapping(false)
@@ -134,16 +257,24 @@ SceneGame::SceneGame()
     , m_attackCenter(0.0f, 0.0f, 0.0f)
     , m_attackSize(0.0f, 0.0f, 0.0f)
 {
-    m_pCamera = new CameraDebug();
-    if (m_pCamera)
+    m_pCameraGame = new CameraDebug();
+    m_pCameraDebug = new CameraDebug();
+    TRAN_INS;
+    tran.cameraMode = NormalizeCameraMode(tran.cameraMode);
+    m_cameraMode = tran.cameraMode;
+    if (m_pCameraGame)
     {
-        m_pCamera->LockPos(false);
-        TRAN_INS;
-        tran.camera.eye = { 0.0f, 6.0f, -6.0f };
-        tran.camera.look = { 0.0f, 0.0f, 0.0f };
-        m_pCamera->SetPos(tran.camera.eye);
-        m_pCamera->SetLook(tran.camera.look);
+        m_pCameraGame->LockPos(false);
+        ApplyCameraPose(m_pCameraGame, tran.cameraGame.eye, tran.cameraGame.look);
     }
+    if (m_pCameraDebug)
+    {
+        m_pCameraDebug->LockPos(false);
+        ApplyCameraPose(m_pCameraDebug, tran.cameraDebug.eye, tran.cameraDebug.look);
+    }
+    m_pCamera = (m_cameraMode == kCameraModeDebug) ? static_cast<Camera*>(m_pCameraDebug)
+        : static_cast<Camera*>(m_pCameraGame);
+    tran.camera = (m_cameraMode == kCameraModeDebug) ? tran.cameraDebug : tran.cameraGame;
 
     m_pPlayer = new Player(m_pCamera);
     {
@@ -251,11 +382,17 @@ SceneGame::~SceneGame()
         delete m_pPlayer;
         m_pPlayer = nullptr;
     }
-    if (m_pCamera)
+    if (m_pCameraGame)
     {
-        delete m_pCamera;
-        m_pCamera = nullptr;
+        delete m_pCameraGame;
+        m_pCameraGame = nullptr;
     }
+    if (m_pCameraDebug)
+    {
+        delete m_pCameraDebug;
+        m_pCameraDebug = nullptr;
+    }
+    m_pCamera = nullptr;
     if (m_pGoal)
     {
         delete m_pGoal;
@@ -265,8 +402,40 @@ SceneGame::~SceneGame()
 
 void SceneGame::Update()
 {
+    TRAN_INS;
+    const int nextMode = NormalizeCameraMode(tran.cameraMode);
+    if (nextMode != m_cameraMode)
+    {
+        m_cameraMode = nextMode;
+        m_pCamera = (m_cameraMode == kCameraModeDebug) ? static_cast<Camera*>(m_pCameraDebug)
+            : static_cast<Camera*>(m_pCameraGame);
+        if (m_pPlayer) m_pPlayer->SetCamera(m_pCamera);
+        if (m_pEnemy) m_pEnemy->SetCamera(m_pCamera);
+        if (m_pGoal) m_pGoal->SetCamera(m_pCamera);
+    }
+
+    if (m_cameraMode == kCameraModeDebug)
+    {
+        tran.camera = tran.cameraDebug;
+        ApplyCameraPose(m_pCameraDebug, tran.cameraDebug.eye, tran.cameraDebug.look);
+    }
+    else
+    {
+        tran.camera = tran.cameraGame;
+        ApplyCameraPose(m_pCameraGame, tran.cameraGame.eye, tran.cameraGame.look);
+    }
+
     if (m_pCamera) m_pCamera->Update();
-    if (m_pPlayer) m_pPlayer->Update();
+
+    if (m_cameraMode == kCameraModeDebug)
+    {
+        tran.cameraDebug = tran.camera;
+    }
+    else
+    {
+        tran.cameraGame = tran.camera;
+    }
+if (m_pPlayer) m_pPlayer->Update();
     if (m_pEnemy) m_pEnemy->Update();
     if (m_pEnemy&&m_pPlayer)m_pEnemy->SetTargetPos(m_pPlayer->GetPos());
     if (m_pEnemy)
@@ -493,6 +662,18 @@ void SceneGame::Draw()
             tran.player.pos.y + tran.player.size.y * 0.5f,
             tran.player.pos.z
         };
+        if (m_cameraMode == kCameraModeDebug)
+        {
+            if (m_pCameraGame)
+            {
+                AddCameraFrustumLines(*m_pCameraGame, { 1.0f, 1.0f, 0.0f, 1.0f });
+            }
+        }
+        else if (m_pCamera)
+        {
+            AddCameraFrustumLines(*m_pCamera, { 1.0f, 1.0f, 0.0f, 1.0f });
+        }
+
         AddAabbLines(playerBox, { 0.0f, 1.0f, 0.0f, 1.0f });
 
         if (m_pEnemy)
@@ -636,3 +817,10 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
         Sprite::Draw();
     }
 }
+
+
+
+
+
+
+

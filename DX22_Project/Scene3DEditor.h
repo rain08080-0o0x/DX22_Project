@@ -1,7 +1,9 @@
-#pragma once
+ï»¿#pragma once
 #include "Scene.h"
 #include <DirectXMath.h>
 #include "Camera.h"
+
+class CameraDebug;
 
 class Scene3DEditor :
     public Scene
@@ -16,21 +18,21 @@ public:
 public:
     struct Transform
     {
-        DirectX::XMFLOAT3 pos;      // ’†SÀ•W
-        DirectX::XMFLOAT3 rotate;   // ‰ñ“]Šp
-        DirectX::XMFLOAT3 scale;    // ƒTƒCƒY
-        DirectX::XMFLOAT3 gpos;     // ƒOƒ[ƒoƒ‹À•W
-        DirectX::XMFLOAT3 opos;     // ƒIƒuƒWƒFƒNƒgÀ•W
+        DirectX::XMFLOAT3 pos;      // ä¸­å¿ƒåº§æ¨™
+        DirectX::XMFLOAT3 rotate;   // å›è»¢è§’
+        DirectX::XMFLOAT3 scale;    // ã‚µã‚¤ã‚º
+        DirectX::XMFLOAT3 gpos;     // ã‚°ãƒ­ãƒ¼ãƒãƒ«åº§æ¨™
+        DirectX::XMFLOAT3 opos;     // ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆåº§æ¨™
     };
     struct BodyTransform
     {
-        DirectX::XMFLOAT3 pos;              // ’†SÀ•W
-        DirectX::XMFLOAT3 rotate;           // ‰ñ“]Šp
-        DirectX::XMFLOAT3 scale;            // ƒTƒCƒY
-        DirectX::XMFLOAT3 jointRightArmPos; // ‰E˜rÚ‡•”À•W
-        DirectX::XMFLOAT3 jointLeftArmPos;  // ¶˜rÚ‡•”À•W
-        DirectX::XMFLOAT3 jointRightLegPos; // ‰E‹rÚ‡•”À•W
-        DirectX::XMFLOAT3 jointLeftLegPos;  // ¶‹rÚ‡•”À•W
+        DirectX::XMFLOAT3 pos;              // ä¸­å¿ƒåº§æ¨™
+        DirectX::XMFLOAT3 rotate;           // å›è»¢è§’
+        DirectX::XMFLOAT3 scale;            // ã‚µã‚¤ã‚º
+        DirectX::XMFLOAT3 jointRightArmPos; // å³è…•æ¥åˆéƒ¨åº§æ¨™
+        DirectX::XMFLOAT3 jointLeftArmPos;  // å·¦è…•æ¥åˆéƒ¨åº§æ¨™
+        DirectX::XMFLOAT3 jointRightLegPos; // å³è„šæ¥åˆéƒ¨åº§æ¨™
+        DirectX::XMFLOAT3 jointLeftLegPos;  // å·¦è„šæ¥åˆéƒ¨åº§æ¨™
     };
 private:
     void RightArm(DirectX::XMFLOAT3 jointPos);
@@ -54,5 +56,9 @@ private:
     BodyTransform m_body;
 
     Camera* m_pCamera;
+    CameraDebug* m_pCameraGame;
+    CameraDebug* m_pCameraDebug;
+    int m_cameraMode;
 };
+
 

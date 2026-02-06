@@ -1,4 +1,4 @@
-#include "Player.h"
+ï»¿#include "Player.h"
 #include "Input.h"
 #include "Transfer.h"
 #include <cmath>
@@ -103,32 +103,32 @@ void Player::Draw()
     if (!m_pTexture) return;
 
     using namespace DirectX;
-    // ---- ƒrƒ‹ƒ{[ƒhs—ñŒvŽZ ----
+    // ---- ãƒ“ãƒ«ãƒœãƒ¼ãƒ‰è¡Œåˆ—è¨ˆç®— ----
     XMMATRIX billboard = XMMatrixIdentity();
 
     if (m_pCamera)
     {
-        // “]’u‚µ‚Ä‚¢‚È‚¢ƒJƒƒ‰‚Ì View s—ñ‚ðŽæ“¾
+        // è»¢ç½®ã—ã¦ã„ãªã„ã‚«ãƒ¡ãƒ©ã® View è¡Œåˆ—ã‚’å–å¾—
         XMFLOAT4X4 viewFloat;
         //XMStoreFloat4x4(&viewFloat, m_pCamera->GetViewMatrix());
         viewFloat = m_pCamera->GetViewMatrix(false);
 
-        // “Ç‚ÝŽæ‚è—p ¨ ŒvŽZ—p
+        // èª­ã¿å–ã‚Šç”¨ â†’ è¨ˆç®—ç”¨
         XMMATRIX viewMat = XMLoadFloat4x4(&viewFloat);
 
-        // ‹ts—ñi‰ñ“] + ˆÚ“®‚ð‘Å‚¿Á‚·j
+        // é€†è¡Œåˆ—ï¼ˆå›žè»¢ + ç§»å‹•ã‚’æ‰“ã¡æ¶ˆã™ï¼‰
         XMMATRIX invView = XMMatrixInverse(nullptr, viewMat);
 
-        // ŒvŽZ—p ¨ “Ç‚ÝŽæ‚è—p
+        // è¨ˆç®—ç”¨ â†’ èª­ã¿å–ã‚Šç”¨
         XMFLOAT4X4 invViewFloat;
         XMStoreFloat4x4(&invViewFloat, invView);
 
-        // ˆÚ“®¬•ª‚ðíœi‰ñ“]‚Ì‚ÝŽc‚·j
+        // ç§»å‹•æˆåˆ†ã‚’å‰Šé™¤ï¼ˆå›žè»¢ã®ã¿æ®‹ã™ï¼‰
         invViewFloat._41 = 0.0f;
         invViewFloat._42 = 0.0f;
         invViewFloat._43 = 0.0f;
 
-        // “Ç‚ÝŽæ‚è—p ¨ ŒvŽZ—p
+        // èª­ã¿å–ã‚Šç”¨ â†’ è¨ˆç®—ç”¨
         billboard = XMLoadFloat4x4(&invViewFloat);
     }
 
@@ -156,12 +156,16 @@ void Player::Draw()
     {
         m_pTrail->SetView(m_pCamera->GetViewMatrix());
         m_pTrail->SetProjection(m_pCamera->GetProjectionMatrix());
-        // ƒeƒNƒXƒ`ƒƒ‚ÌÝ’è(Ý’è‚È‚µ)
+        // ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®è¨­å®š(è¨­å®šãªã—)
         //m_pTrail->SetTexture(m_pTrailEffectTexture);
         m_pTrail->Draw();
     }
 }
 
+void Player::SetCamera(Camera* set)
+{
+    m_pCamera = set;
+}
 void Player::SyncFromTransfer()
 {
     TRAN_INS;
@@ -282,4 +286,5 @@ void Player::ClampToStage()
     m_pos.z = ClampFloat(m_pos.z, minZ, maxZ);
     m_pos.y = 0.0f;
 }
+
 

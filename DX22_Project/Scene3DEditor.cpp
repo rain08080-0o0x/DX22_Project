@@ -1,4 +1,4 @@
-#include "Scene3DEditor.h"
+ï»¿#include "Scene3DEditor.h"
 #include "Geometory.h"
 #include "Transfer.h"
 #include "CameraDebug.h"
@@ -10,10 +10,10 @@
 #define SAFE_UPDATE(p) if(p){p->Update();}
 
 /// <summary>
-/// g—p‚·‚é”’l‚ÍkÚE‰ñ“]EˆÊ’u‚Ì‚İ
+/// ä½¿ç”¨ã™ã‚‹æ•°å€¤ã¯ç¸®å°ºãƒ»å›è»¢ãƒ»ä½ç½®ã®ã¿
 /// </summary>
-/// <param name="set">Transform‚ğ‘ã“ü</param>
-/// <returns>XMFLOAT4X4‚ª’l‚Æ‚µ‚Ä•Ô‹p</returns>
+/// <param name="set">Transformã‚’ä»£å…¥</param>
+/// <returns>XMFLOAT4X4ãŒå€¤ã¨ã—ã¦è¿”å´</returns>
 static DirectX::XMFLOAT4X4 TransformToFloat4x4(Scene3DEditor::Transform set)
 {
     using namespace DirectX;
@@ -41,6 +41,24 @@ static DirectX::XMFLOAT3 AdditionFloat3(DirectX::XMFLOAT3 A, DirectX::XMFLOAT3 B
     return result;
 }
 
+namespace
+{
+    const int kCameraModeGame = 0;
+    const int kCameraModeDebug = 1;
+
+    int NormalizeCameraMode(int mode)
+    {
+        return (mode == kCameraModeDebug) ? kCameraModeDebug : kCameraModeGame;
+    }
+
+    void ApplyCameraPose(CameraDebug* camera, const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& look)
+    {
+        if (camera)
+        {
+            camera->SetPose(eye, look);
+        }
+    }
+}
 void Scene3DEditor::RightArm(DirectX::XMFLOAT3 jointPos)
 {
     m_armRight1.pos.x = cosf(-m_armRight1.rotate.y) * HALF(m_armRight1.scale.x) + jointPos.x;
@@ -107,6 +125,10 @@ void Scene3DEditor::BodyTransformUpdate()
 }
 
 Scene3DEditor::Scene3DEditor()
+    : m_pCamera(nullptr)
+    , m_pCameraGame(nullptr)
+    , m_pCameraDebug(nullptr)
+    , m_cameraMode(0)
 {
     TRAN_INS;
     {
@@ -168,27 +190,66 @@ Scene3DEditor::Scene3DEditor()
     m_body.jointLeftLegPos = {-0.8f,0,-2.7f};
     SyncToTransfer();
     }
-    m_pCamera = new CameraDebug();
-    if (m_pCamera)
+    m_pCameraGame = new CameraDebug();
+    m_pCameraDebug = new CameraDebug();
+    tran.cameraMode = NormalizeCameraMode(tran.cameraMode);
+    m_cameraMode = tran.cameraMode;
+    if (m_pCameraGame)
     {
-        m_pCamera->LockPos(false);
-        tran.camera.eye = { 0.0f, 6.0f, -6.0f };
-        tran.camera.look = { 0.0f, 0.0f, 0.0f };
-        m_pCamera->SetPos(tran.camera.eye);
-        m_pCamera->SetLook(tran.camera.look);
+        m_pCameraGame->LockPos(false);
+        ApplyCameraPose(m_pCameraGame, tran.cameraGame.eye, tran.cameraGame.look);
     }
+    if (m_pCameraDebug)
+    {
+        m_pCameraDebug->LockPos(false);
+        ApplyCameraPose(m_pCameraDebug, tran.cameraDebug.eye, tran.cameraDebug.look);
+    }
+    m_pCamera = (m_cameraMode == kCameraModeDebug) ? static_cast<Camera*>(m_pCameraDebug)
+        : static_cast<Camera*>(m_pCameraGame);
+    tran.camera = (m_cameraMode == kCameraModeDebug) ? tran.cameraDebug : tran.cameraGame;
 }
 
 Scene3DEditor::~Scene3DEditor()
 {
-    SAFE_DELETE(m_pCamera);
+    SAFE_DELETE(m_pCameraGame);
+    SAFE_DELETE(m_pCameraDebug);
+    m_pCamera = nullptr;
 }
 
 void Scene3DEditor::Update()
 {
     SyncFromTransfer();
 
+    TRAN_INS;
+    const int nextMode = NormalizeCameraMode(tran.cameraMode);
+    if (nextMode != m_cameraMode)
+    {
+        m_cameraMode = nextMode;
+        m_pCamera = (m_cameraMode == kCameraModeDebug) ? static_cast<Camera*>(m_pCameraDebug)
+            : static_cast<Camera*>(m_pCameraGame);
+    }
+
+    if (m_cameraMode == kCameraModeDebug)
+    {
+        tran.camera = tran.cameraDebug;
+        ApplyCameraPose(m_pCameraDebug, tran.cameraDebug.eye, tran.cameraDebug.look);
+    }
+    else
+    {
+        tran.camera = tran.cameraGame;
+        ApplyCameraPose(m_pCameraGame, tran.cameraGame.eye, tran.cameraGame.look);
+    }
+
     SAFE_UPDATE(m_pCamera);
+
+    if (m_cameraMode == kCameraModeDebug)
+    {
+        tran.cameraDebug = tran.camera;
+    }
+    else
+    {
+        tran.cameraGame = tran.camera;
+    }
 
     BodyTransformUpdate();
 
@@ -327,3 +388,11 @@ void Scene3DEditor::SyncFromTransfer()
     m_body.jointRightLegPos = tran.modelediter.body.jointRightLegPos;
     m_body.jointLeftLegPos = tran.modelediter.body.jointLeftLegPos;
 }
+
+
+
+
+
+
+
+

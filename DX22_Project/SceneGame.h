@@ -1,4 +1,4 @@
-#ifndef __SCENE_GAME_H__
+﻿#ifndef __SCENE_GAME_H__
 #define __SCENE_GAME_H__
 
 #include "Scene.h"
@@ -10,6 +10,7 @@
 class UIObject;
 class Enemy;
 class Texture;
+class CameraDebug;
 
 class SceneGame : public Scene
 {
@@ -26,6 +27,9 @@ private:
                                    float rate);
 
     Camera* m_pCamera;
+    CameraDebug* m_pCameraGame;
+    CameraDebug* m_pCameraDebug;
+    int m_cameraMode;
     Player* m_pPlayer;
     Enemy* m_pEnemy;
     bool m_enemyWasOverlapping;
@@ -48,3 +52,4 @@ private:
 };
 
 #endif // __SCENE_GAME_H__
+

@@ -1,6 +1,6 @@
-#include "CameraDebug.h"
+ï»¿#include "CameraDebug.h"
 #include "Transfer.h"
-
+#include <cmath>
 const float CameraSpeed = 0.1f;
 const float CameraDebugRotate = 0.1f;
 const float CameraDefaultDistance = -2.0f;
@@ -33,28 +33,28 @@ void CameraDebug::Update()
     if (!isLock)
     {
         using namespace DirectX;
-        // æ¶‚Ì‚â‚Â
-        //--- ’‹“_‚ÌˆÚ“®
-        // ª(+z)‚ÉˆÚ“® 
+        // å…ˆç”Ÿã®ã‚„ã¤
+        //--- æ³¨è¦–ç‚¹ã®ç§»å‹•
+        // â†‘(+z)ã«ç§»å‹• 
         XMVECTOR pos = XMLoadFloat3(&m_pos);
         XMVECTOR look = XMLoadFloat3(&m_look);
 
-        // Œü‚¢‚Ä‚¢‚é•ûŒüilook - posj
+        // å‘ã„ã¦ã„ã‚‹æ–¹å‘ï¼ˆlook - posï¼‰
         XMVECTOR forward = look - pos;
 
-        // ’n–ÊˆÚ“®‚É‚µ‚½‚¢‚È‚çY¬•ª‚ğ’×‚·iXZ•½–Êj
+        // åœ°é¢ç§»å‹•ã«ã—ãŸã„ãªã‚‰Yæˆåˆ†ã‚’æ½°ã™ï¼ˆXZå¹³é¢ï¼‰
         forward = XMVectorSetY(forward, 0.0f);
 
-        // ‚Ù‚Úƒ[ƒ’·‚³‘Îô
+        // ã»ã¼ã‚¼ãƒ­é•·ã•å¯¾ç­–
         if (XMVectorGetX(XMVector3LengthSq(forward)) < 1e-8f)
             return;
 
         forward = XMVector3Normalize(forward);
 
-        // ƒ[ƒ‹ƒhã•ûŒü
+        // ãƒ¯ãƒ¼ãƒ«ãƒ‰ä¸Šæ–¹å‘
         const XMVECTOR up = XMVectorSet(0, 1, 0, 0);
 
-        // ‰E•ûŒüi¶‰E‚ª‹t‚È‚ç cross ‚Ì‡˜‚ğ•Ï‚¦‚éj
+        // å³æ–¹å‘ï¼ˆå·¦å³ãŒé€†ãªã‚‰ cross ã®é †åºã‚’å¤‰ãˆã‚‹ï¼‰
         XMVECTOR right = XMVector3Normalize(XMVector3Cross(up, forward));
 
         XMVECTOR delta = XMVectorZero();
@@ -64,33 +64,33 @@ void CameraDebug::Update()
         if (IsKeyPress(VK_RIGHT)) delta += right * CameraSpeed;
         if (IsKeyPress(VK_LEFT))  delta -= right * CameraSpeed;
 
-         //ã‰ºˆÚ“®iƒ[ƒ‹ƒhYj
+         //ä¸Šä¸‹ç§»å‹•ï¼ˆãƒ¯ãƒ¼ãƒ«ãƒ‰Yï¼‰
         if (IsKeyPress(VK_LSHIFT))   delta += up * CameraSpeed;
         if (IsKeyPress(VK_LCONTROL)) delta -= up * CameraSpeed;
 
-        // ‹ü‚ğˆÛ‚µ‚½‚Ü‚Ü•½sˆÚ“®Fpos ‚Æ look ‚ğ“¯‚¶‚¾‚¯“®‚©‚·
+        // è¦–ç·šã‚’ç¶­æŒã—ãŸã¾ã¾å¹³è¡Œç§»å‹•ï¼špos ã¨ look ã‚’åŒã˜ã ã‘å‹•ã‹ã™
         pos += delta;
         look += delta;
 
-        // m_pos‚É‚Â‚¢‚Ä‚ÍŒã‚ÅlookŠî€‚É“®‚©‚·‚Ì‚ÅÁ‚·
+        // m_posã«ã¤ã„ã¦ã¯å¾Œã§lookåŸºæº–ã«å‹•ã‹ã™ã®ã§æ¶ˆã™
         //XMStoreFloat3(&m_pos, pos);
         XMStoreFloat3(&m_look, look);
-        //--- ƒJƒƒ‰ˆÊ’u‚ÌˆÚ“® 
-        // ‰ñ‚è‚İ
+        //--- ã‚«ãƒ¡ãƒ©ä½ç½®ã®ç§»å‹• 
+        // å›ã‚Šè¾¼ã¿
         if (IsKeyPress('J')) { m_radXZ += CameraDebugRotate; }
         if (IsKeyPress('L')) { m_radXZ -= CameraDebugRotate; }
         if (IsKeyPress('I')) { m_radY -= CameraDebugRotate; }
         if (IsKeyPress('K')) { m_radY += CameraDebugRotate; }
 
-        // --- ƒJƒƒ‰‚Ì‹——£
+        // --- ã‚«ãƒ¡ãƒ©ã®è·é›¢
         if (IsKeyPress('E')) { m_radius += CameraSpeed; }
         if (IsKeyPress('Q')) { m_radius -= CameraSpeed; }
 
-        // ƒJƒƒ‰‚ÌˆÊ’u‚ÌŒvZ
+        // ã‚«ãƒ¡ãƒ©ã®ä½ç½®ã®è¨ˆç®—
         m_pos.x = m_look.x + m_radius * cosf(m_radY) * sinf(m_radXZ);
         m_pos.y = m_look.y + m_radius * sinf(m_radY);
         m_pos.z = m_look.z + m_radius * cosf(m_radY) * cosf(m_radXZ);
-        // Transfer‚ÌXV
+        // Transferã®æ›´æ–°
         tran.camera.eye = m_pos;
         tran.camera.look = m_look;
     }
@@ -106,16 +106,53 @@ void CameraDebug::Update()
 
 void CameraDebug::SetLook(DirectX::XMFLOAT3 set)
 {
-	m_look = set;
+    m_look = set;
+    SyncOrbitFromPose();
+    TRAN_INS;
+    tran.camera.look = m_look;
 }
 
 void CameraDebug::SetPos(DirectX::XMFLOAT3 pos)
 {
     m_pos = pos;
-    Transfer::GetInstance().camera.eye = m_pos;
+    SyncOrbitFromPose();
+    TRAN_INS;
+    tran.camera.eye = m_pos;
 }
 
 void CameraDebug::LockPos(bool set)
 {
     isLock = set;
 }
+
+void CameraDebug::SetPose(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& look)
+{
+    m_pos = eye;
+    m_look = look;
+    SyncOrbitFromPose();
+    TRAN_INS;
+    tran.camera.eye = m_pos;
+    tran.camera.look = m_look;
+}
+
+void CameraDebug::SyncOrbitFromPose()
+{
+    const float dx = m_pos.x - m_look.x;
+    const float dy = m_pos.y - m_look.y;
+    const float dz = m_pos.z - m_look.z;
+    const float distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq < 1.0e-6f)
+    {
+        m_radius = 0.0f;
+        return;
+    }
+    const float dist = sqrtf(distSq);
+    m_radius = dist;
+    m_radY = asinf(dy / dist);
+    const float lenXZ = sqrtf(dx * dx + dz * dz);
+    if (lenXZ > 1.0e-6f)
+    {
+        m_radXZ = atan2f(dx, dz);
+    }
+}
+

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <DirectXMath.h>
 #include "Defines.h"
@@ -50,12 +50,12 @@ private:
 		DirectX::XMFLOAT4 color;
 		DirectX::XMFLOAT2 lcokColor;
 		const float ground = 0.0f;
-		// ‚±‚±‚©‚çtest—p		   
-		DirectX::XMFLOAT4X4 world;	// ƒ[ƒ‹ƒhÀ•WŒn
-		DirectX::XMFLOAT4X4 obj;	// ƒIƒuƒWƒFƒNƒgÀ•WŒn
-		DirectX::XMFLOAT3 virtualVelocity;	//‰¼‘z‰^“®—Ê
-		int currentFaceNumber[MAX_DICE];	// Œ»İ‚Ì•\–Êƒiƒ“ƒo[
-		float underVel = 0.0f; // ‚±‚êˆÈ‰º‚Ì‰^“®—Ê‚È‚ç’â~—p•Ï”
+		// ã“ã“ã‹ã‚‰testç”¨		   
+		DirectX::XMFLOAT4X4 world;	// ãƒ¯ãƒ¼ãƒ«ãƒ‰åº§æ¨™ç³»
+		DirectX::XMFLOAT4X4 obj;	// ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆåº§æ¨™ç³»
+		DirectX::XMFLOAT3 virtualVelocity;	//ä»®æƒ³é‹å‹•é‡
+		int currentFaceNumber[MAX_DICE];	// ç¾åœ¨ã®è¡¨é¢ãƒŠãƒ³ãƒãƒ¼
+		float underVel = 0.0f; // ã“ã‚Œä»¥ä¸‹ã®é‹å‹•é‡ãªã‚‰åœæ­¢ç”¨å¤‰æ•°
 	};
 	struct UIobj
 	{
@@ -117,7 +117,10 @@ public:
 public:
 	PlayerInfo player;
 	DiceInfo dice;
-	CameraInfo camera;
+	CameraInfo camera{ { 0.0f, 6.0f, -6.0f },{ 0.0f, 0.0f, 0.0f } };
+	CameraInfo cameraGame{ { 0.0f, 6.0f, -6.0f },{ 0.0f, 0.0f, 0.0f } };
+	CameraInfo cameraDebug{ { 0.0f, 10.0f, 0.001f },{ 0.0f, 0.0f, 0.0f } };
+	int cameraMode = 0;
 	ObjectfromAtoB obj;
 	UIInfo diceui;
 	DirectX::XMFLOAT2 mousePos;

@@ -1,41 +1,47 @@
-#pragma once
+ï»¿#pragma once
 
 
 #include <DirectXMath.h> 
 
 class Camera {
 public:
-	// ƒRƒ“ƒXƒgƒ‰ƒNƒ^ 
+	// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ 
 	Camera();
 
-	// ƒfƒXƒgƒ‰ƒNƒ^ 
+	// ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ 
 	virtual ~Camera();
 
-	// XVˆ—iŒp³æ‚ÌƒNƒ‰ƒX‚Å•K‚¸À‘• 
+	// æ›´æ–°å‡¦ç†ï¼ˆç¶™æ‰¿å…ˆã®ã‚¯ãƒ©ã‚¹ã§å¿…ãšå®Ÿè£… 
 	virtual void Update() = 0;
 
-	// ƒrƒ…[s—ñ‚Ìæ“¾iƒfƒtƒHƒ‹ƒg‚Å‚Í“]’uÏ‚İ‚Ìs—ñ‚ğŒvZ‚·‚é 
+	// ãƒ“ãƒ¥ãƒ¼è¡Œåˆ—ã®å–å¾—ï¼ˆãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã§ã¯è»¢ç½®æ¸ˆã¿ã®è¡Œåˆ—ã‚’è¨ˆç®—ã™ã‚‹ 
 	DirectX::XMFLOAT4X4 GetViewMatrix(bool transpose = true);
-		// ƒvƒƒWƒFƒNƒVƒ‡ƒ“s—ñ‚Ìæ“¾iƒfƒtƒHƒ‹ƒg‚Å‚Í“]’uÏ‚İ‚Ìs—ñ‚ğŒvZ‚·‚é 
+		// ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ã‚·ãƒ§ãƒ³è¡Œåˆ—ã®å–å¾—ï¼ˆãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã§ã¯è»¢ç½®æ¸ˆã¿ã®è¡Œåˆ—ã‚’è¨ˆç®—ã™ã‚‹ 
 	DirectX::XMFLOAT4X4 GetProjectionMatrix(bool transpose = true);
 
-	// À•W‚Ìæ“¾ 
-	DirectX::XMFLOAT3 GetPos();
+	// åº§æ¨™ã®å–å¾— 
+	DirectX::XMFLOAT3 GetPos() const;
 
-	// ’‹“_‚Ìæ“¾ 
-	DirectX::XMFLOAT3 GetLook();
+	// æ³¨è¦–ç‚¹ã®å–å¾— 
+	DirectX::XMFLOAT3 GetLook() const;
+	DirectX::XMFLOAT3 GetUp() const;
+	float GetFovy() const;
+	float GetAspect() const;
+	float GetNear() const;
+	float GetFar() const;
 
 	virtual void SetPos(DirectX::XMFLOAT3 pos) = 0;
 	virtual void SetLook(DirectX::XMFLOAT3 set) = 0;
 
 	virtual void LockPos(bool set) = 0;
 protected:
-	DirectX::XMFLOAT3 m_pos;  // À•W 
-	DirectX::XMFLOAT3 m_look;  // ’‹“_ 
-	DirectX::XMFLOAT3 m_up;  // ã•ûƒxƒNƒgƒ‹ 
-	float m_fovy;  // ‰æŠp 
-	float m_aspect; // ƒAƒXƒyƒNƒg”ä 
-	float m_near;  // ƒjƒAƒNƒŠƒbƒv 
-	float m_far;  // ƒtƒ@[ƒNƒŠƒbƒv 
+	DirectX::XMFLOAT3 m_pos;  // åº§æ¨™ 
+	DirectX::XMFLOAT3 m_look;  // æ³¨è¦–ç‚¹ 
+	DirectX::XMFLOAT3 m_up;  // ä¸Šæ–¹ãƒ™ã‚¯ãƒˆãƒ« 
+	float m_fovy;  // ç”»è§’ 
+	float m_aspect; // ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯” 
+	float m_near;  // ãƒ‹ã‚¢ã‚¯ãƒªãƒƒãƒ— 
+	float m_far;  // ãƒ•ã‚¡ãƒ¼ã‚¯ãƒªãƒƒãƒ— 
 };
+
 

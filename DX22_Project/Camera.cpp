@@ -1,4 +1,4 @@
-#include "Camera.h"
+ï»¿#include "Camera.h"
 
 Camera::Camera()
 	: m_pos(0.0f,1.5f,-2.0f)
@@ -9,7 +9,7 @@ Camera::Camera()
 	, m_near(0.03f)
 	, m_far(1000.0f) 
 {
-}// Camera.cpp ‚É’Ç‰ÁiƒfƒXƒgƒ‰ƒNƒ^À‘•j
+}// Camera.cpp ã«è¿½åŠ ï¼ˆãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿å®Ÿè£…ï¼‰
 Camera::~Camera() 
 {
 }
@@ -20,8 +20,8 @@ DirectX::XMFLOAT4X4 Camera::GetViewMatrix(bool transpose)
 	DirectX::XMMATRIX view;
 	view = DirectX::XMMatrixLookAtLH(
 		DirectX::XMVectorSet(m_pos.x, m_pos.y, m_pos.z, 0.0f),
-		DirectX::XMVectorSet(m_look.x, m_look.y, m_look.z, 0.0f), // x ‚ğg‚¤
-		DirectX::XMVectorSet(m_up.x, m_up.y, m_up.z, 0.0f)        // ƒƒ“ƒo m_up ‚ğg‚¤
+		DirectX::XMVectorSet(m_look.x, m_look.y, m_look.z, 0.0f), // x ã‚’ä½¿ã†
+		DirectX::XMVectorSet(m_up.x, m_up.y, m_up.z, 0.0f)        // ãƒ¡ãƒ³ãƒ m_up ã‚’ä½¿ã†
 	);
 	if (transpose) {
 		view = DirectX::XMMatrixTranspose(view);
@@ -47,13 +47,39 @@ DirectX::XMFLOAT4X4 Camera::GetProjectionMatrix(bool transpose)
 	return mat;
 }
 
-DirectX::XMFLOAT3 Camera::GetPos()
+DirectX::XMFLOAT3 Camera::GetPos() const
 {
 	return m_pos;
 }
 
-DirectX::XMFLOAT3 Camera::GetLook()
+DirectX::XMFLOAT3 Camera::GetLook() const
 {
 	return m_look;
 }
+
+DirectX::XMFLOAT3 Camera::GetUp() const
+{
+	return m_up;
+}
+
+float Camera::GetFovy() const
+{
+	return m_fovy;
+}
+
+float Camera::GetAspect() const
+{
+	return m_aspect;
+}
+
+float Camera::GetNear() const
+{
+	return m_near;
+}
+
+float Camera::GetFar() const
+{
+	return m_far;
+}
+
 
