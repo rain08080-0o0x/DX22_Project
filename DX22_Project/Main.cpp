@@ -11,6 +11,7 @@
 // rand初期化用
 #include <cstdlib>
 #include <ctime>
+#include <cstdio> // 追加
 
 // ImGui
 #include "imgui.h"
@@ -72,6 +73,26 @@ void Draw()
 
 #ifdef _DEBUG
 	TRAN_INS;
+
+	// Docking用のルート（上下左右の吸着・分割/再結合）
+	if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable)
+	{
+		ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImGui::SetNextWindowPos(viewport->Pos);
+		ImGui::SetNextWindowSize(viewport->Size);
+		ImGui::SetNextWindowViewport(viewport->ID);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+		ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+			ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground;
+		ImGui::Begin("DockSpaceRoot", nullptr, window_flags);
+		ImGui::PopStyleVar(2);
+		ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+		ImGui::End();
+	}
 
 	// ImGuiの描画
 	static bool show_main_window = false;
@@ -454,6 +475,155 @@ void Draw()
 		Separator();
 		Text("FPS: %.1f", GetIO().Framerate);
 		End();
+	}	// -----------------------------
+	// Debug Tools : Tables + DrawList
+	//   - Tables : 一覧/監視用
+	//   - DrawList : 画面上への簡易オーバーレイ
+	// -----------------------------
+	static bool show_table_window = true;
+	static bool show_overlay = true;
+	static bool show_imgui_demo = false;
+
+	// TABキーのメインウィンドウだけだと隠れやすいので、ここで簡易トグルも用意
+	if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) show_table_window = !show_table_window;
+	if (ImGui::IsKeyPressed(ImGuiKey_F2, false)) show_overlay = !show_overlay;
+	if (ImGui::IsKeyPressed(ImGuiKey_F3, false)) show_imgui_demo = !show_imgui_demo;
+
+	if (show_table_window)
+	{
+		ImGui::Begin("Inspector (Tables)", &show_table_window);
+
+		ImGui::Text("F1:Table  F2:Overlay  F3:Demo");
+		ImGui::Separator();
+
+		// 1) Key-Value 監視テーブル（縦スクロール）
+		ImGuiTableFlags flags =
+			ImGuiTableFlags_Borders |
+			ImGuiTableFlags_RowBg |
+			ImGuiTableFlags_Resizable |
+			ImGuiTableFlags_SizingStretchProp |
+			ImGuiTableFlags_ScrollY;
+
+		const float table_h = 220.0f;
+		if (ImGui::BeginTable("##kv", 2, flags, ImVec2(0.0f, table_h)))
+		{
+			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+			ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableHeadersRow();
+
+			auto row_f3 = [](const char* name, const DirectX::XMFLOAT3& v)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(name);
+					ImGui::TableSetColumnIndex(1); ImGui::Text("(%.2f, %.2f, %.2f)", v.x, v.y, v.z);
+				};
+			auto row_f4 = [](const char* name, const DirectX::XMFLOAT4& v)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(name);
+					ImGui::TableSetColumnIndex(1); ImGui::Text("(%.2f, %.2f, %.2f, %.2f)", v.x, v.y, v.z, v.w);
+				};
+			auto row_f1 = [](const char* name, float v)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(name);
+					ImGui::TableSetColumnIndex(1); ImGui::Text("%.3f", v);
+				};
+			auto row_i1 = [](const char* name, int v)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(name);
+					ImGui::TableSetColumnIndex(1); ImGui::Text("%d", v);
+				};
+
+			// Transfer の中身を例として監視
+			row_f3("player.pos", tran.player.pos);
+			row_f3("player.velocity", tran.player.velocity);
+			row_f1("player.hp", tran.player.hp);
+			row_f1("player.maxHp", tran.player.maxHp);
+
+			row_f3("dice.pos", tran.dice.pos);
+			row_f3("dice.velocity", tran.dice.velocity);
+			row_f4("dice.rot", tran.dice.rot);
+			row_f1("dice.underVel", tran.dice.underVel);
+
+			row_i1("cameraMode", tran.cameraMode);
+
+			ImGui::EndTable();
+		}
+
+		ImGui::Spacing();
+
+		// 2) Dice face number のテーブル（小テーブル）
+		if (ImGui::CollapsingHeader("Dice Faces (Table)", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGuiTableFlags f2 =
+				ImGuiTableFlags_Borders |
+				ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_SizingFixedFit;
+
+			if (ImGui::BeginTable("##faces", MAX_DICE, f2))
+			{
+				for (int c = 0; c < MAX_DICE; ++c)
+				{
+					char buf[32];
+					sprintf_s(buf, "D%d", c);
+					ImGui::TableSetupColumn(buf);
+				}
+				ImGui::TableHeadersRow();
+
+				ImGui::TableNextRow();
+				for (int c = 0; c < MAX_DICE; ++c)
+				{
+					ImGui::TableSetColumnIndex(c);
+					ImGui::Text("%d", tran.dice.currentFaceNumber[c]);
+				}
+
+				ImGui::EndTable();
+			}
+		}
+
+		ImGui::End();
+	}
+
+	// DrawList overlay（画面上に線や矩形などを描く）
+	// 3D上の座標投影まではやらず、まずは「画面座標の可視化」に寄せてある
+	if (show_overlay)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+
+		const ImVec2 mouse = io.MousePos;
+		const ImVec2 center(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f);
+
+		// クロスヘア（マウス）
+		const float cross = 10.0f;
+		dl->AddLine(ImVec2(mouse.x - cross, mouse.y), ImVec2(mouse.x + cross, mouse.y), IM_COL32(255, 255, 0, 255), 1.0f);
+		dl->AddLine(ImVec2(mouse.x, mouse.y - cross), ImVec2(mouse.x, mouse.y + cross), IM_COL32(255, 255, 0, 255), 1.0f);
+
+		// 画面中央マーカー
+		dl->AddCircle(center, 6.0f, IM_COL32(0, 255, 255, 255), 16, 1.0f);
+
+		// 右上に簡易HUD（背景付き）
+		char hud[256];
+		sprintf_s(hud, "FPS %.1f\nMouse (%.0f, %.0f)\nPlayerHP %.1f / %.1f",
+			io.Framerate, mouse.x, mouse.y, tran.player.hp, tran.player.maxHp);
+
+		const ImVec2 pad(8.0f, 6.0f);
+		const ImVec2 text_size = ImGui::CalcTextSize(hud);
+		const ImVec2 box_min(vp->Pos.x + vp->Size.x - text_size.x - pad.x * 2.0f - 10.0f, vp->Pos.y + 10.0f);
+		const ImVec2 box_max(box_min.x + text_size.x + pad.x * 2.0f, box_min.y + text_size.y + pad.y * 2.0f);
+
+		dl->AddRectFilled(box_min, box_max, IM_COL32(0, 0, 0, 160), 4.0f);
+		dl->AddRect(box_min, box_max, IM_COL32(255, 255, 255, 100), 4.0f);
+		dl->AddText(ImVec2(box_min.x + pad.x, box_min.y + pad.y), IM_COL32(255, 255, 255, 255), hud);
+	}
+
+	// ImGui標準デモ（Tables / Docking / Viewports の動作確認用）
+	if (show_imgui_demo)
+	{
+		//ImGui::ShowDemoWindow(&show_imgui_demo);
 	}
 
 

@@ -50,3 +50,60 @@ DX22_Project にて、敵・攻撃・当たり判定可視化・影・敵HP表�
 - 敵AI（追従/徘徊）
 - 敵死亡演出やドロップ
 
+
+---
+
+# 作業レポート（2026-02-06）
+
+## 概要
+カメラの描画範囲（フラスタム）表示と、ゲーム/デバッグの2カメラ切替を実装。ImGui からモード切替と両カメラの位置編集が可能。
+
+## 実装内容
+- カメラフラスタムの可視化（AddLine）
+  - カメラの near/far・FOV・aspect からフラスタムをワイヤー描画。
+- ゲーム/デバッグ2カメラの導入
+  - ゲーム用とデバッグ用のカメラ状態を分離。
+  - デフォルトはゲームモード。
+- ImGui でのモード切替と位置編集
+  - Camera タブに `Camera Mode`（Game/Debug）を追加。
+  - Game/Debug それぞれの Eye/Look を個別に編集可能。
+- デバッグモード中のフラスタム表示
+  - デバッグモード時にゲームカメラのフラスタムを表示。
+- 補助対応
+  - `Camera::GetPos/GetLook` を `const` 化。
+  - `Player::SetCamera` の未定義リンクエラーを解消。
+  - `CameraDebug::SetPose`/軌道同期を追加。
+
+## 追加/更新ファイル
+- 更新
+  - DX22_Project\Camera.h
+  - DX22_Project\Camera.cpp
+  - DX22_Project\CameraDebug.h
+  - DX22_Project\CameraDebug.cpp
+  - DX22_Project\Transfer.h
+  - DX22_Project\SceneGame.h
+  - DX22_Project\SceneGame.cpp
+  - DX22_Project\Scene3DEditor.h
+  - DX22_Project\Scene3DEditor.cpp
+  - DX22_Project\Main.cpp
+  - DX22_Project\Player.cpp
+
+## 追加メモ
+- `SceneGame.cpp` が一度 0 バイト化していたため、git の HEAD から復元して修正を再適用。
+
+## 動作仕様メモ
+- デバッグモード時: ゲームカメラの描画範囲線を表示。
+- ゲームモード時: アクティブカメラの範囲線を表示。
+
+
+---
+
+# 追記（2026-02-07）
+
+## 実施内容
+- 工数・設計.md を追加。
+  - ゲーム概要、現状実装、足りないアクション要素、設計方針、工数見積、MVP進行案を整理。
+
+## 追加/更新ファイル
+- 新規
+  - 工数・設計.md
