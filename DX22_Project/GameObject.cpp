@@ -1,4 +1,4 @@
-#include "GameObject.h"
+﻿#include "GameObject.h"
 
 GameObject::GameObject()
 	: m_pos(0.0f, 0.0f, 0.0f)

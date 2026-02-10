@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "GameObject.h"
 #include "Camera.h"
 #include "Collision.h"
@@ -31,15 +31,15 @@ private:
     Camera* m_pCamera = nullptr;
     Model* m_pModel = nullptr;
 
-    DirectX::XMFLOAT3 m_pos;    // ˆÊ’uî•ñ
-    DirectX::XMFLOAT3 m_size;   // ƒTƒCƒY
-    float m_mass;               // ¿—Ê
+    DirectX::XMFLOAT3 m_pos;    // ä½ç½®æƒ…å ±
+    DirectX::XMFLOAT3 m_size;   // ã‚µã‚¤ã‚º
+    float m_mass;               // è³ªé‡
 
     DirectX::XMFLOAT3 vertex[8];
-    // •¨—–{‘Ì
+    // ç‰©ç†æœ¬ä½“
     RigidBodyOBB *body[MAX_DICE];
 
-    // •\¦—pi•K—v‚È‚çjF‚È‚Ç‚¾‚¯ Dice ‚ª‚Â
+    // è¡¨ç¤ºç”¨ï¼ˆå¿…è¦ãªã‚‰ï¼‰è‰²ãªã©ã ã‘ Dice ãŒæŒã¤
     DirectX::XMFLOAT4 color = { 1,1,1,1 };
 
 

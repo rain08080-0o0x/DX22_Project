@@ -1,4 +1,4 @@
-#include "Scene.h"
+ï»¿#include "Scene.h"
 
 Scene::Scene()
 {
@@ -16,7 +16,7 @@ Scene::~Scene()
 //void Scene::SetNext(int next)
 //{
 //	m_next = next;
-//	// Ø‚è‘Ö‚¦æ‚ª”­¶‚µ‚½Û‚ÉƒtƒF[ƒh‚àÀs 
+//	// åˆ‡ã‚Šæ›¿ãˆå…ˆãŒç™ºç”Ÿã—ãŸéš›ã«ãƒ•ã‚§ãƒ¼ãƒ‰ã‚‚å®Ÿè¡Œ 
 //	if (m_pFade)
 //		m_pFade->Start(1, false);
 //}

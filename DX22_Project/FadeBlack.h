@@ -1,4 +1,4 @@
-//#pragma once
+ï»¿//#pragma once
 //#include "Fade.h"
 //#include "Texture.h"
 //#include <DirectXMath.h>
@@ -7,21 +7,21 @@
 //    public Fade
 //{
 //private:
-//    Texture* m_pTexture; // ƒtƒF[ƒh’†‚É•\¦‚·‚é‰æ‘œ 
+//    Texture* m_pTexture; // ãƒ•ã‚§ãƒ¼ãƒ‰ä¸­ã«è¡¨ç¤ºã™ã‚‹ç”»åƒ 
 //
 //public:
-//    // ƒRƒ“ƒXƒgƒ‰ƒNƒ^ 
+//    // ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ 
 //    FadeBlack();
 //
-//    // ƒfƒXƒgƒ‰ƒNƒ^ 
+//    // ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ 
 //    ~FadeBlack() final;
 //
 //protected:
-//    // ƒtƒF[ƒhƒCƒ“EƒtƒF[ƒhƒAƒEƒg‹¤‚É“¯‚¶ˆ—‚ÅÀ‘• 
+//    // ãƒ•ã‚§ãƒ¼ãƒ‰ã‚¤ãƒ³ãƒ»ãƒ•ã‚§ãƒ¼ãƒ‰ã‚¢ã‚¦ãƒˆå…±ã«åŒã˜å‡¦ç†ã§å®Ÿè£… 
 //    void DrawFadeIn(float alpha) final { DrawFade(alpha); }
 //    void DrawFadeOut(float alpha) final { DrawFade(alpha); }
 //
-//    // ‹¤’ÊƒtƒF[ƒhˆ— 
+//    // å…±é€šãƒ•ã‚§ãƒ¼ãƒ‰å‡¦ç† 
 //    void DrawFade(float alpha);
 //};
 //

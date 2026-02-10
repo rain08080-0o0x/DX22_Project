@@ -1,4 +1,4 @@
-#include "SceneManager.h"
+﻿#include "SceneManager.h"
 #include "SceneTitle.h"
 #include "SceneGame.h"
 #include "SceneResult.h"
@@ -58,7 +58,7 @@ void SceneManager::CreateScene(SceneType type)
 
 void SceneManager::ChangeScene(SceneType next)
 {
-    // �����V�[���ɕς���͖̂���
+    // 同じシーンに変えるのは無視
     if (next == m_current) return;
 
     m_next = next;
@@ -79,8 +79,8 @@ void SceneManager::Update()
 {
     if (m_isChanging)
     {
-        // �����Ƀt�F�[�h������ꂽ���Ȃ��Œǉ��ł���
-        // ���͑��؂�ւ�
+        // ここにフェード等を入れたいなら後で追加できる
+        // 今は即切り替え
         m_current = m_next;
         CreateScene(m_current);
         m_isChanging = false;
@@ -95,5 +95,5 @@ void SceneManager::Draw()
     if (m_pScene)
         m_pScene->RootDraw();
 
-    // �t�F�[�h��������Ȃ�A�����ŏ�`��
+    // フェード等を入れるなら、ここで上描き
 }

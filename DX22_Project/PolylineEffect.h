@@ -1,4 +1,4 @@
-#ifndef __POLYLINE_EFFECT_H__
+ï»¿#ifndef __POLYLINE_EFFECT_H__
 #define __POLYLINE_EFFECT_H__
 
 #include "MeshBuffer.h"
@@ -8,31 +8,31 @@
 class PolylineEffect
 {
 protected:
-	// ƒ|ƒŠƒ‰ƒCƒ“§Œä—p‚Ì“_
+	// ãƒãƒªãƒ©ã‚¤ãƒ³åˆ¶å¾¡ç”¨ã®ç‚¹
 	struct ControlPoint
 	{
-		DirectX::XMFLOAT3	pos;	// À•W
-		DirectX::XMFLOAT3	normal;	// –@ü
-		float				bold;	// ‘¾‚³
-		DirectX::XMFLOAT4	color;	// F
+		DirectX::XMFLOAT3	pos;	// åº§æ¨™
+		DirectX::XMFLOAT3	normal;	// æ³•ç·š
+		float				bold;	// å¤ªã•
+		DirectX::XMFLOAT4	color;	// è‰²
 	};
 	using ControlPoints = std::vector<ControlPoint>;
 
-	// ƒ|ƒŠƒ‰ƒCƒ“•\¦—p‚Ì’¸“_î•ñ
+	// ãƒãƒªãƒ©ã‚¤ãƒ³è¡¨ç¤ºç”¨ã®é ‚ç‚¹æƒ…å ±
 	struct Vertex
 	{
-		DirectX::XMFLOAT3	pos;	// À•W
+		DirectX::XMFLOAT3	pos;	// åº§æ¨™
 		DirectX::XMFLOAT2	uv;		// UV
-		DirectX::XMFLOAT4	color;	// F
+		DirectX::XMFLOAT4	color;	// è‰²
 	};
 
-	// 1ƒ‰ƒCƒ““–‚½‚è‚Ìî•ñ
+	// 1ãƒ©ã‚¤ãƒ³å½“ãŸã‚Šã®æƒ…å ±
 	struct Line
 	{
-		ControlPoints		controlPoints;	// §Œä“_
-		DirectX::XMFLOAT2	uvScale;		// ƒ|ƒŠƒ‰ƒCƒ“‚É“\‚è•t‚¯‚éUVƒTƒCƒY
-		DirectX::XMFLOAT2	uvOffset;		// ƒ|ƒŠƒ‰ƒCƒ“‚É“\‚è•t‚¯‚éUV‚ÌƒIƒtƒZƒbƒg
-		Vertex*				ptr;			// ’¸“_î•ñ
+		ControlPoints		controlPoints;	// åˆ¶å¾¡ç‚¹
+		DirectX::XMFLOAT2	uvScale;		// ãƒãƒªãƒ©ã‚¤ãƒ³ã«è²¼ã‚Šä»˜ã‘ã‚‹UVã‚µã‚¤ã‚º
+		DirectX::XMFLOAT2	uvOffset;		// ãƒãƒªãƒ©ã‚¤ãƒ³ã«è²¼ã‚Šä»˜ã‘ã‚‹UVã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
+		Vertex*				ptr;			// é ‚ç‚¹æƒ…å ±
 	};
 	using Lines = std::vector<Line>;
 
@@ -40,17 +40,17 @@ public:
 	using LineID = int;
 
 public:
-	static const LineID LINE_NONE = -1; // ƒ‰ƒCƒ“‚ª¶¬o—ˆ‚È‚©‚Á‚½‚Æ‚«‚Ìî•ñ
+	static const LineID LINE_NONE = -1; // ãƒ©ã‚¤ãƒ³ãŒç”Ÿæˆå‡ºæ¥ãªã‹ã£ãŸã¨ãã®æƒ…å ±
 
 public:	
-	// ƒ|ƒŠƒ‰ƒCƒ“‘S‘Ì‚Åg—p‚·‚é’¸“_”
+	// ãƒãƒªãƒ©ã‚¤ãƒ³å…¨ä½“ã§ä½¿ç”¨ã™ã‚‹é ‚ç‚¹æ•°
 	PolylineEffect(int maxVertices = 1000);
 	~PolylineEffect();
 
 	virtual void Update();
 	void Draw();
 
-	// §Œä“_‚Ì”‚ğw’è‚µ‚Ä“à•”‚Åˆµ‚¤ƒ|ƒŠƒ‰ƒCƒ“‚ğ¶¬
+	// åˆ¶å¾¡ç‚¹ã®æ•°ã‚’æŒ‡å®šã—ã¦å†…éƒ¨ã§æ‰±ã†ãƒãƒªãƒ©ã‚¤ãƒ³ã‚’ç”Ÿæˆ
 	LineID AddLine(int controlPointNum);
 
 	void SetView(DirectX::XMFLOAT4X4 view);
@@ -62,25 +62,25 @@ public:
 
 
 protected:
-	// §Œä“_‚Ì‰Šú‰»
+	// åˆ¶å¾¡ç‚¹ã®åˆæœŸåŒ–
 	virtual void InitControlPoints(LineID id, ControlPoints& controlPoints);
-	// §Œä“_‚ÌXVˆ—
+	// åˆ¶å¾¡ç‚¹ã®æ›´æ–°å‡¦ç†
 	virtual void UpdateControlPoints(LineID id, ControlPoints& controlPoints) = 0;
 
 private:
-	// ƒVƒF[ƒ_[î•ñ
+	// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼æƒ…å ±
 	static VertexShader* m_pDefVS;
 	static PixelShader* m_pDefPS;
 	static int m_shaderRefCount;
 	static Texture* m_pDefTex;
 
 private:
-	Lines		m_lines;		// ƒ|ƒŠƒ‰ƒCƒ“‚Ìî•ñ
-	int			m_useVtxCount;	// g—pÏ‚İ’¸“_”
-	MeshBuffer*	m_pMesh;		// •\¦ƒƒbƒVƒ…
-	Vertex*		m_pVertices;	// ’¸“_ƒf[ƒ^
+	Lines		m_lines;		// ãƒãƒªãƒ©ã‚¤ãƒ³ã®æƒ…å ±
+	int			m_useVtxCount;	// ä½¿ç”¨æ¸ˆã¿é ‚ç‚¹æ•°
+	MeshBuffer*	m_pMesh;		// è¡¨ç¤ºãƒ¡ãƒƒã‚·ãƒ¥
+	Vertex*		m_pVertices;	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 
-	// •\¦î•ñ
+	// è¡¨ç¤ºæƒ…å ±
 	VertexShader* m_pVS;
 	PixelShader* m_pPS;
 	DirectX::XMFLOAT4X4 m_matrix[2];

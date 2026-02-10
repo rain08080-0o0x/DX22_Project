@@ -1,4 +1,4 @@
-#include "Goal.h"
+ï»¿#include "Goal.h"
 #include "Sprite.h"
 #include <Windows.h>
 
@@ -25,55 +25,55 @@ Goal::~Goal()
 
 void Goal::Update()
 {
-    /* —áFã‰º‚É‚Ó‚í‚Ó‚í‚³‚¹‚éŠÈˆÕƒAƒjƒ[ƒVƒ‡ƒ“*/static float t = 0.0f;t += 0.05f;m_pos.y += sinf(t) * 0.01f;
+    /* ä¾‹ï¼šä¸Šä¸‹ã«ãµã‚ãµã‚ã•ã›ã‚‹ç°¡æ˜“ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³*/static float t = 0.0f;t += 0.05f;m_pos.y += sinf(t) * 0.01f;
 }
 
 void Goal::Draw()
 {
-    // ---- ƒXƒvƒ‰ƒCƒg—p View / Projection İ’è ----
+    // ---- ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆç”¨ View / Projection è¨­å®š ----
     Sprite::SetView(m_pCamera->GetViewMatrix());
     Sprite::SetProjection(m_pCamera->GetProjectionMatrix());
 
-    // ---- ƒrƒ‹ƒ{[ƒhs—ñŒvZ ----
+    // ---- ãƒ“ãƒ«ãƒœãƒ¼ãƒ‰è¡Œåˆ—è¨ˆç®— ----
     XMMATRIX billboard = XMMatrixIdentity();
 
     if (m_pCamera)
     {
-        // “]’u‚µ‚Ä‚¢‚È‚¢ƒJƒƒ‰‚Ì View s—ñ‚ğæ“¾
+        // è»¢ç½®ã—ã¦ã„ãªã„ã‚«ãƒ¡ãƒ©ã® View è¡Œåˆ—ã‚’å–å¾—
         XMFLOAT4X4 viewFloat;
         //XMStoreFloat4x4(&viewFloat, m_pCamera->GetViewMatrix());
 		viewFloat = m_pCamera->GetViewMatrix(false);
 
-        // “Ç‚İæ‚è—p ¨ ŒvZ—p
+        // èª­ã¿å–ã‚Šç”¨ â†’ è¨ˆç®—ç”¨
         XMMATRIX viewMat = XMLoadFloat4x4(&viewFloat);
 
-        // ‹ts—ñi‰ñ“] + ˆÚ“®‚ğ‘Å‚¿Á‚·j
+        // é€†è¡Œåˆ—ï¼ˆå›è»¢ + ç§»å‹•ã‚’æ‰“ã¡æ¶ˆã™ï¼‰
         XMMATRIX invView = XMMatrixInverse(nullptr, viewMat);
 
-        // ŒvZ—p ¨ “Ç‚İæ‚è—p
+        // è¨ˆç®—ç”¨ â†’ èª­ã¿å–ã‚Šç”¨
         XMFLOAT4X4 invViewFloat;
         XMStoreFloat4x4(&invViewFloat, invView);
 
-        // ˆÚ“®¬•ª‚ğíœi‰ñ“]‚Ì‚İc‚·j
+        // ç§»å‹•æˆåˆ†ã‚’å‰Šé™¤ï¼ˆå›è»¢ã®ã¿æ®‹ã™ï¼‰
         invViewFloat._41 = 0.0f;
         invViewFloat._42 = 0.0f;
         invViewFloat._43 = 0.0f;
 
-        // “Ç‚İæ‚è—p ¨ ŒvZ—p
+        // èª­ã¿å–ã‚Šç”¨ â†’ è¨ˆç®—ç”¨
         billboard = XMLoadFloat4x4(&invViewFloat);
     }
 
-    // ---- ƒ[ƒ‹ƒhs—ñ ----
+    // ---- ãƒ¯ãƒ¼ãƒ«ãƒ‰è¡Œåˆ— ----
     XMMATRIX world =
         billboard *
         XMMatrixScaling(m_scale.x, m_scale.y, 1.0f) *
         XMMatrixTranslation(m_pos.x, m_pos.y, m_pos.z);
 
-    // “]’u‚µ‚Ä Sprite —p‚É“n‚·
+    // è»¢ç½®ã—ã¦ Sprite ç”¨ã«æ¸¡ã™
     XMFLOAT4X4 worldFloat;
     XMStoreFloat4x4(&worldFloat, XMMatrixTranspose(world));
 
-    // ---- ƒXƒvƒ‰ƒCƒg•`‰æ ----
+    // ---- ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆæç”» ----
     Sprite::SetColor({ 1,1,1,1 });
     Sprite::SetOffset({ 0,0 });
     Sprite::SetWorld(worldFloat);

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "GameObject.h"
 #include "Texture.h"
 #include "Sprite.h"
@@ -24,10 +24,17 @@ public:
     bool IsAlive() const;
     int GetHp() const;
     int GetMaxHp() const;
+    int GetState() const;
     void SetCamera(Camera*);
 
     void SetTargetPos(DirectX::XMFLOAT3);
 private:
+    enum class MoveState
+    {
+        Wander,
+        Chase
+    };
+
     Camera* m_pCamera;
     Texture* m_pTexture;
     DirectX::XMFLOAT3 m_size;
@@ -38,4 +45,7 @@ private:
     int m_hp;
     int m_maxHp;
     DirectX::XMFLOAT3 m_targetPos;
+    DirectX::XMFLOAT3 m_wanderTarget;
+    float m_wanderTimer;
+    MoveState m_state;
 };

@@ -1,4 +1,4 @@
-#ifndef __DIRECTX_H__
+ï»¿#ifndef __DIRECTX_H__
 #define __DIRECTX_H__
 
 #include <d3d11.h>
@@ -47,10 +47,10 @@ void SetDepthTest(bool enable);
 void SetBlendMode(BlendMode blend);
 void SetSamplerState(SamplerState state);
 
-// ƒŠƒTƒCƒY—p
+// ãƒªã‚µã‚¤ã‚ºç”¨
 void OnResizeDirectX(UINT width, UINT height);
 
-// ImGuiŠÖ˜A
+// ImGuié–¢é€£
 void InitImGui(HWND hWnd);
 void ShutdownImGui();
 void BeginImGuiFrame();

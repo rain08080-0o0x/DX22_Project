@@ -1,4 +1,4 @@
-#include "SceneTitle.h"
+ï»¿#include "SceneTitle.h"
 #include "SceneManager.h"
 #include "Input.h"
 #include "UIObject.h"
@@ -10,8 +10,8 @@ SceneTitle::SceneTitle()
     , m_pStart(nullptr)
     , m_pHint(nullptr)
 {
-    // ‰æ‘œ‚Í Assets/Texture/ ‚ğ UIObject ‘¤‚ª•t‚¯‚é‘O’ñ‚È‚ç‘Š‘Î‚ÅOK
-    // —á: Assets/Texture/Title/Title_Logo.png ‚ğ’u‚¢‚½ê‡‚Í "Title/Title_Logo.png"
+    // ç”»åƒã¯ Assets/Texture/ ã‚’ UIObject å´ãŒä»˜ã‘ã‚‹å‰æãªã‚‰ç›¸å¯¾ã§OK
+    // ä¾‹: Assets/Texture/Title/Title_Logo.png ã‚’ç½®ã„ãŸå ´åˆã¯ "Title/Title_Logo.png"
 
     m_pLogo = new UIObject("Title/Title.png", SCREEN_WIDTH * 0.5f, 210.0f, 900.0f, 380.0f / 2);
     m_pStart = new UIObject("Title/Btn_Start.png", SCREEN_WIDTH * 0.5f, 550.0f, 380.0f, 110.0f);
@@ -27,7 +27,7 @@ SceneTitle::~SceneTitle()
 
 void SceneTitle::Update()
 {
-    // Enter ‚ÅƒQ[ƒ€‚Ö
+    // Enter ã§ã‚²ãƒ¼ãƒ ã¸
     if (IsKeyTrigger(VK_RETURN))
     {
         SceneManager::ChangeScene(SceneManager::SCENE_GAME);

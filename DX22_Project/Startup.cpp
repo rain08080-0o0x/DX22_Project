@@ -1,4 +1,4 @@
-﻿#include <windows.h>
+﻿﻿#include <windows.h>
 #include "Defines.h"
 #include "Main.h"
 #include <stdio.h>

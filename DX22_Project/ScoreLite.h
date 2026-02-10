@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <string>
 #include "UIObject.h"
 
@@ -20,7 +20,7 @@ private:
     void DrawNumberRightAligned(int value);
 
 private:
-    UIObject* m_digits;     // 0..9 ‚ª‰¡•À‚Ñ‚Ì1–‡
+    UIObject* m_digits;     // 0..9 ãŒæ¨ªä¸¦ã³ã®1æš
     int m_score;
 
     float m_x;

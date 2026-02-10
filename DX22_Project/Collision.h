@@ -1,30 +1,30 @@
-#pragma once
+п»ї#pragma once
 #include<DirectXMath.h>
 
 class Collision {
 public:
-    //--- “–‚Ѕ‚и”»’и
-    // —§•ы‘М
+    //--- еЅ“гЃџг‚Ље€¤е®љ
+    // з«‹ж–№дЅ“
     struct Box
     {
-        DirectX::XMFLOAT3 center;   // ’†ђSЌА•W
-        DirectX::XMFLOAT3 size;     // ѓTѓCѓY
+        DirectX::XMFLOAT3 center;   // дё­еїѓеє§жЁ™
+        DirectX::XMFLOAT3 size;     // г‚µг‚¤г‚є
     };
-    // ‹…
+    // зђѓ
     struct Sphere 
     {
-        DirectX::XMFLOAT3 center;   // ’†ђSЌА•W
-        float radius;               // ”јЊa
+        DirectX::XMFLOAT3 center;   // дё­еїѓеє§жЁ™
+        float radius;               // еЌЉеѕ„
     };
-    //--- “–‚Ѕ‚и”»’и‚МЊ‹‰К
+    //--- еЅ“гЃџг‚Ље€¤е®љгЃ®зµђжћњ
     struct Result 
     {
-        bool isHit;             // “–‚Ѕ‚Б‚Ѕ‚©‚З‚¤‚©
-        DirectX::XMFLOAT3 dir;  // ѓqѓbѓg•ыЊь
+        bool isHit;             // еЅ“гЃџгЃЈгЃџгЃ‹гЃ©гЃ†гЃ‹
+        DirectX::XMFLOAT3 dir;  // гѓ’гѓѓгѓ€ж–№еђ‘
         //      
     };
 public:
-    //  —§•ы‘М“ЇЋm‚М“–‚Ѕ‚и”»’и
+    //  з«‹ж–№дЅ“еђЊеЈ«гЃ®еЅ“гЃџг‚Ље€¤е®љ
     static Result Hit(Box a, Box b);
 
     /// <summary>
@@ -40,14 +40,14 @@ public:
 #include <cmath>
 #include <algorithm>
 
-// Љо–{“I‚И3ЋџЊіѓxѓNѓgѓ‹ЃiDirectX‚МXMFLOAT3‘Љ“–‚ѕ‚Є‰‰ЋZ‚р’З‰БЃj
+// еџєжњ¬зљ„гЃЄ3ж¬Ўе…ѓгѓ™г‚Їгѓ€гѓ«пј€DirectXгЃ®XMFLOAT3з›ёеЅ“гЃ гЃЊжј”з®—г‚’иїЅеЉ пј‰
 struct Vec3 {
     float x, y, z;
 
     Vec3() : x(0), y(0), z(0) {}
     Vec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
 
-    // ѓxѓNѓgѓ‹‰‰ЋZ‚МѓIЃ[ѓoЃ[ѓЌЃ[ѓh
+    // гѓ™г‚Їгѓ€гѓ«жј”з®—гЃ®г‚Єгѓјгѓђгѓјгѓ­гѓјгѓ‰
     Vec3 operator+(const Vec3& v) const { return Vec3(x + v.x, y + v.y, z + v.z); }
     Vec3& operator+=(const Vec3& v)
     {
@@ -57,15 +57,15 @@ struct Vec3 {
     Vec3 operator-(const Vec3& v) const { return Vec3(x - v.x, y - v.y, z - v.z); }
     Vec3 operator*(float s) const { return Vec3(x * s, y * s, z * s); }
     Vec3 operator=(const DirectX::XMFLOAT3 f3)const { return Vec3(f3.x, f3.y, f3.z); }
-    // “ађП
+    // е†…з©Ќ
     float Dot(const Vec3& v) const { return x * v.x + y * v.y + z * v.z; }
 
-    // ЉOђПЃi‰с“]ЊvЋZ‚Й•Kђ{Ѓj
+    // е¤–з©Ќпј€е›ћи»ўиЁ€з®—гЃ«еї…й €пј‰
     Vec3 Cross(const Vec3& v) const {
         return Vec3(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
     }
 
-    // ђі‹K‰»
+    // ж­Ји¦ЏеЊ–
     Vec3 Normalize() const {
         float len = std::sqrt(x * x + y * y + z * z);
         if (len > 0) return Vec3(x / len, y / len, z / len);
@@ -73,21 +73,21 @@ struct Vec3 {
     }
 
     static Vec3 Vector3Zero() { return Vec3(0.0f, 0.0f, 0.0f); }
-    // ===== Vec3 ’З‰БѓЃѓ\ѓbѓh =====
+    // ===== Vec3 иїЅеЉ гѓЎг‚Ѕгѓѓгѓ‰ =====
 
-// ’·‚і‚М2ЏжЃisqrt‚µ‚И‚ў‚М‚ЕЌ‚‘¬Ѓj
+// й•·гЃ•гЃ®2д№—пј€sqrtгЃ—гЃЄгЃ„гЃ®гЃ§й«йЂџпј‰
     float LengthSq() const
     {
         return x * x + y * y + z * z;
     }
 
-    // ѓxѓNѓgѓ‹‚М’·‚і
+    // гѓ™г‚Їгѓ€гѓ«гЃ®й•·гЃ•
     float Length() const
     {
         return sqrtf(LengthSq());
     }
 
-    // ђі‹K‰»ЃiЋ©•Є‚рЏ‘‚«Љ·‚¦‚йЃj
+    // ж­Ји¦ЏеЊ–пј€и‡Єе€†г‚’ж›ёгЃЌжЏ›гЃ€г‚‹пј‰
     Vec3& Normalize()
     {
         float len = Length();
@@ -100,7 +100,7 @@ struct Vec3 {
         return *this;
     }
 
-    // ђі‹K‰»‚µ‚ЅѓRѓsЃ[‚р•Ф‚·
+    // ж­Ји¦ЏеЊ–гЃ—гЃџг‚ігѓ”гѓјг‚’иї”гЃ™
     Vec3 Normalized() const
     {
         float len = Length();
@@ -110,102 +110,102 @@ struct Vec3 {
     }
 
 };
-// Collision.hЃiRigidBodyOBB ‚Й’З‰БЃj
+// Collision.hпј€RigidBodyOBB гЃ«иїЅеЉ пј‰
 
 
-// •Ё—ќ‹““®‚рЋќ‚ВOBBѓIѓuѓWѓFѓNѓg
+// з‰©зђ†жЊ™е‹•г‚’жЊЃгЃ¤OBBг‚Єгѓ–г‚ёг‚§г‚Їгѓ€
 class RigidBodyOBB 
 {
 public:
-    // Њ`ЏуѓfЃ[ѓ^
-    Vec3 center;        // ЏdђS€К’u
-    Vec3 extents;       // ѓnЃ[ѓtѓTѓCѓY (width/2, height/2, depth/2)
+    // еЅўзЉ¶гѓ‡гѓјг‚ї
+    Vec3 center;        // й‡ЌеїѓдЅЌзЅ®
+    Vec3 extents;       // гѓЏгѓјгѓ•г‚µг‚¤г‚є (width/2, height/2, depth/2)
 
-    // ЋpђЁѓfЃ[ѓ^Ѓi‰с“]Ќs—с‚М‘г‚н‚и‚Й3‚В‚МЋІѓxѓNѓgѓ‹‚рЋќ‚ВЃj
+    // е§їе‹ўгѓ‡гѓјг‚їпј€е›ћи»ўиЎЊе€—гЃ®д»Јг‚Џг‚ЉгЃ«3гЃ¤гЃ®и»ёгѓ™г‚Їгѓ€гѓ«г‚’жЊЃгЃ¤пј‰
     Vec3 axis[3];       // 0:Right(X), 1:Up(Y), 2:Forward(Z)
 
-    // •Ё—ќѓpѓ‰ѓЃЃ[ѓ^
-    float mass;         // Ћї—К (0‚И‚зђГ“IѓIѓuѓWѓFѓNѓg)
-    float invMass;      // 1/Ћї—К
-    Vec3 velocity;      // ђьЊ`‘¬“x
-    Vec3 angularVel;    // Љp‘¬“xЃiѓ‰ѓWѓAѓ“/•bЃj
-    Vec3 inertiaTensor; // Љµђ«ѓ‚Ѓ[ѓЃѓ“ѓgЃi’ј•ы‘М‹ЯЋ—ЃAѓЌЃ[ѓJѓ‹ЋІЃj
+    // з‰©зђ†гѓ‘гѓ©гѓЎгѓјг‚ї
+    float mass;         // иіЄй‡Џ (0гЃЄг‚‰йќ™зљ„г‚Єгѓ–г‚ёг‚§г‚Їгѓ€)
+    float invMass;      // 1/иіЄй‡Џ
+    Vec3 velocity;      // з·љеЅўйЂџеє¦
+    Vec3 angularVel;    // и§’йЂџеє¦пј€гѓ©г‚ёг‚ўгѓі/з§’пј‰
+    Vec3 inertiaTensor; // ж…ЈжЂ§гѓўгѓјгѓЎгѓігѓ€пј€з›ґж–№дЅ“иї‘дјјгЂЃгѓ­гѓјг‚«гѓ«и»ёпј‰
 
-    bool isGround;      // ’n–К
+    bool isGround;      // ењ°йќў
 
-    // ---- ’n–КѓXѓiѓbѓvЃ•’вЋ~‚Ми‡’l ----
-    float groundEps = 0.001f;      // ’n–К”»’и‚М‹–—e(‚Я‚иЌћ‚Э‹–—e)
-    float stopVelY = 0.05f;       // ‚±‚к€И‰є‚М—Ћ‰є‘¬“x‚И‚зЋ~‚Я‚й(m/sЉ·ЋZ‚И‚з’l‚НЏ¬‚і‚Я)
-    float stopMoveY = 0.0005f;     // ‚±‚к€И‰є‚МY€Ъ“®‚И‚зЋ~‚Я‚й
-    float sleepTime = 0.2f;        // €А’и‚Є‚±‚к‚ѕ‚Ї‘±‚ў‚Ѕ‚зsleep
+    // ---- ењ°йќўг‚№гѓЉгѓѓгѓ—пј†еЃњж­ўгЃ®й–ѕеЂ¤ ----
+    float groundEps = 0.001f;      // ењ°йќўе€¤е®љгЃ®иЁ±е®№(г‚Ѓг‚ЉиѕјгЃїиЁ±е®№)
+    float stopVelY = 0.05f;       // гЃ“г‚Њд»Ґдё‹гЃ®иђЅдё‹йЂџеє¦гЃЄг‚‰ж­ўг‚Ѓг‚‹(m/sжЏ›з®—гЃЄг‚‰еЂ¤гЃЇе°ЏгЃ•г‚Ѓ)
+    float stopMoveY = 0.0005f;     // гЃ“г‚Њд»Ґдё‹гЃ®Yз§»е‹•гЃЄг‚‰ж­ўг‚Ѓг‚‹
+    float sleepTime = 0.2f;        // е®‰е®љгЃЊгЃ“г‚ЊгЃ гЃ‘з¶љгЃ„гЃџг‚‰sleep
 
-    float stableTimer = 0.0f;      // “а•”—p
+    float stableTimer = 0.0f;      // е†…йѓЁз”Ё
 
-    // Љ®‘S’вЋ~ѓtѓ‰ѓO
+    // е®Ње…ЁеЃњж­ўгѓ•гѓ©г‚°
     bool fullyLocked = false;
 
     DirectX::XMFLOAT4 orientation = { 0,0,0,1 }; // quaternion
 
     /// <summary>
-    /// RidigBody‚МѓRѓ“ѓXѓgѓ‰ѓNѓ^
+    /// RidigBodyгЃ®г‚ігѓіг‚№гѓ€гѓ©г‚Їг‚ї
     /// </summary>
-    /// <param name="pos">’†ђS€К’u</param>
-    /// <param name="size"ѓTѓCѓY</param>
-    /// <param name="m">Ћї—К</param>
+    /// <param name="pos">дё­еїѓдЅЌзЅ®</param>
+    /// <param name="size"г‚µг‚¤г‚є</param>
+    /// <param name="m">иіЄй‡Џ</param>
     RigidBodyOBB(Vec3 pos, Vec3 size, float m);
 
-    // ѓЏЃ[ѓ‹ѓh‹уЉФ‚М8’ё“_‚рЊvЋZ‚µ‚ДЋж“ѕ
-    // ‚±‚к‚ЄЃu’ё“_‚І‚Ж‚ЙѓxѓNѓgѓ‹‚р—p€УЃv‚Й‘Љ“–‚µ‚Ь‚·
-    // 0+++		„« ‰њ 5_______4
-    // 1-++		„«      /         /
-    // 2+-+		„«  7/_____ / 6
-    // 3--+		„«   
-    // 4++-		„« ‘O 1_______0
-    // 5-+-		„«      /        /
-    // 6+--		„«  3/_____ / 2
-    // 7---		„« 
+    // гѓЇгѓјгѓ«гѓ‰з©єй–“гЃ®8й ‚з‚№г‚’иЁ€з®—гЃ—гЃ¦еЏ–еѕ—
+    // гЃ“г‚ЊгЃЊгЂЊй ‚з‚№гЃ”гЃЁгЃ«гѓ™г‚Їгѓ€гѓ«г‚’з”Ёж„ЏгЂЌгЃ«з›ёеЅ“гЃ—гЃѕгЃ™
+    // 0+++		в”ѓ еҐҐ 5_______4
+    // 1-++		в”ѓ      /         /
+    // 2+-+		в”ѓ  7/_____ / 6
+    // 3--+		в”ѓ   
+    // 4++-		в”ѓ е‰Ќ 1_______0
+    // 5-+-		в”ѓ      /        /
+    // 6+--		в”ѓ  3/_____ / 2
+    // 7---		в”ѓ 
     //_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
     void GetWorldVertices(Vec3 outVertices[8]) const;
     void GetWorldVertices(DirectX::XMFLOAT3 outVertices[8]) const;
 
-    // ђП•ЄЌXђVЃi–€ѓtѓЊЃ[ѓЂЊД‚ФЃjѓfѓtѓHѓ‹ѓg€шђ”(1ѓtѓЊЃ[ѓЂ)
+    // з©Ќе€†ж›ґж–°пј€жЇЋгѓ•гѓ¬гѓјгѓ е‘јгЃ¶пј‰гѓ‡гѓ•г‚©гѓ«гѓ€еј•ж•°(1гѓ•гѓ¬гѓјгѓ )
     void Update(float dt = 1.0f / 60.0f);
     void AddLinearVelocity(const Vec3& dv);
     void AddAngularVelocity(const Vec3& dw);
     void ClampLinear(float vMax);
     void ClampAngular(float wMax);
     void IntegrateRotation(float dt);
-    // Џd—Н“K‰ћ•ПЌXЉЦђ”
+    // й‡ЌеЉ›йЃ©еїње¤‰ж›ґй–ўж•°
     void SetGravity(bool enable);
-    // Љ®‘S’вЋ~ђЭ’иЉЦђ”
+    // е®Ње…ЁеЃњж­ўиЁ­е®љй–ўж•°
     void SetFullyLocked(bool lock);
-    // ===== Sleep / Gravity (’З‰БѓuѓЌѓbѓN) =====
+    // ===== Sleep / Gravity (иїЅеЉ гѓ–гѓ­гѓѓг‚Ї) =====
     
-    // ЉO—НЃi—Н‚М’~ђПЃj
+    // е¤–еЉ›пј€еЉ›гЃ®и“„з©Ќпј‰
     Vec3 forceAccum = Vec3(0, 0, 0);
 
-    // Џd—НЃi‰Б‘¬“xЃj‚ЖON/OFF
+    // й‡ЌеЉ›пј€еЉ йЂџеє¦пј‰гЃЁON/OFF
     Vec3 gravity = Vec3(0, -9.8f, 0);
     bool gravityEnabled = true;
 
-    // Џу‘Ф
-    bool isStatic = false;     // Љ®‘SЊЕ’иЃiUpdate‚µ‚И‚ўЃj
-    bool isSleeping = false;   // –°‚иЃiUpdate‚µ‚И‚ўЃj
+    // зЉ¶ж…‹
+    bool isStatic = false;     // е®Ње…Ёе›єе®љпј€UpdateгЃ—гЃЄгЃ„пј‰
+    bool isSleeping = false;   // зњ г‚Љпј€UpdateгЃ—гЃЄгЃ„пј‰
 
-    // ђЪ’nЃi–€ѓtѓЊЃ[ѓЂЉO•”‚ЕЌXђV‚µ‚ДOKЃj
+    // жЋҐењ°пј€жЇЋгѓ•гѓ¬гѓјгѓ е¤–йѓЁгЃ§ж›ґж–°гЃ—гЃ¦OKпј‰
     bool grounded = false;
 
-    // sleep”»’и—p
+    // sleepе€¤е®љз”Ё
     Vec3 lastCenter = Vec3(0, 0, 0);
     float sleepTimer = 0.0f;
 
-    // и‡’lЃi’Іђ®—pЃj
+    // й–ѕеЂ¤пј€иЄїж•ґз”Ёпј‰
     float linearSleepEps = 0.05f;     // m/s
     float angularSleepEps = 0.2f;     // rad/s
     float moveSleepEps = 0.001f;      // m
     float sleepTimeToEnter = 0.5f;    // sec
 
-    // ’З‰БѓЃѓ\ѓbѓhЃiRigidBodyOBB“а‚ЙђйЊѕЃj
+    // иїЅеЉ гѓЎг‚Ѕгѓѓгѓ‰пј€RigidBodyOBBе†…гЃ«е®ЈиЁЂпј‰
     void ApplyForce(const Vec3& f)
     {
         if (isStatic) return;
@@ -233,22 +233,22 @@ public:
 
 class CollisionResolver {
 public:
-    // ЏХ“ЛЏо•сЌ\‘ў‘М
+    // иЎќзЄЃжѓ…е ±ж§‹йЂ дЅ“
     struct Manifold {
         RigidBodyOBB* bodyA;
         RigidBodyOBB* bodyB;
-        Vec3 contactPoint; // ѓЏЃ[ѓ‹ѓh‹уЉФ‚Е‚МЏХ“Л“_
-        Vec3 normal;       // A‚©‚зB‚Ц‚МЏХ“Л–@ђь
-        float depth;       // ‚Я‚иЌћ‚Э—К
+        Vec3 contactPoint; // гѓЇгѓјгѓ«гѓ‰з©єй–“гЃ§гЃ®иЎќзЄЃз‚№
+        Vec3 normal;       // AгЃ‹г‚‰BгЃёгЃ®иЎќзЄЃжі•з·љ
+        float depth;       // г‚Ѓг‚ЉиѕјгЃїй‡Џ
     };
 
-    // ЏХ“Л‰ћ“љ‚МЊvЋZЃi€Ъ“®—К‚Ж‰с“]—К‚М“K—pЃj
+    // иЎќзЄЃеїњз­”гЃ®иЁ€з®—пј€з§»е‹•й‡ЏгЃЁе›ћи»ўй‡ЏгЃ®йЃ©з”Ёпј‰
     static void ResolveCollision(Manifold& m);
 
 private:
-    // ѓЏЃ[ѓ‹ѓh‹уЉФ‚Е‚МЉµђ«ѓeѓ“ѓ\ѓ‹‚М‹t•ПЉ·“K—p
-    // I_world^-1 * v ‚рЊvЋZ‚·‚йЉЦђ”
-    // Matrix‚рЋg‚н‚И‚ў‚Ѕ‚ЯЃAѓxѓNѓgѓ‹‚рѓЌЃ[ѓJѓ‹‚Й–Я‚µ‚ДЊvЋZ‚µЃAѓЏЃ[ѓ‹ѓh‚Й–Я‚·
+    // гѓЇгѓјгѓ«гѓ‰з©єй–“гЃ§гЃ®ж…ЈжЂ§гѓ†гѓіг‚Ѕгѓ«гЃ®йЂ†е¤‰жЏ›йЃ©з”Ё
+    // I_world^-1 * v г‚’иЁ€з®—гЃ™г‚‹й–ўж•°
+    // Matrixг‚’дЅїг‚ЏгЃЄгЃ„гЃџг‚ЃгЂЃгѓ™г‚Їгѓ€гѓ«г‚’гѓ­гѓјг‚«гѓ«гЃ«ж€»гЃ—гЃ¦иЁ€з®—гЃ—гЂЃгѓЇгѓјгѓ«гѓ‰гЃ«ж€»гЃ™
     static Vec3 ApplyInertiaInverse(const RigidBodyOBB* body, const Vec3& v);
 };
 

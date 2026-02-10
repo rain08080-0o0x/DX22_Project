@@ -1,4 +1,4 @@
-#include "Yukari.h"
+ï»¿#include "Yukari.h"
 #include "Transfer.h"
 
 Yukari::Yukari()
@@ -10,14 +10,14 @@ Yukari::Yukari()
 	DirectX::XMFLOAT2 pos = { SCREEN_WIDTH - (size.x / 2.0f) + 100.0f, SCREEN_HEIGHT - (size.y / 2.0f * 0.75f) };
 	tran.yukari.pos = pos;
 	tran.yukari.size = size;
-	m_pYukari[0] = new UIObject("Yukari/Œ»ê”L.png", pos.x, pos.y, size.x, size.y);
+	m_pYukari[0] = new UIObject("Yukari/ç¾å ´çŒ«.png", pos.x, pos.y, size.x, size.y);
 	m_pYukari[1] = new UIObject("Yukari/happy.png", pos.x, pos.y, size.x, size.y);
 	m_pYukari[2] = new UIObject("Yukari/unhappy.png", pos.x, pos.y, size.x, size.y);
 	m_pYukari[3] = new UIObject("Yukari/think.png", pos.x, pos.y, size.x, size.y);
 
 
 
-	// ‚±‚±‚©‚ç‚«o‚µ
+	// ã“ã“ã‹ã‚‰å¹ãå‡ºã—
 	"Assets/Texture/Yukari/talk/iidesune.png";
 	"Assets/Texture/Yukari/talk/ikimasuyo.png";
 	"Assets/Texture/Yukari/talk/sate.png";

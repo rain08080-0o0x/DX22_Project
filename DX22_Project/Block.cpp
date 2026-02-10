@@ -1,4 +1,4 @@
-#include "Block.h"
+ï»¿#include "Block.h"
 #include "Geometory.h"
 
 Block::Block()
@@ -21,22 +21,22 @@ void Block::Update()
 
 void Block::Draw()
 {
-#if _DEBUG // ƒfƒoƒbƒO‚Å“–‚½‚è”»’è•\¦ 
-	// •ÏŠ·s—ñ‚ÌŒvZ 
+#if _DEBUG // ãƒ‡ãƒãƒƒã‚°ã§å½“ãŸã‚Šåˆ¤å®šè¡¨ç¤º 
+	// å¤‰æ›è¡Œåˆ—ã®è¨ˆç®— 
 	DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(m_pos.x,m_pos.y,m_pos.z);
 	DirectX::XMMATRIX S = DirectX::XMMatrixScaling(m_collision.size.x,m_collision.size.y,m_collision.size.z);
 	DirectX::XMMATRIX mat;
 	mat = S * T;
 	mat = DirectX::XMMatrixTranspose(mat);
-	// •ÏŠ·s—ñ‚ğ}Œ`•\¦—p‚Éİ’è 
+	// å¤‰æ›è¡Œåˆ—ã‚’å›³å½¢è¡¨ç¤ºç”¨ã«è¨­å®š 
 	DirectX::XMFLOAT4X4 fMat;
 	DirectX::XMStoreFloat4x4(&fMat, mat);
 	Geometory::SetWorld(fMat);
 
-	// ƒ{ƒbƒNƒX•`‰æ 
+	// ãƒœãƒƒã‚¯ã‚¹æç”» 
 	Geometory::DrawBox();
 #endif 
-	//iƒ‚ƒfƒ‹‚Ì•\¦ˆ—‚ª“ü‚é‚ÆGoodIj
+	//ï¼ˆãƒ¢ãƒ‡ãƒ«ã®è¡¨ç¤ºå‡¦ç†ãŒå…¥ã‚‹ã¨Goodï¼ï¼‰
 }
 
 Collision::Box Block::GetCollision()

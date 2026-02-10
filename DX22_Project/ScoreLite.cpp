@@ -1,4 +1,4 @@
-#include "ScoreLite.h"
+﻿#include "ScoreLite.h"
 #include <algorithm>
 
 ScoreLite::ScoreLite(const char* digitsTexture, float x, float y, float digitW, float digitH, float spacing)

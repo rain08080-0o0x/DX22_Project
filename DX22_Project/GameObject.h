@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <DirectXMath.h>
 #include "Model.h"
@@ -6,16 +6,16 @@
 class GameObject 
 {
 protected:
-	DirectX::XMFLOAT3 m_pos; // ƒIƒuƒWƒFƒNƒg‚ÌÀ•W 
+	DirectX::XMFLOAT3 m_pos; // ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®åº§æ¨™ 
 
 public:
-	//--- Šî–{ˆ— 
+	//--- åŸºæœ¬å‡¦ç† 
 	GameObject();
 	virtual ~GameObject() = 0;
 	virtual void Update() = 0;
 	virtual void Draw() = 0;
 
-	//--- À•W‘€ì 
+	//--- åº§æ¨™æ“ä½œ 
 	DirectX::XMFLOAT3 GetPos();
 	void SetPos(DirectX::XMFLOAT3 pos);
 

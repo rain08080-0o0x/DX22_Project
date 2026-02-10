@@ -1,4 +1,6 @@
-#include "Enemy.h"
+ï»¿#include "Enemy.h"
+#include <cmath>
+#include <cstdlib>
 
 namespace
 {
@@ -7,6 +9,31 @@ namespace
     const float kDefaultStageSize = 5.0f;
     const float kDefaultMoveSpeed = 1.2f;
     const float kMoveDt = 1.0f / 60.0f;
+    const float kChaseStartRatio = 0.45f;
+    const float kChaseEndRatio = 0.60f;
+    const float kStopDistanceMin = 0.15f;
+    const float kStopDistanceRange = 0.40f;
+    const float kWanderSpeedScale = 0.50f;
+    const float kWanderReachEps = 0.15f;
+    const float kWanderTimerMin = 0.40f;
+    const float kWanderTimerMax = 1.20f;
+
+    float ClampFloat(float v, float lo, float hi)
+    {
+        if (v < lo) return lo;
+        if (v > hi) return hi;
+        return v;
+    }
+
+    float Rand01()
+    {
+        return static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    }
+
+    float RandRange(float minV, float maxV)
+    {
+        return minV + (maxV - minV) * Rand01();
+    }
 }
 
 Enemy::Enemy()
@@ -19,6 +46,9 @@ Enemy::Enemy()
     , m_hp(kDefaultEnemyHp)
     , m_maxHp(kDefaultEnemyHp)
     , m_targetPos({2,0,0})
+    , m_wanderTarget(0.0f, 0.0f, 0.0f)
+    , m_wanderTimer(0.0f)
+    , m_state(MoveState::Wander)
 {
     m_pos = { 0.0f, 0.0f, 0.0f };
 
@@ -40,40 +70,93 @@ Enemy::~Enemy()
 
 void Enemy::Update()
 {
-    bool isActive = false;
-    if(isActive)
+    const float stage = (m_stageSize > 0.0f) ? m_stageSize : kDefaultStageSize;
+    const float half = stage * 0.5f;
+    const float halfX = m_size.x * 0.5f;
+    const float halfZ = m_size.z * 0.5f;
+
+    float minX = -half + halfX;
+    float maxX = half - halfX;
+    float minZ = -half + halfZ;
+    float maxZ = half - halfZ;
+    if (minX > maxX) { minX = 0.0f; maxX = 0.0f; }
+    if (minZ > maxZ) { minZ = 0.0f; maxZ = 0.0f; }
+
+    const float chaseStart = stage * kChaseStartRatio;
+    const float chaseEnd = stage * kChaseEndRatio;
+
+    const float toTargetX = m_targetPos.x - m_pos.x;
+    const float toTargetZ = m_targetPos.z - m_pos.z;
+    const float targetDistSq = toTargetX * toTargetX + toTargetZ * toTargetZ;
+
+    if (m_state == MoveState::Wander)
     {
-        const float stage = (m_stageSize > 0.0f) ? m_stageSize : kDefaultStageSize;
-        const float half = stage * 0.5f;
-        const float halfX = m_size.x * 0.5f;
-
-        float minX = -half + halfX;
-        float maxX = half - halfX;
-        if (minX > maxX)
+        if (targetDistSq <= chaseStart * chaseStart)
         {
-            minX = 0.0f;
-            maxX = 0.0f;
-        }
-
-        m_pos.x += m_moveDirX * m_moveSpeed * kMoveDt;
-
-        if (m_pos.x <= minX)
-        {
-            m_pos.x = minX;
-            m_moveDirX = 1.0f;
-        }
-        else if (m_pos.x >= maxX)
-        {
-            m_pos.x = maxX;
-            m_moveDirX = -1.0f;
+            m_state = MoveState::Chase;
         }
     }
     else
     {
-        // ƒ^[ƒQƒbƒg‚Ì•ûŒü‚ÖˆÚ“®
-        m_pos.x += (m_targetPos.x - m_pos.x) * 0.02f;
-        m_pos.z += (m_targetPos.z - m_pos.z) * 0.02f;
+        if (targetDistSq >= chaseEnd * chaseEnd)
+        {
+            m_state = MoveState::Wander;
+            m_wanderTimer = 0.0f;
+        }
     }
+
+    if (m_state == MoveState::Chase)
+    {
+        const float dist = std::sqrt(targetDistSq);
+        if (dist > 0.0001f)
+        {
+            float stopDist = (m_size.x > m_size.z) ? m_size.x : m_size.z;
+            stopDist *= 0.6f;
+            if (stopDist < kStopDistanceMin) stopDist = kStopDistanceMin;
+
+            if (dist > stopDist)
+            {
+                float speedScale = 1.0f;
+                if (dist < stopDist + kStopDistanceRange)
+                {
+                    speedScale = (dist - stopDist) / kStopDistanceRange;
+                }
+                m_pos.x += (toTargetX / dist) * m_moveSpeed * speedScale * kMoveDt;
+                m_pos.z += (toTargetZ / dist) * m_moveSpeed * speedScale * kMoveDt;
+            }
+        }
+    }
+    else
+    {
+        m_wanderTimer -= kMoveDt;
+
+        float toWanderX = m_wanderTarget.x - m_pos.x;
+        float toWanderZ = m_wanderTarget.z - m_pos.z;
+        float wanderDistSq = toWanderX * toWanderX + toWanderZ * toWanderZ;
+
+        if (m_wanderTimer <= 0.0f || wanderDistSq <= kWanderReachEps * kWanderReachEps)
+        {
+            float targetX = (minX == maxX) ? minX : RandRange(minX, maxX);
+            float targetZ = (minZ == maxZ) ? minZ : RandRange(minZ, maxZ);
+            m_wanderTarget = { targetX, 0.0f, targetZ };
+            m_wanderTimer = RandRange(kWanderTimerMin, kWanderTimerMax);
+
+            toWanderX = m_wanderTarget.x - m_pos.x;
+            toWanderZ = m_wanderTarget.z - m_pos.z;
+            wanderDistSq = toWanderX * toWanderX + toWanderZ * toWanderZ;
+        }
+
+        const float dist = std::sqrt(wanderDistSq);
+        if (dist > 0.0001f)
+        {
+            const float speed = m_moveSpeed * kWanderSpeedScale;
+            m_pos.x += (toWanderX / dist) * speed * kMoveDt;
+            m_pos.z += (toWanderZ / dist) * speed * kMoveDt;
+        }
+    }
+
+    m_pos.x = ClampFloat(m_pos.x, minX, maxX);
+    m_pos.z = ClampFloat(m_pos.z, minZ, maxZ);
     m_pos.y = 0.0f;
 }
 
@@ -81,32 +164,32 @@ void Enemy::Draw()
 {
     if (!m_pTexture) return;
     using namespace DirectX;
-    // ---- ƒrƒ‹ƒ{[ƒhs—ñŒvZ ----
+    // ---- ãƒ“ãƒ«ãƒœãƒ¼ãƒ‰è¡Œåˆ—è¨ˆç®— ----
     XMMATRIX billboard = XMMatrixIdentity();
 
     if (m_pCamera)
     {
-        // “]’u‚µ‚Ä‚¢‚È‚¢ƒJƒƒ‰‚Ì View s—ñ‚ğæ“¾
+        // è»¢ç½®ã—ã¦ã„ãªã„ã‚«ãƒ¡ãƒ©ã® View è¡Œåˆ—ã‚’å–å¾—
         XMFLOAT4X4 viewFloat;
         //XMStoreFloat4x4(&viewFloat, m_pCamera->GetViewMatrix());
         viewFloat = m_pCamera->GetViewMatrix(false);
 
-        // “Ç‚İæ‚è—p ¨ ŒvZ—p
+        // èª­ã¿å–ã‚Šç”¨ â†’ è¨ˆç®—ç”¨
         XMMATRIX viewMat = XMLoadFloat4x4(&viewFloat);
 
-        // ‹ts—ñi‰ñ“] + ˆÚ“®‚ğ‘Å‚¿Á‚·j
+        // é€†è¡Œåˆ—ï¼ˆå›è»¢ + ç§»å‹•ã‚’æ‰“ã¡æ¶ˆã™ï¼‰
         XMMATRIX invView = XMMatrixInverse(nullptr, viewMat);
 
-        // ŒvZ—p ¨ “Ç‚İæ‚è—p
+        // è¨ˆç®—ç”¨ â†’ èª­ã¿å–ã‚Šç”¨
         XMFLOAT4X4 invViewFloat;
         XMStoreFloat4x4(&invViewFloat, invView);
 
-        // ˆÚ“®¬•ª‚ğíœi‰ñ“]‚Ì‚İc‚·j
+        // ç§»å‹•æˆåˆ†ã‚’å‰Šé™¤ï¼ˆå›è»¢ã®ã¿æ®‹ã™ï¼‰
         invViewFloat._41 = 0.0f;
         invViewFloat._42 = 0.0f;
         invViewFloat._43 = 0.0f;
 
-        // “Ç‚İæ‚è—p ¨ ŒvZ—p
+        // èª­ã¿å–ã‚Šç”¨ â†’ è¨ˆç®—ç”¨
         billboard = XMLoadFloat4x4(&invViewFloat);
     }
     DirectX::XMMATRIX T = billboard * DirectX::XMMatrixTranslation(
@@ -180,6 +263,12 @@ int Enemy::GetMaxHp() const
 {
     return m_maxHp;
 }
+
+int Enemy::GetState() const
+{
+    return (m_state == MoveState::Chase) ? 1 : 0;
+}
+
 
 
 void Enemy::SetCamera(Camera* camera)

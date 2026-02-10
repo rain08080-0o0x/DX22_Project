@@ -1,7 +1,7 @@
-/*
+ï»¿/*
  * @
- * “à•”‚ÅCOMƒIƒuƒWƒFƒNƒg‚ğ—˜—p‚·‚é‚½‚ßALoadTextureŠÖ”‚æ‚èŒã‚ÉInitSoundŠÖ”ŒÄ‚Ño‚·‚Æ
- * ƒGƒ‰[‚É‚È‚é
+ * å†…éƒ¨ã§COMã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’åˆ©ç”¨ã™ã‚‹ãŸã‚ã€LoadTextureé–¢æ•°ã‚ˆã‚Šå¾Œã«InitSoundé–¢æ•°å‘¼ã³å‡ºã™ã¨
+ * ã‚¨ãƒ©ãƒ¼ã«ãªã‚‹
  */
 #ifndef __SOUND_H__
 #define __SOUND_H__
@@ -10,16 +10,16 @@
 #pragma comment(lib, "xaudio2.lib")
 
 //----------
-// ƒvƒƒgƒ^ƒCƒvéŒ¾
+// ãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—å®£è¨€
 //----------
 HRESULT InitSound(void);
 void UninitSound(void);
 
-// ƒTƒEƒ“ƒhƒtƒ@ƒCƒ‹‚Ì“Ç‚İ‚İ
+// ã‚µã‚¦ãƒ³ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«ã®èª­ã¿è¾¼ã¿
 XAUDIO2_BUFFER* LoadSound(const char *file, bool loop = false);
 
-// ƒTƒEƒ“ƒh‚ÌÄ¶
-#undef PlaySound // winapi‚ÌPlaySound‚ğ–³Œø‚É‚·‚é
+// ã‚µã‚¦ãƒ³ãƒ‰ã®å†ç”Ÿ
+#undef PlaySound // winapiã®PlaySoundã‚’ç„¡åŠ¹ã«ã™ã‚‹
 IXAudio2SourceVoice* PlaySound(XAUDIO2_BUFFER* pSound);
 
 #endif // __SOUND_H__

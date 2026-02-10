@@ -1,4 +1,4 @@
-#ifndef __UI_OBJECT_MANAGER_H__
+﻿#ifndef __UI_OBJECT_MANAGER_H__
 #define __UI_OBJECT_MANAGER_H__
 
 #include "UIManager.h"

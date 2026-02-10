@@ -1,4 +1,4 @@
-﻿#include "Camera.h"
+﻿﻿#include "Camera.h"
 
 Camera::Camera()
 	: m_pos(0.0f,1.5f,-2.0f)

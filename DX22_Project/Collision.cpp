@@ -1,20 +1,20 @@
-#include "Collision.h"
+ï»¿#include "Collision.h"
 
 Collision::Result Collision::Hit(Box a, Box b)
 {
     Result out = {};
 
-    // ŒvZ—p‚Ì•û‚É•ÏŠ·
+    // è¨ˆç®—ç”¨ã®æ–¹ã«å¤‰æ›
     DirectX::XMVECTOR vPosA = DirectX::XMLoadFloat3(&a.center);
     DirectX::XMVECTOR vPosB = DirectX::XMLoadFloat3(&b.center);
     DirectX::XMVECTOR vSizeA = DirectX::XMLoadFloat3(&a.size);
     DirectX::XMVECTOR vSizeB = DirectX::XMLoadFloat3(&b.size);
 
-    // ƒ{ƒbƒNƒX‚Ì”¼•ª‚ÌƒTƒCƒY‚ğæ“¾
+    // ãƒœãƒƒã‚¯ã‚¹ã®åŠåˆ†ã®ã‚µã‚¤ã‚ºã‚’å–å¾—
     vSizeA = DirectX::XMVectorScale(vSizeA, 0.5f);
     vSizeB = DirectX::XMVectorScale(vSizeB, 0.5f);
 
-    // ƒ{ƒbƒNƒX‚ÌŠe²‚ÌÅ‘å’lAÅ¬’l‚ğæ“¾
+    // ãƒœãƒƒã‚¯ã‚¹ã®å„è»¸ã®æœ€å¤§å€¤ã€æœ€å°å€¤ã‚’å–å¾—
     DirectX::XMVECTOR vMaxA = DirectX::XMVectorAdd(vPosA, vSizeA);
     DirectX::XMVECTOR vMinA = DirectX::XMVectorSubtract(vPosA, vSizeA);
     DirectX::XMVECTOR vMaxB = DirectX::XMVectorAdd(vPosB, vSizeB);
@@ -46,7 +46,7 @@ Collision::Result Collision::Hit(Box a, Box b)
                 DirectX::XMFLOAT3 overlap;
                 DirectX::XMStoreFloat3(&overlap, vOverlap);
 
-                // Še²‚Ì‚ß‚è‚İ—Ê‚Ì‚¤‚¿AÅ¬‚Ì‚ß‚è‚İ—Ê‚Ì•ûŒü‚Ö’µ‚Ë•Ô‚· 
+                // å„è»¸ã®ã‚ã‚Šè¾¼ã¿é‡ã®ã†ã¡ã€æœ€å°ã®ã‚ã‚Šè¾¼ã¿é‡ã®æ–¹å‘ã¸è·³ã­è¿”ã™ 
                 if (overlap.x < overlap.y) {
                     if (overlap.x < overlap.z)
                         out.dir = { a.center.x < b.center.x ? -1.0f : 1.0f, 0.0f, 0.0f };
@@ -97,14 +97,14 @@ RigidBodyOBB::RigidBodyOBB(Vec3 pos, Vec3 size, float maasss)
     , angularVel(0, 0, 0)
     , isGround(false)
 {
-    // ‰Šúp¨‚Íƒ[ƒ‹ƒh²‚Æ“¯‚¶
+    // åˆæœŸå§¿å‹¢ã¯ãƒ¯ãƒ¼ãƒ«ãƒ‰è»¸ã¨åŒã˜
     axis[0] = Vec3(1, 0, 0);
     axis[1] = Vec3(0, 1, 0);
     axis[2] = Vec3(0, 0, 1);
 
     if (mass > 0.0f) {
         invMass = 1.0f / mass;
-        // ’¼•û‘Ì‚ÌŠµ«ƒ‚[ƒƒ“ƒgŒvZ I = m/12 * (h^2 + d^2) ...
+        // ç›´æ–¹ä½“ã®æ…£æ€§ãƒ¢ãƒ¼ãƒ¡ãƒ³ãƒˆè¨ˆç®— I = m/12 * (h^2 + d^2) ...
         float w2 = size.x * size.x;
         float h2 = size.y * size.y;
         float d2 = size.z * size.z;
@@ -124,7 +124,7 @@ void RigidBodyOBB::GetWorldVertices(Vec3 outVertices[8]) const {
     Vec3 ay = axis[1] * extents.y;
     Vec3 az = axis[2] * extents.z;
 
-    // 8’Ê‚è‚Ì‘g‚İ‡‚í‚¹‚ğ“WŠJ
+    // 8é€šã‚Šã®çµ„ã¿åˆã‚ã›ã‚’å±•é–‹
     outVertices[0] = center + ax + ay + az;
     outVertices[1] = center - ax + ay + az;
     outVertices[2] = center + ax - ay + az;
@@ -142,7 +142,7 @@ void RigidBodyOBB::GetWorldVertices(DirectX::XMFLOAT3 outVertices[8]) const
     Vec3 az = axis[2] * extents.z;
 
     Vec3 all[8];
-    // 8’Ê‚è‚Ì‘g‚İ‡‚í‚¹‚ğ“WŠJ
+    // 8é€šã‚Šã®çµ„ã¿åˆã‚ã›ã‚’å±•é–‹
     all[0] = center + ax + ay + az;
     all[1] = center - ax + ay + az;
     all[2] = center + ax - ay + az;
@@ -164,7 +164,7 @@ void RigidBodyOBB::GetWorldVertices(DirectX::XMFLOAT3 outVertices[8]) const
 
 void RigidBodyOBB::Update(float dt)
 {
-    // Š®‘SŒÅ’è‚È‚ç‰½‚à‚µ‚È‚¢
+    // å®Œå…¨å›ºå®šãªã‚‰ä½•ã‚‚ã—ãªã„
     if (fullyLocked) return;
 
     if (isStatic) return;
@@ -174,7 +174,7 @@ void RigidBodyOBB::Update(float dt)
     if (dt <= 0.0f) return;
     if (dt > 0.1f) dt = 0.1f;
 
-    // š–ˆƒtƒŒ[ƒ€ƒŠƒZƒbƒgi•K{j
+    // â˜…æ¯ãƒ•ãƒ¬ãƒ¼ãƒ ãƒªã‚»ãƒƒãƒˆï¼ˆå¿…é ˆï¼‰
     isGround = false;
 
     Vec3 accel(0, 0, 0);
@@ -187,20 +187,20 @@ void RigidBodyOBB::Update(float dt)
     velocity += accel * dt;
     center += velocity * dt;
 
-    // --- ‰ñ“]‚ÌÏ•ªiaxis ‚ğ angularVel ‚ÅXVj ---
+    // --- å›è»¢ã®ç©åˆ†ï¼ˆaxis ã‚’ angularVel ã§æ›´æ–°ï¼‰ ---
     {
-        // Šp‘¬“x‚ª¬‚³‚¢‚È‚çƒXƒLƒbƒv
+        // è§’é€Ÿåº¦ãŒå°ã•ã„ãªã‚‰ã‚¹ã‚­ãƒƒãƒ—
         float wLen2 = angularVel.x * angularVel.x + angularVel.y * angularVel.y + angularVel.z * angularVel.z;
         if (wLen2 > 1e-12f)
         {
-            // ‰ñ“]²i³‹K‰»j
+            // å›è»¢è»¸ï¼ˆæ­£è¦åŒ–ï¼‰
             float wLen = sqrtf(wLen2);
             Vec3 rotAxis = angularVel * (1.0f / wLen);
 
-            // ‰ñ“]Špiƒ‰ƒWƒAƒ“j
+            // å›è»¢è§’ï¼ˆãƒ©ã‚¸ã‚¢ãƒ³ï¼‰
             float angle = wLen * dt;
 
-            // DirectX‚Ì‰ñ“]s—ñ‚ğì‚Á‚Ä axis ‚ğ‰ñ‚·
+            // DirectXã®å›è»¢è¡Œåˆ—ã‚’ä½œã£ã¦ axis ã‚’å›ã™
             DirectX::XMMATRIX R = DirectX::XMMatrixRotationAxis(
                 DirectX::XMVectorSet(rotAxis.x, rotAxis.y, rotAxis.z, 0.0f),
                 angle
@@ -219,19 +219,19 @@ void RigidBodyOBB::Update(float dt)
             axis[1] = RotateVec(axis[1]);
             axis[2] = RotateVec(axis[2]);
 
-            // ”’lŒë·‚Å•ö‚ê‚é‚Ì‚Å³‹K’¼Œğ‰»i’´d—vj
+            // æ•°å€¤èª¤å·®ã§å´©ã‚Œã‚‹ã®ã§æ­£è¦ç›´äº¤åŒ–ï¼ˆè¶…é‡è¦ï¼‰
             axis[0] = axis[0].Normalize();
             axis[1] = (axis[1] - axis[0] * axis[0].Dot(axis[1])).Normalize(); // Gram-Schmidt
-            axis[2] = axis[0].Cross(axis[1]); // ‰EèŒn‚ğˆÛ
+            axis[2] = axis[0].Cross(axis[1]); // å³æ‰‹ç³»ã‚’ç¶­æŒ
         }
     }
 
     forceAccum = Vec3(0, 0, 0);
 
-    // ’n–ÊƒXƒiƒbƒv
+    // åœ°é¢ã‚¹ãƒŠãƒƒãƒ—
     {
         const float groundY = 0.0f;
-        const float groundEps = 0.002f; // šƒqƒXƒeƒŠƒVƒX
+        const float groundEps = 0.002f; // â˜…ãƒ’ã‚¹ãƒ†ãƒªã‚·ã‚¹
 
         DirectX::XMFLOAT3 vtx[8];
         GetWorldVertices(vtx);
@@ -250,13 +250,13 @@ void RigidBodyOBB::Update(float dt)
 
             if (velocity.y < 0.0f) velocity.y = 0.0f;
 
-            // ‚±‚ÌğŒ‚ÍÀ¿ˆÓ–¡‚ª”–‚¢‚Ì‚Åí‚Á‚ÄOKi‰º‚Åà–¾j
+            // ã“ã®æ¡ä»¶ã¯å®Ÿè³ªæ„å‘³ãŒè–„ã„ã®ã§å‰Šã£ã¦OKï¼ˆä¸‹ã§èª¬æ˜ï¼‰
             // const float stopVy = 0.05f;
             // if (fabsf(velocity.y) < stopVy) velocity.y = 0.0f;
         }
     }
 
-    // –€C/Œ¸ŠiÕ“ËŒã‚É“ü‚ê‚é‚Ì‚Í³‚µ‚¢j
+    // æ‘©æ“¦/æ¸›è¡°ï¼ˆè¡çªå¾Œã«å…¥ã‚Œã‚‹ã®ã¯æ­£ã—ã„ï¼‰
     if (isGround)
     {
         velocity.x *= 0.80f;
@@ -328,7 +328,7 @@ void RigidBodyOBB::SetFullyLocked(bool lock)
 
     if (lock)
     {
-        // •¨—“I‚ÉŠ®‘S’â~
+        // ç‰©ç†çš„ã«å®Œå…¨åœæ­¢
         velocity = Vec3(0.0f, 0.0f, 0.0f);
         angularVel = Vec3(0.0f, 0.0f, 0.0f);
 
@@ -344,55 +344,55 @@ void CollisionResolver::ResolveCollision(Manifold& m)
     RigidBodyOBB* A = m.bodyA;
     RigidBodyOBB* B = m.bodyB;
 
-    // Ã~ƒIƒuƒWƒFƒNƒg“¯m‚È‚ç–³‹
+    // é™æ­¢ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆåŒå£«ãªã‚‰ç„¡è¦–
     if (A->invMass == 0 && B->invMass == 0) return;
 
-    // 1. Õ“Ë“_‚Ö‚ÌƒxƒNƒgƒ‹idS r ‚©‚çÕ“Ë“_ p ‚Ö‚ÌƒxƒNƒgƒ‹j
+    // 1. è¡çªç‚¹ã¸ã®ãƒ™ã‚¯ãƒˆãƒ«ï¼ˆé‡å¿ƒ r ã‹ã‚‰è¡çªç‚¹ p ã¸ã®ãƒ™ã‚¯ãƒˆãƒ«ï¼‰
     Vec3 rA = m.contactPoint - A->center;
     Vec3 rB = m.contactPoint - B->center;
 
-    // 2. Õ“Ë“_‚É‚¨‚¯‚é‘Š‘Î‘¬“x‚ÌŒvZ
+    // 2. è¡çªç‚¹ã«ãŠã‘ã‚‹ç›¸å¯¾é€Ÿåº¦ã®è¨ˆç®—
     // v_point = v_center + angularVel x r
     Vec3 velA = A->velocity + A->angularVel.Cross(rA);
     Vec3 velB = B->velocity + B->angularVel.Cross(rB);
     Vec3 relativeVel = velB - velA;
 
-    // ‘Š‘Î‘¬“x‚Ì–@ü•ûŒü¬•ª
+    // ç›¸å¯¾é€Ÿåº¦ã®æ³•ç·šæ–¹å‘æˆåˆ†
     float velAlongNormal = relativeVel.Dot(m.normal);
 
-    // —£‚ê‚æ‚¤‚Æ‚µ‚Ä‚¢‚é‚È‚çˆ—‚µ‚È‚¢
+    // é›¢ã‚Œã‚ˆã†ã¨ã—ã¦ã„ã‚‹ãªã‚‰å‡¦ç†ã—ãªã„
 
-// —£‚ê‚Ä‚¢‚­•ûŒü‚È‚çA‘¬“x‰“ši”½”­j‚Í•s—vB
-// ‚½‚¾‚µA‚ß‚è‚İ(m.depth)‚ªc‚Á‚Ä‚¢‚é‚±‚Æ‚ª‚ ‚é‚Ì‚ÅAˆÊ’u•â³‚ÍÀs‚³‚¹‚éB
-// ‚±‚±‚Å return ‚µ‚Ä‚µ‚Ü‚¤‚ÆAÃ~ÚG‚ª•ö‚ê‚ÄŒX‚«‚ÌŒ´ˆö‚É‚È‚éB
+// é›¢ã‚Œã¦ã„ãæ–¹å‘ãªã‚‰ã€é€Ÿåº¦å¿œç­”ï¼ˆåç™ºï¼‰ã¯ä¸è¦ã€‚
+// ãŸã ã—ã€ã‚ã‚Šè¾¼ã¿(m.depth)ãŒæ®‹ã£ã¦ã„ã‚‹ã“ã¨ãŒã‚ã‚‹ã®ã§ã€ä½ç½®è£œæ­£ã¯å®Ÿè¡Œã•ã›ã‚‹ã€‚
+// ã“ã“ã§ return ã—ã¦ã—ã¾ã†ã¨ã€é™æ­¢æ¥è§¦ãŒå´©ã‚Œã¦å‚¾ãã®åŸå› ã«ãªã‚‹ã€‚
     if (velAlongNormal > 0.0f)
     {
-        velAlongNormal = 0.0f; // ƒCƒ“ƒpƒ‹ƒX‚ª 0 ‚É‚È‚é‚æ‚¤‚É‚·‚éiˆÊ’u•â³‚Í‰º‚Ås‚¤j
+        velAlongNormal = 0.0f; // ã‚¤ãƒ³ãƒ‘ãƒ«ã‚¹ãŒ 0 ã«ãªã‚‹ã‚ˆã†ã«ã™ã‚‹ï¼ˆä½ç½®è£œæ­£ã¯ä¸‹ã§è¡Œã†ï¼‰
     }
 
 
-    // 3. ”½”­ŒW” (e)
-    float e = 0.5f; // 0:”ñ’e«, 1:Š®‘S’e«
+    // 3. åç™ºä¿‚æ•° (e)
+    float e = 0.5f; // 0:éå¼¾æ€§, 1:å®Œå…¨å¼¾æ€§
 
-    // Õ“Ë‘¬“x‚ª¬‚³‚¢i—á‚¦‚Îd—Í‚Ì‰e‹¿’ö“xj‚È‚çA”½”­ŒW”‚ğ0‚É‚µ‚Ä’e‚Ü‚È‚¢‚æ‚¤‚É‚·‚é
-    // è‡’l‚Íd—Í‰Á‘¬“x‚âƒtƒŒ[ƒ€ƒŒ[ƒg‚É‚æ‚è‚Ü‚·‚ªA1.0f`2.0f’ö“x‚Å’²®‚µ‚Ä‚­‚¾‚³‚¢
+    // è¡çªé€Ÿåº¦ãŒå°ã•ã„ï¼ˆä¾‹ãˆã°é‡åŠ›ã®å½±éŸ¿ç¨‹åº¦ï¼‰ãªã‚‰ã€åç™ºä¿‚æ•°ã‚’0ã«ã—ã¦å¼¾ã¾ãªã„ã‚ˆã†ã«ã™ã‚‹
+    // é–¾å€¤ã¯é‡åŠ›åŠ é€Ÿåº¦ã‚„ãƒ•ãƒ¬ãƒ¼ãƒ ãƒ¬ãƒ¼ãƒˆã«ã‚ˆã‚Šã¾ã™ãŒã€1.0fï½2.0fç¨‹åº¦ã§èª¿æ•´ã—ã¦ãã ã•ã„
     if (std::abs(velAlongNormal) < 1.0f)
     {
         e = 0.0f;
     }
 
-    // 4. ƒCƒ“ƒpƒ‹ƒXiŒ‚—Íj‚ÌƒXƒJƒ‰’l j ‚ÌŒvZ
-    // Œö®: j = -(1+e)(v_relEn) / (1/Ma + 1/Mb + (Ia^-1(rA x n) x rA + ... )En)
+    // 4. ã‚¤ãƒ³ãƒ‘ãƒ«ã‚¹ï¼ˆæ’ƒåŠ›ï¼‰ã®ã‚¹ã‚«ãƒ©å€¤ j ã®è¨ˆç®—
+    // å…¬å¼: j = -(1+e)(v_relãƒ»n) / (1/Ma + 1/Mb + (Ia^-1(rA x n) x rA + ... )ãƒ»n)
 
     float raxn_sq = 0.0f;
     float rbxn_sq = 0.0f;
 
-    // A‚Ì‰ñ“]¬•ª‚Ö‚Ì‰e‹¿ŒvZ
+    // Aã®å›è»¢æˆåˆ†ã¸ã®å½±éŸ¿è¨ˆç®—
     Vec3 raxn = rA.Cross(m.normal);
-    Vec3 iaInv_raxn = ApplyInertiaInverse(A, raxn); // Šµ«ƒeƒ“ƒ\ƒ‹‚Ì‹ts—ñ‚ğŠ|‚¯‚é
+    Vec3 iaInv_raxn = ApplyInertiaInverse(A, raxn); // æ…£æ€§ãƒ†ãƒ³ã‚½ãƒ«ã®é€†è¡Œåˆ—ã‚’æ›ã‘ã‚‹
     raxn_sq = iaInv_raxn.Cross(rA).Dot(m.normal);
 
-    // B‚Ì‰ñ“]¬•ª‚Ö‚Ì‰e‹¿ŒvZ
+    // Bã®å›è»¢æˆåˆ†ã¸ã®å½±éŸ¿è¨ˆç®—
     Vec3 rbxn = rB.Cross(m.normal);
     Vec3 ibInv_rbxn = ApplyInertiaInverse(B, rbxn);
     rbxn_sq = ibInv_rbxn.Cross(rB).Dot(m.normal);
@@ -400,20 +400,20 @@ void CollisionResolver::ResolveCollision(Manifold& m)
     float j = -(1.0f + e) * velAlongNormal;
     j /= (A->invMass + B->invMass + raxn_sq + rbxn_sq);
 
-    // 5. ƒCƒ“ƒpƒ‹ƒXƒxƒNƒgƒ‹‚Ì“K—p
+    // 5. ã‚¤ãƒ³ãƒ‘ãƒ«ã‚¹ãƒ™ã‚¯ãƒˆãƒ«ã®é©ç”¨
     Vec3 impulse = m.normal * j;
 
-    // A‚Ö‚Ì“K—pi‹t•ûŒüj
+    // Aã¸ã®é©ç”¨ï¼ˆé€†æ–¹å‘ï¼‰
     if (A->invMass > 0) {
-        // ˆÚ“®—Êi‘¬“xj‚Ì•Ï‰»
+        // ç§»å‹•é‡ï¼ˆé€Ÿåº¦ï¼‰ã®å¤‰åŒ–
         A->velocity = A->velocity - (impulse * A->invMass);
 
-        // Šp‰^“®—ÊiŠp‘¬“xj‚Ì•Ï‰»: Torque = r x F -> AngularVel += I^-1 * (r x Impulse)
+        // è§’é‹å‹•é‡ï¼ˆè§’é€Ÿåº¦ï¼‰ã®å¤‰åŒ–: Torque = r x F -> AngularVel += I^-1 * (r x Impulse)
         Vec3 torqueImpulse = rA.Cross(impulse);
         A->angularVel = A->angularVel - ApplyInertiaInverse(A, torqueImpulse);
     }
 
-    // B‚Ö‚Ì“K—pi³•ûŒüj
+    // Bã¸ã®é©ç”¨ï¼ˆæ­£æ–¹å‘ï¼‰
     if (B->invMass > 0) {
         B->velocity = B->velocity + (impulse * B->invMass);
 
@@ -421,12 +421,12 @@ void CollisionResolver::ResolveCollision(Manifold& m)
         B->angularVel = B->angularVel + ApplyInertiaInverse(B, torqueImpulse);
     }
 
-    // ¦‚ß‚è‚İ‰ğÁiPositional Correction)‚Íˆê’U‚È‚µ
+    // â€»ã‚ã‚Šè¾¼ã¿è§£æ¶ˆï¼ˆPositional Correction)ã¯ä¸€æ—¦ãªã—
     if (true)
-    // ‘¬“x‰ğŒˆ‚Æ•Ê‚ÉuˆÊ’uv‚ğ‰Ÿ‚µ–ß‚³‚È‚¢‚ÆAH‚¢‚İ‚ªc‚Á‚Ä•sˆÀ’è‚É‚È‚é
+    // é€Ÿåº¦è§£æ±ºã¨åˆ¥ã«ã€Œä½ç½®ã€ã‚’æŠ¼ã—æˆ»ã•ãªã„ã¨ã€é£Ÿã„è¾¼ã¿ãŒæ®‹ã£ã¦ä¸å®‰å®šã«ãªã‚‹
     {
-        const float percent = 0.25f;  // ‰Ÿ‚µ–ß‚µ‚ğ‹­‚ß‚éiÏ‚İã‚°/–ÊÚ’n‚ªˆÀ’è‚µ‚â‚·‚¢j
-        const float slop = 0.001f;    // ¬‚³‚¢‚ß‚è‚İ‚Í‹–—e‚µ‚Äk‚¦‚ğŒ¸‚ç‚·
+        const float percent = 0.25f;  // æŠ¼ã—æˆ»ã—ã‚’å¼·ã‚ã‚‹ï¼ˆç©ã¿ä¸Šã’/é¢æ¥åœ°ãŒå®‰å®šã—ã‚„ã™ã„ï¼‰
+        const float slop = 0.001f;    // å°ã•ã„ã‚ã‚Šè¾¼ã¿ã¯è¨±å®¹ã—ã¦éœ‡ãˆã‚’æ¸›ã‚‰ã™
 
         const float invMassSum = A->invMass + B->invMass;
 
@@ -445,19 +445,19 @@ void CollisionResolver::ResolveCollision(Manifold& m)
 Vec3 CollisionResolver::ApplyInertiaInverse(const RigidBodyOBB* body, const Vec3& v) {
     if (body->invMass == 0) return Vec3(0, 0, 0);
 
-    // 1. ƒxƒNƒgƒ‹ v ‚ğƒ{ƒfƒB‚Ìƒ[ƒJƒ‹‹óŠÔ‚Öi“]’us—ñ‚ğŠ|‚¯‚é‚Ì‚Æ“¯‹`j
-    //    Axis‚ª³‹K’¼ŒğŠî’ê‚È‚Ì‚ÅA“àÏ‚Å¬•ª•ª‰ğ‚Å‚«‚é
+    // 1. ãƒ™ã‚¯ãƒˆãƒ« v ã‚’ãƒœãƒ‡ã‚£ã®ãƒ­ãƒ¼ã‚«ãƒ«ç©ºé–“ã¸ï¼ˆè»¢ç½®è¡Œåˆ—ã‚’æ›ã‘ã‚‹ã®ã¨åŒç¾©ï¼‰
+    //    AxisãŒæ­£è¦ç›´äº¤åŸºåº•ãªã®ã§ã€å†…ç©ã§æˆåˆ†åˆ†è§£ã§ãã‚‹
     float x = body->axis[0].Dot(v);
     float y = body->axis[1].Dot(v);
     float z = body->axis[2].Dot(v);
 
-    // 2. ƒ[ƒJƒ‹‹óŠÔ‚Å‹tŠµ«ƒ‚[ƒƒ“ƒg‚ğŠ|‚¯‚é (‘ÎŠp¬•ª‚Ì‚İ‚È‚Ì‚Å’Pƒ‚ÈŠ|‚¯Z)
+    // 2. ãƒ­ãƒ¼ã‚«ãƒ«ç©ºé–“ã§é€†æ…£æ€§ãƒ¢ãƒ¼ãƒ¡ãƒ³ãƒˆã‚’æ›ã‘ã‚‹ (å¯¾è§’æˆåˆ†ã®ã¿ãªã®ã§å˜ç´”ãªæ›ã‘ç®—)
     //    I^-1 = (1/Ix, 1/Iy, 1/Iz)
     if (body->inertiaTensor.x != 0) x /= body->inertiaTensor.x;
     if (body->inertiaTensor.y != 0) y /= body->inertiaTensor.y;
     if (body->inertiaTensor.z != 0) z /= body->inertiaTensor.z;
 
-    // 3. Œ‹‰Ê‚ğƒ[ƒ‹ƒh‹óŠÔ‚Ö–ß‚·
+    // 3. çµæœã‚’ãƒ¯ãƒ¼ãƒ«ãƒ‰ç©ºé–“ã¸æˆ»ã™
     return body->axis[0] * x + body->axis[1] * y + body->axis[2] * z;
 }
 
@@ -472,7 +472,7 @@ int GetTopFace(const RigidBodyOBB& b)
 {
     const Vec3 worldUp(0.0f, 1.0f, 0.0f);
 
-    // 6–Ê‚Ì–@üi•„†”½“]‚Í * -1.0fj
+    // 6é¢ã®æ³•ç·šï¼ˆç¬¦å·åè»¢ã¯ * -1.0fï¼‰
     Vec3 normals[6] =
     {
         b.axis[0],              // +X
@@ -483,7 +483,7 @@ int GetTopFace(const RigidBodyOBB& b)
         b.axis[2] * -1.0f       // -Z
     };
 
-    // ‘Î‰‚·‚éo–Ú
+    // å¯¾å¿œã™ã‚‹å‡ºç›®
     int faceValue[6] =
     {
         4, // +X

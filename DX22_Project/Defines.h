@@ -1,4 +1,4 @@
-#ifndef __DEFINES_H__
+ï»¿#ifndef __DEFINES_H__
 #define __DEFINES_H__
 
 #include <assert.h>
@@ -9,10 +9,10 @@
 static const int FPS = 120;
 static const float fFPS = static_cast<float>(FPS);
 
-// ƒŠƒ\[ƒXƒpƒX
+// ãƒªã‚½ãƒ¼ã‚¹ãƒ‘ã‚¹
 #define ASSET(path)	"Assets/"path
 
-// 3D‹óŠÔ’è‹`
+// 3Dç©ºé–“å®šç¾©
 #define CMETER(value) (value * 0.01f)
 #define METER(value) (value * 1.0f)
 #define MSEC(value) (value / fFPS)
@@ -20,18 +20,18 @@ static const float fFPS = static_cast<float>(FPS);
 #define HALF(test) (test / 2.0f)
 static const float GRAVITY = 0.98f;
 
-// ƒ^ƒCƒgƒ‹
+// ã‚¿ã‚¤ãƒˆãƒ«
 static const char* APP_TITLE = "DX22_Golf";
 
-// ‰æ–ÊƒTƒCƒY
+// ç”»é¢ã‚µã‚¤ã‚º
 static const int SCREEN_WIDTH	= 1280;
 static const int SCREEN_HEIGHT	= 720;
 
-// ƒOƒŠƒbƒhƒTƒCƒY(ƒfƒoƒbƒO—p
-static const int	DEBUG_GRID_NUM		= 10;			// ƒOƒŠƒbƒh’†S‚©‚ç’[‚Ü‚Å‚Ìü‚Ì–{”
-static const float	DEBUG_GRID_MARGIN	= METER(1.0f);	// ƒOƒŠƒbƒh”z’u•
+// ã‚°ãƒªãƒƒãƒ‰ã‚µã‚¤ã‚º(ãƒ‡ãƒãƒƒã‚°ç”¨
+static const int	DEBUG_GRID_NUM		= 10;			// ã‚°ãƒªãƒƒãƒ‰ä¸­å¿ƒã‹ã‚‰ç«¯ã¾ã§ã®ç·šã®æœ¬æ•°
+static const float	DEBUG_GRID_MARGIN	= METER(1.0f);	// ã‚°ãƒªãƒƒãƒ‰é…ç½®å¹…
 
-// Å‘åƒTƒCƒRƒ”
+// æœ€å¤§ã‚µã‚¤ã‚³ãƒ­æ•°
 #define MAX_DICE (10)
 
 #define PI (3.1415926535F)

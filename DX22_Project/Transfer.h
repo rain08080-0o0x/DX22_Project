@@ -41,6 +41,15 @@ private:
 		DirectX::XMFLOAT4 color;
 		DirectX::XMFLOAT2 lcokColor;
 	};
+	struct EnemyInfo
+	{
+		DirectX::XMFLOAT3 pos{ 0.0f, 0.0f, 0.0f };
+		float hp = 0.0f;
+		float maxHp = 0.0f;
+		int state = -1;
+		int exists = 0;
+	};
+
 	struct DiceInfo
 	{
 		DirectX::XMFLOAT3 pos;
@@ -116,6 +125,7 @@ public:
 	}
 public:
 	PlayerInfo player;
+	EnemyInfo enemy;
 	DiceInfo dice;
 	CameraInfo camera{ { 0.0f, 6.0f, -6.0f },{ 0.0f, 0.0f, 0.0f } };
 	CameraInfo cameraGame{ { 0.0f, 6.0f, -6.0f },{ 0.0f, 0.0f, 0.0f } };

@@ -1,4 +1,4 @@
-#include "PolylineEffect.h"
+ï»¿#include "PolylineEffect.h"
 
 VertexShader*	PolylineEffect::m_pDefVS = nullptr;
 PixelShader*	PolylineEffect::m_pDefPS = nullptr;
@@ -6,17 +6,17 @@ int				PolylineEffect::m_shaderRefCount = 0;
 Texture*		PolylineEffect::m_pDefTex = nullptr;
 
 /*
-* @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-* @param[in] maxVertices Å‘å’¸“_”
+* @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+* @param[in] maxVertices æœ€å¤§é ‚ç‚¹æ•°
 */
 PolylineEffect::PolylineEffect(int maxVertices)
 	: m_useVtxCount(0)
 	, m_pTexture(nullptr)
 {
-	// ’¸“_ƒf[ƒ^ì¬
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	m_pVertices = new Vertex[maxVertices];
 
-	// ’¸“_ƒoƒbƒtƒ@ì¬
+	// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ä½œæˆ
 	MeshBuffer::Description desc = {};
 	desc.pVtx = m_pVertices;
 	desc.vtxSize = sizeof(Vertex);
@@ -26,7 +26,7 @@ PolylineEffect::PolylineEffect(int maxVertices)
 	m_pMesh = new MeshBuffer();
 	m_pMesh->Create(desc);
 
-	// ƒVƒF[ƒ_[QÆXV
+	// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼å‚ç…§æ›´æ–°
 	++m_shaderRefCount;
 	if (m_shaderRefCount > 1)
 	{
@@ -35,7 +35,7 @@ PolylineEffect::PolylineEffect(int maxVertices)
 		return;
 	}
 
-	// ƒfƒtƒHƒ‹ƒgƒVƒF[ƒ_[ì¬
+	// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ä½œæˆ
 	const char* VS = R"EOT(
 struct VS_IN {
 	float3 pos : POSITION0;
@@ -85,18 +85,18 @@ float4 main(PS_IN pin) : SV_TARGET {
 }
 
 /*
-* @brief ƒfƒXƒgƒ‰ƒNƒ^
+* @brief ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 */
 PolylineEffect::~PolylineEffect()
 {
 	delete m_pMesh;
 	delete[] m_pVertices;
 
-	// ƒVƒF[ƒ_[QÆ”XV
+	// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼å‚ç…§æ•°æ›´æ–°
 	-- m_shaderRefCount;
 	if (m_shaderRefCount <= 0)
 	{
-		// ƒVƒF[ƒ_[íœ
+		// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼å‰Šé™¤
 		delete m_pDefVS;
 		delete m_pDefPS;
 		delete m_pDefTex;
@@ -104,31 +104,31 @@ PolylineEffect::~PolylineEffect()
 }
 
 /*
-* @brief XVˆ—
+* @brief æ›´æ–°å‡¦ç†
 */
 void PolylineEffect::Update()
 {
-	// ƒfƒtƒHƒ‹ƒg‚Å‚Íˆ—‚È‚µ
+	// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã§ã¯å‡¦ç†ãªã—
 }
 
 /*
-* @brief •`‰æˆ—
+* @brief æç”»å‡¦ç†
 */
 void PolylineEffect::Draw()
 {
-	// §Œä“_‚Æ’¸“_ƒf[ƒ^‚ÌXV
+	// åˆ¶å¾¡ç‚¹ã¨é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®æ›´æ–°
 	for (UINT i = 0; i < m_lines.size(); ++i)
 	{
-		// §Œä“_‚ÌXV
+		// åˆ¶å¾¡ç‚¹ã®æ›´æ–°
 		ControlPoints& points = m_lines[i].controlPoints;
 		UpdateControlPoints(i, points);
 
-		// ’¸“_‚ÌXV
+		// é ‚ç‚¹ã®æ›´æ–°
 		Vertex* pVtx = m_lines[i].ptr;
 		ControlPoints::const_iterator it = points.cbegin();
 		while (it != points.cend())
 		{
-			// §Œä“_‚É•R‚Ã‚­’¸“_‚Éˆê’U’l‚ğİ’è
+			// åˆ¶å¾¡ç‚¹ã«ç´ã¥ãé ‚ç‚¹ã«ä¸€æ—¦å€¤ã‚’è¨­å®š
 			UINT pointIdx = static_cast<UINT>(it - points.cbegin());
 			pVtx[0].pos = it->pos;
 			pVtx[0].color = it->color;
@@ -136,7 +136,7 @@ void PolylineEffect::Draw()
 			pVtx[0].uv.y = m_lines[i].uvOffset.y;
 			pVtx[1] = pVtx[0];
 
-			// ‘OŒã‚Ì§Œä“_‚©‚çA’¸“_‚Ì”z’uˆÊ’u‚ğŒvZ
+			// å‰å¾Œã®åˆ¶å¾¡ç‚¹ã‹ã‚‰ã€é ‚ç‚¹ã®é…ç½®ä½ç½®ã‚’è¨ˆç®—
 			DirectX::XMVECTOR vPrev = DirectX::XMLoadFloat3(&(it - (pointIdx ? 1 : 0))->pos);
 			DirectX::XMVECTOR vNext = DirectX::XMLoadFloat3(
 				&(it + (pointIdx + 1 == points.size() ? 0 : 1))->pos);
@@ -155,16 +155,16 @@ void PolylineEffect::Draw()
 			pVtx[1].pos.y -= dir.y;
 			pVtx[1].pos.z -= dir.z;
 
-			// •Ğ’¸“_‚Ìuv’l‚ğ’²®
+			// ç‰‡é ‚ç‚¹ã®uvå€¤ã‚’èª¿æ•´
 			pVtx[1].uv.y += m_lines[i].uvScale.y;
 
-			// Ÿ‚Ì§Œä“_
+			// æ¬¡ã®åˆ¶å¾¡ç‚¹
 			pVtx += 2;
 			++it;
 		}
 	}
 
-	// k‘Şƒ|ƒŠƒSƒ“—p‚Ì’²®
+	// ç¸®é€€ãƒãƒªã‚´ãƒ³ç”¨ã®èª¿æ•´
 	for (UINT i = 1; i < m_lines.size(); ++i)
 	{
 		Vertex* pVtx = m_lines[i].ptr;
@@ -172,10 +172,10 @@ void PolylineEffect::Draw()
 		*(pVtx - 2) = *(pVtx - 3);
 	}
 
-	// XV‚³‚ê‚½’¸“_ƒf[ƒ^‚ğ‚à‚Æ‚Éƒoƒbƒtƒ@‚ğXV
+	// æ›´æ–°ã•ã‚ŒãŸé ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã‚’ã‚‚ã¨ã«ãƒãƒƒãƒ•ã‚¡ã‚’æ›´æ–°
 	m_pMesh->Write(m_pVertices);
 
-	// •`‰æ
+	// æç”»
 	m_pVS->Bind();
 	m_pPS->Bind();
 	m_pVS->WriteBuffer(0, m_matrix);
@@ -217,20 +217,20 @@ PolylineEffect::LineID PolylineEffect::AddLine(int controlPointNum)
 {
 	static const int SYUKUTAI = 2;
 
-	// c‚è‚Ì’¸“_”‚ğŒvZ
+	// æ®‹ã‚Šã®é ‚ç‚¹æ•°ã‚’è¨ˆç®—
 	MeshBuffer::Description desc = m_pMesh->GetDesc();
 	if (desc.vtxCount < static_cast<UINT>(m_useVtxCount + controlPointNum * 2 + SYUKUTAI))
 	{
 		return LINE_NONE;
 	}
 
-	// k‘Şƒ|ƒŠƒSƒ“—p‚Ì’¸“_‚ğ’Ç‰Á‚·‚é‚©Šm”F
+	// ç¸®é€€ãƒãƒªã‚´ãƒ³ç”¨ã®é ‚ç‚¹ã‚’è¿½åŠ ã™ã‚‹ã‹ç¢ºèª
 	if (!m_lines.empty())
 	{
 		m_useVtxCount += SYUKUTAI;
 	}
 
-	// ƒ|ƒŠƒ‰ƒCƒ“ƒf[ƒ^‚Ì¶¬
+	// ãƒãƒªãƒ©ã‚¤ãƒ³ãƒ‡ãƒ¼ã‚¿ã®ç”Ÿæˆ
 	Line line;
 	line.controlPoints.resize(controlPointNum);
 	InitControlPoints(static_cast<LineID>(m_lines.size()), line.controlPoints);
@@ -239,15 +239,15 @@ PolylineEffect::LineID PolylineEffect::AddLine(int controlPointNum)
 	line.ptr = m_pVertices + m_useVtxCount;
 	m_lines.push_back(line);
 
-	// g—pÏ‚İ’¸“_”‚ÌXV
+	// ä½¿ç”¨æ¸ˆã¿é ‚ç‚¹æ•°ã®æ›´æ–°
 	m_useVtxCount += controlPointNum * 2;
 	return static_cast<LineID>(m_lines.size() - 1);
 }
 
 /*
-* @brief §Œä“_‚Ì‰Šú‰»
-* @param[in] id ƒ|ƒŠƒ‰ƒCƒ“ID
-* @param[out] controlPoints ƒ|ƒŠƒ‰ƒCƒ“‚ğ§Œä‚·‚éˆÊ’uî•ñ
+* @brief åˆ¶å¾¡ç‚¹ã®åˆæœŸåŒ–
+* @param[in] id ãƒãƒªãƒ©ã‚¤ãƒ³ID
+* @param[out] controlPoints ãƒãƒªãƒ©ã‚¤ãƒ³ã‚’åˆ¶å¾¡ã™ã‚‹ä½ç½®æƒ…å ±
 */
 void PolylineEffect::InitControlPoints(LineID id, ControlPoints& controlPoints)
 {

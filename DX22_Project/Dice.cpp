@@ -1,4 +1,4 @@
-﻿#include "Dice.h"
+﻿﻿#include "Dice.h"
 #include "Geometory.h"
 #include "Transfer.h"
 #include "Input.h"

@@ -1,4 +1,4 @@
-//#include "FadeBlack.h"
+ï»¿//#include "FadeBlack.h"
 //#include "Sprite.h"
 //
 //FadeBlack::FadeBlack() 
@@ -20,12 +20,12 @@
 //void FadeBlack::DrawFade(float alpha)
 //{
 //    DirectX::XMFLOAT4X4 fWVP[3];
-//    //2D‚Ì•\¦İ’è‚âƒXƒvƒ‰ƒCƒg‚Éİ’è‚·‚é•ÏŠ·s—ñ(ƒ[ƒ‹ƒh, ƒrƒ…[, ƒvƒƒWƒFƒNƒVƒ‡ƒ“)‚ğŒvZ
+//    //2Dã®è¡¨ç¤ºè¨­å®šã‚„ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆã«è¨­å®šã™ã‚‹å¤‰æ›è¡Œåˆ—(ãƒ¯ãƒ¼ãƒ«ãƒ‰, ãƒ“ãƒ¥ãƒ¼, ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ã‚·ãƒ§ãƒ³)ã‚’è¨ˆç®—
 //
 //
-//	DirectX::XMMATRIX world, view, proj; // Še•ÏŠ·s—ñ‚ÌŠi”[æ 
+//	DirectX::XMMATRIX world, view, proj; // å„å¤‰æ›è¡Œåˆ—ã®æ ¼ç´å…ˆ 
 //
-//	// ì¬‚µ‚½s—ñ‚ğŠe•Ï”‚ÖŠi”[ 
+//	// ä½œæˆã—ãŸè¡Œåˆ—ã‚’å„å¤‰æ•°ã¸æ ¼ç´ 
 //	world = DirectX::XMMatrixTranslation(0.0f, 0.0f, 0.0f);
 //	view = DirectX::XMMatrixLookAtLH(
 //		DirectX::XMVectorSet(0.0f, 1.5f, -2.0f, 0.0f),
@@ -33,35 +33,35 @@
 //		DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
 //	proj =
 //		DirectX::XMMatrixOrthographicOffCenterLH(
-//			-640, 640,	// ‰¡‰ºŒÀãŒÀ’l
-//			-360, 360,	// c‰ºŒÀãŒÀ’l
+//			-640, 640,	// æ¨ªä¸‹é™ä¸Šé™å€¤
+//			-360, 360,	// ç¸¦ä¸‹é™ä¸Šé™å€¤
 //			0.001f,		// Near
 //			1000.0f);	// Far
 //	proj = DirectX::XMMatrixPerspectiveFovLH(
-//		// DirectXMath‚É—pˆÓ‚³‚ê‚Ä‚¢‚éŠp“x‚ğƒ‰ƒWƒAƒ“Šp‚É•ÏŠ·‚·‚éŠÖ”
-//		DirectX::XMConvertToRadians(70.0f),	//Šp“x
-//		16.0f / 9.0f,						//ƒAƒX”ä
-//		0.1f,								//Å¬•`‰æ‹——£
-//		100.0f);							//Å’·•`‰æ‹——£
+//		// DirectXMathã«ç”¨æ„ã•ã‚Œã¦ã„ã‚‹è§’åº¦ã‚’ãƒ©ã‚¸ã‚¢ãƒ³è§’ã«å¤‰æ›ã™ã‚‹é–¢æ•°
+//		DirectX::XMConvertToRadians(70.0f),	//è§’åº¦
+//		16.0f / 9.0f,						//ã‚¢ã‚¹æ¯”
+//		0.1f,								//æœ€å°æç”»è·é›¢
+//		100.0f);							//æœ€é•·æç”»è·é›¢
 //
 //
 //
-//	// ŒvZ—p‚Ìƒf[ƒ^‚©‚ç“Ç‚İæ‚è—p‚Ìƒf[ƒ^‚É•ÏŠ· 
+//	// è¨ˆç®—ç”¨ã®ãƒ‡ãƒ¼ã‚¿ã‹ã‚‰èª­ã¿å–ã‚Šç”¨ã®ãƒ‡ãƒ¼ã‚¿ã«å¤‰æ› 
 //	DirectX::XMStoreFloat4x4(&fWVP[0], DirectX::XMMatrixTranspose(world));
 //	DirectX::XMStoreFloat4x4(&fWVP[1], DirectX::XMMatrixTranspose(view));
 //	DirectX::XMStoreFloat4x4(&fWVP[2], DirectX::XMMatrixTranspose(proj));
 //
-//    // ƒtƒF[ƒh‚Ì•\¦İ’è 
+//    // ãƒ•ã‚§ãƒ¼ãƒ‰ã®è¡¨ç¤ºè¨­å®š 
 //    Sprite::SetWorld(fWVP[0]);
 //    Sprite::SetView(fWVP[1]);
 //    Sprite::SetProjection(fWVP[2]);
 //    Sprite::SetTexture(m_pTexture);
 //    Sprite::SetSize({ 1280,720 });
 //    Sprite::SetOffset({ 0.0f, 0.0f });
-//    Sprite::SetColor({ 0.0f, 0.0f, 0.0f, alpha }); // ˆø”‚ÌƒAƒ‹ƒtƒ@‚ğŒ³‚É“§–¾“x‚ğİ’è 
+//    Sprite::SetColor({ 0.0f, 0.0f, 0.0f, alpha }); // å¼•æ•°ã®ã‚¢ãƒ«ãƒ•ã‚¡ã‚’å…ƒã«é€æ˜åº¦ã‚’è¨­å®š 
 //
 //	SetDepthTest(false);
-//    // ƒtƒF[ƒh‚Ì•`‰æ 
+//    // ãƒ•ã‚§ãƒ¼ãƒ‰ã®æç”» 
 //    Sprite::Draw();
 //	SetDepthTest(true);
 //

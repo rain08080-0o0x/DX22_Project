@@ -1,39 +1,39 @@
-//#pragma once
-//// ‹ós‚ğíœ
+ï»¿//#pragma once
+//// ç©ºè¡Œã‚’å‰Šé™¤
 //
 //class Fade 
 //{
 //private:
-//	bool  m_isFadeIn; // ƒtƒF[ƒhƒCƒ“‚©ƒtƒF[ƒhƒAƒEƒg‚ğ”»’è‚·‚éƒtƒ‰ƒO 
-//	float m_time;  // Œ»İ‚ÌƒtƒF[ƒh‚Ìc‚èŠÔ 
-//	float m_maxTime; // ƒtƒF[ƒh‚ÌÅ‘åŠÔ 
+//	bool  m_isFadeIn; // ãƒ•ã‚§ãƒ¼ãƒ‰ã‚¤ãƒ³ã‹ãƒ•ã‚§ãƒ¼ãƒ‰ã‚¢ã‚¦ãƒˆã‚’åˆ¤å®šã™ã‚‹ãƒ•ãƒ©ã‚° 
+//	float m_time;  // ç¾åœ¨ã®ãƒ•ã‚§ãƒ¼ãƒ‰ã®æ®‹ã‚Šæ™‚é–“ 
+//	float m_maxTime; // ãƒ•ã‚§ãƒ¼ãƒ‰ã®æœ€å¤§æ™‚é–“ 
 //
 //public:
 //	Fade();
 //	virtual ~Fade();
 //
-//	// XVˆ— 
+//	// æ›´æ–°å‡¦ç† 
 //	void Update();
 //
-//	// •`‰æˆ— 
+//	// æç”»å‡¦ç† 
 //	void Draw();
 //
-//	// ƒtƒF[ƒh‚ÌŠJnˆ— 
+//	// ãƒ•ã‚§ãƒ¼ãƒ‰ã®é–‹å§‹å‡¦ç† 
 //	void Start(float time, bool isIn);
 //
-//	// ƒtƒF[ƒhŠeí”»’è 
+//	// ãƒ•ã‚§ãƒ¼ãƒ‰å„ç¨®åˆ¤å®š 
 //	bool IsFinish() { return m_time <= 0.0f; }
 //	bool IsFadeIn() { return m_isFadeIn; }
 //	bool IsFadeOut() { return !m_isFadeIn; }
 //
-//	// ƒtƒF[ƒh‚ÌŒo‰ßŠ„‡‚ğæ“¾iŠJn“_‚Å‚PAI—¹“_‚Å0j 
+//	// ãƒ•ã‚§ãƒ¼ãƒ‰ã®çµŒéå‰²åˆã‚’å–å¾—ï¼ˆé–‹å§‹æ™‚ç‚¹ã§ï¼‘ã€çµ‚äº†æ™‚ç‚¹ã§0ï¼‰ 
 //	float GetRate();
 //
-//	// ƒtƒF[ƒh‚Ì“§–¾“x‚ğæ“¾ 
+//	// ãƒ•ã‚§ãƒ¼ãƒ‰ã®é€æ˜åº¦ã‚’å–å¾— 
 //	float GetAlpha();
 //
 //protected:
-//	// ƒtƒF[ƒhƒCƒ“,ƒtƒF[ƒhƒAƒEƒg‚Ìˆ—‚ÍŒp³æ‚ÅÀ‘• 
+//	// ãƒ•ã‚§ãƒ¼ãƒ‰ã‚¤ãƒ³,ãƒ•ã‚§ãƒ¼ãƒ‰ã‚¢ã‚¦ãƒˆã®å‡¦ç†ã¯ç¶™æ‰¿å…ˆã§å®Ÿè£… 
 //	virtual void DrawFadeIn(float alpha) = 0;
 //	virtual void DrawFadeOut(float alpha) = 0;
 //};

@@ -542,6 +542,22 @@ void Draw()
 			row_f1("player.hp", tran.player.hp);
 			row_f1("player.maxHp", tran.player.maxHp);
 
+			row_i1("enemy.exists", tran.enemy.exists);
+			row_f3("enemy.pos", tran.enemy.pos);
+			row_f1("enemy.hp", tran.enemy.hp);
+			row_f1("enemy.maxHp", tran.enemy.maxHp);
+			const char* enemyStateText = "None";
+			switch (tran.enemy.state)
+			{
+			case 0: enemyStateText = "Wander"; break;
+			case 1: enemyStateText = "Chase"; break;
+			default: enemyStateText = "None"; break;
+			}
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("enemy.state");
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.enemy.state, enemyStateText);
+
+
 			row_f3("dice.pos", tran.dice.pos);
 			row_f3("dice.velocity", tran.dice.velocity);
 			row_f4("dice.rot", tran.dice.rot);

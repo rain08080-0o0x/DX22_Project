@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "PolylineEffect.h" 
 #include "Player.h" 
 
@@ -8,15 +8,15 @@ class TrailEffect
 	: public PolylineEffect
 {
 private:
-	Player* m_pPlayer; // ƒvƒŒƒCƒ„[î•ñ 
+	Player* m_pPlayer; // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼æƒ…å ± 
 	DirectX::XMFLOAT3 m_oldPos;
-	// ˆÈ‘O‚ÉƒvƒŒƒCƒ„[‚ª‚¢‚½ˆÊ’u 
+	// ä»¥å‰ã«ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãŒã„ãŸä½ç½® 
 public:
-	// ‰Šú‰»ˆ— 
+	// åˆæœŸåŒ–å‡¦ç† 
 	TrailEffect(Player* pPlayer);
-	// I—¹ˆ— 
+	// çµ‚äº†å‡¦ç† 
 	virtual ~TrailEffect() {}
 protected:
-	// ƒ|ƒŠƒ‰ƒCƒ“§Œä“_XVˆ— 
+	// ãƒãƒªãƒ©ã‚¤ãƒ³åˆ¶å¾¡ç‚¹æ›´æ–°å‡¦ç† 
 	void UpdateControlPoints(LineID id, ControlPoints& controlPoints) final;
 };

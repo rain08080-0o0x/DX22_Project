@@ -1,4 +1,4 @@
-#include "UIObjectManager.h"
+﻿#include "UIObjectManager.h"
 
 void UIObjectManager::Add(UIObject* obj, Layer layer)
 {

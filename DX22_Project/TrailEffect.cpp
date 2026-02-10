@@ -1,4 +1,4 @@
-#include "TrailEffect.h"
+ï»¿#include "TrailEffect.h"
 
 TrailEffect::TrailEffect(Player* pPlayer)
 	: m_pPlayer(pPlayer)
@@ -9,34 +9,34 @@ TrailEffect::TrailEffect(Player* pPlayer)
 
 void TrailEffect::UpdateControlPoints(LineID id, ControlPoints& controlPoints)
 {
-	// –ˆƒtƒŒ[ƒ€ƒ|ƒŠƒ‰ƒCƒ“‚Ì•‚ğ­‚µ‚¸‚Â¬‚³‚­‚·‚é 
+	// æ¯ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒªãƒ©ã‚¤ãƒ³ã®å¹…ã‚’å°‘ã—ãšã¤å°ã•ãã™ã‚‹ 
 	ControlPoints::iterator it = controlPoints.begin();
 	while (it != controlPoints.end()) {
 		it->bold *= 0.95f;
 		++it;
 	}
-	// ƒvƒŒƒCƒ„[‚ÌˆÚ“®ƒxƒNƒgƒ‹‚ğŒvZ 
+	// ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®ç§»å‹•ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨ˆç®— 
 	float distance = 0.0f;
-	DirectX::XMFLOAT3 pos = m_pPlayer->GetPos();    // ƒvƒŒƒCƒ„[ˆÊ’u‚Ìæ“¾ 
-	DirectX::XMVECTOR vOld = DirectX::XMLoadFloat3(&m_oldPos); // ‘O‚ÌˆÊ’u 
-	DirectX::XMVECTOR vNow = DirectX::XMLoadFloat3(&pos);  // Œ»İˆÊ’u 
+	DirectX::XMFLOAT3 pos = m_pPlayer->GetPos();    // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ä½ç½®ã®å–å¾— 
+	DirectX::XMVECTOR vOld = DirectX::XMLoadFloat3(&m_oldPos); // å‰ã®ä½ç½® 
+	DirectX::XMVECTOR vNow = DirectX::XMLoadFloat3(&pos);  // ç¾åœ¨ä½ç½® 
 	DirectX::XMVECTOR vDir = DirectX::XMVectorSubtract(vNow,vOld);
 
-	// ƒxƒNƒgƒ‹‚©‚ç‹——£‚ğZo 
+	// ãƒ™ã‚¯ãƒˆãƒ«ã‹ã‚‰è·é›¢ã‚’ç®—å‡º 
 	DirectX::XMStoreFloat(&distance, DirectX::XMVector3Length(vDir));
 
-	// ƒvƒŒƒCƒ„[‚ªˆÚ“®‚µ‚Ä‚¢‚é‚©”»’è  
+	// ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãŒç§»å‹•ã—ã¦ã„ã‚‹ã‹åˆ¤å®š  
 	if (distance >= 0.2f) {
-		// §Œä“_‚Ìî•ñ‚ğˆê‚Â‚¸‚Â‚¸‚ç‚· 
+		// åˆ¶å¾¡ç‚¹ã®æƒ…å ±ã‚’ä¸€ã¤ãšã¤ãšã‚‰ã™ 
 		for (int i = controlPoints.size() - 1; i > 0; --i) {
 			controlPoints[i] = controlPoints[i - 1];
 		}
 
-		// æ“ª‚ÉV‚µ‚¢ƒf[ƒ^‚ğİ’è 
+		// å…ˆé ­ã«æ–°ã—ã„ãƒ‡ãƒ¼ã‚¿ã‚’è¨­å®š 
 		controlPoints[0].pos = pos;
 		controlPoints[0].bold = 0.03f;
 
-		// ƒvƒŒƒCƒ„[‚Ì”z’uˆÊ’u‚ğXV 
+		// ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®é…ç½®ä½ç½®ã‚’æ›´æ–° 
 		m_oldPos = pos;
 	}
 }

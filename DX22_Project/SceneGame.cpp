@@ -537,6 +537,26 @@ if (m_pPlayer) m_pPlayer->Update();
         }
     }
 
+    {
+        TRAN_INS;
+        if (m_pEnemy)
+        {
+            tran.enemy.exists = 1;
+            tran.enemy.pos = m_pEnemy->GetPos();
+            tran.enemy.hp = static_cast<float>(m_pEnemy->GetHp());
+            tran.enemy.maxHp = static_cast<float>(m_pEnemy->GetMaxHp());
+            tran.enemy.state = m_pEnemy->GetState();
+        }
+        else
+        {
+            tran.enemy.exists = 0;
+            tran.enemy.pos = { 0.0f, 0.0f, 0.0f };
+            tran.enemy.hp = 0.0f;
+            tran.enemy.maxHp = 0.0f;
+            tran.enemy.state = -1;
+        }
+    }
+
     if(m_pGoal)
     {
         m_pGoal->Update();

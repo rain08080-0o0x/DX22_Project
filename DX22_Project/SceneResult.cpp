@@ -1,4 +1,4 @@
-#include "SceneResult.h"
+﻿#include "SceneResult.h"
 #include "Defines.h"
 #include "Input.h"
 
