@@ -96,6 +96,60 @@ namespace
         return v;
     }
 
+    int ClampInt(int v, int lo, int hi)
+    {
+        if (v < lo) return lo;
+        if (v > hi) return hi;
+        return v;
+    }
+
+    int CalcDifficultyBaseEnemyBonus(int preset)
+    {
+        switch (preset)
+        {
+        case 0: return -1; // Easy
+        case 2: return 1;  // Hard
+        default: return 0; // Normal
+        }
+    }
+
+    int CalcDifficultyWaveAddBonus(int preset)
+    {
+        switch (preset)
+        {
+        case 0: return 0; // Easy
+        case 2: return 1; // Hard
+        default: return 0; // Normal
+        }
+    }
+
+    float CalcDifficultyEnemyAttackDamageScale(int preset)
+    {
+        switch (preset)
+        {
+        case 0: return 0.85f; // Easy
+        case 2: return 1.25f; // Hard
+        default: return 1.0f; // Normal
+        }
+    }
+
+    float CalcAttackCooldownScale(int attackSpeedLevel)
+    {
+        const float scale = 1.0f - 0.08f * static_cast<float>(attackSpeedLevel);
+        return ClampRange(scale, 0.35f, 1.0f);
+    }
+
+    float CalcEvadeCooldownScale(int evadeCooldownLevel)
+    {
+        const float scale = 1.0f - 0.10f * static_cast<float>(evadeCooldownLevel);
+        return ClampRange(scale, 0.30f, 1.0f);
+    }
+
+    int CalcPlayerAttackDamage(int attackPowerLevel)
+    {
+        return 1 + ClampInt(attackPowerLevel, 0, 999);
+    }
+
     float DistSqXZ(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b)
     {
         const float dx = a.x - b.x;
@@ -403,14 +457,36 @@ SceneGame::SceneGame()
         static_cast<float>(tran.gameplay.waveEnemyAddPerWave),
         0.0f,
         static_cast<float>(kEnemyCountMax)));
+    const int difficultyPreset = ClampInt(tran.gameplayDebug.difficultyPreset, 0, 2);
+    const int effectiveBaseEnemyCount = ClampInt(
+        baseEnemyCount + CalcDifficultyBaseEnemyBonus(difficultyPreset),
+        kEnemyCountMin,
+        kEnemyCountMax);
+    const int effectiveWaveEnemyAdd = ClampInt(
+        waveEnemyAddPerWave + CalcDifficultyWaveAddBonus(difficultyPreset),
+        0,
+        kEnemyCountMax);
 
     m_currentWave = 1;
     m_waveMax = waveMax;
-    m_requestedEnemyCount = CalcWaveEnemyCount(baseEnemyCount, m_currentWave, waveEnemyAddPerWave);
+    m_requestedEnemyCount = CalcWaveEnemyCount(effectiveBaseEnemyCount, m_currentWave, effectiveWaveEnemyAdd);
 
     tran.gameplay.enemyCount = baseEnemyCount;
     tran.gameplay.waveMax = m_waveMax;
     tran.gameplay.waveEnemyAddPerWave = waveEnemyAddPerWave;
+    tran.gameplayDebug.difficultyPreset = difficultyPreset;
+    tran.gameplayDebug.effectiveEnemyBaseCount = effectiveBaseEnemyCount;
+    tran.gameplayDebug.effectiveEnemyAddPerWave = effectiveWaveEnemyAdd;
+    tran.gameplayDebug.stageClearCount = tran.roguelike.stageClearCount;
+    tran.gameplayDebug.attackPowerLevel = tran.roguelike.attackPowerLevel;
+    tran.gameplayDebug.attackSpeedLevel = tran.roguelike.attackSpeedLevel;
+    tran.gameplayDebug.evadeCooldownLevel = tran.roguelike.evadeCooldownLevel;
+    tran.gameplayDebug.lastUpgradeType = tran.roguelike.lastUpgradeType;
+    tran.gameplayDebug.upgradeSelectionPending = tran.roguelike.selectionPending;
+    tran.gameplayDebug.upgradeRerollRemain = tran.roguelike.rerollRemain;
+    tran.gameplayDebug.upgradeOffer0 = tran.roguelike.offers[0];
+    tran.gameplayDebug.upgradeOffer1 = tran.roguelike.offers[1];
+    tran.gameplayDebug.upgradeOffer2 = tran.roguelike.offers[2];
     EnsureEnemyCount(m_requestedEnemyCount, tran.player.stageSize);
 
     m_pShadow = new Texture();
@@ -714,16 +790,30 @@ void SceneGame::Update()
     if (waveEnemyAddPerWave < 0) waveEnemyAddPerWave = 0;
     if (waveEnemyAddPerWave > kEnemyCountMax) waveEnemyAddPerWave = kEnemyCountMax;
     tran.gameplay.waveEnemyAddPerWave = waveEnemyAddPerWave;
+    const int difficultyPreset = ClampInt(tran.gameplayDebug.difficultyPreset, 0, 2);
+    tran.gameplayDebug.difficultyPreset = difficultyPreset;
+    const int effectiveBaseEnemyCount = ClampInt(
+        baseEnemyCount + CalcDifficultyBaseEnemyBonus(difficultyPreset),
+        kEnemyCountMin,
+        kEnemyCountMax);
+    const int effectiveWaveEnemyAdd = ClampInt(
+        waveEnemyAddPerWave + CalcDifficultyWaveAddBonus(difficultyPreset),
+        0,
+        kEnemyCountMax);
+    const int playerAttackDamage = CalcPlayerAttackDamage(tran.roguelike.attackPowerLevel);
+    const float playerAttackCooldownScale = CalcAttackCooldownScale(tran.roguelike.attackSpeedLevel);
+    const float playerEvadeCooldownScale = CalcEvadeCooldownScale(tran.roguelike.evadeCooldownLevel);
+    const float difficultyEnemyAttackDamageScale = CalcDifficultyEnemyAttackDamageScale(difficultyPreset);
 
     if (m_currentWave < kWaveCountMin) m_currentWave = kWaveCountMin;
     if (m_currentWave > m_waveMax) m_currentWave = m_waveMax;
 
-    const int waveEnemyTarget = CalcWaveEnemyCount(baseEnemyCount, m_currentWave, waveEnemyAddPerWave);
+    const int waveEnemyTarget = CalcWaveEnemyCount(effectiveBaseEnemyCount, m_currentWave, effectiveWaveEnemyAdd);
 
     const float attackWindup = (tran.gameplay.attackWindup < 0.0f) ? 0.0f : tran.gameplay.attackWindup;
     const float attackDuration = (tran.gameplay.attackDuration < kMinDuration) ? kMinDuration : tran.gameplay.attackDuration;
     const float attackRecovery = (tran.gameplay.attackRecovery < 0.0f) ? 0.0f : tran.gameplay.attackRecovery;
-    const float attackCooldown = (tran.gameplay.attackCooldown < 0.0f) ? 0.0f : tran.gameplay.attackCooldown;
+    const float attackCooldown = ((tran.gameplay.attackCooldown < 0.0f) ? 0.0f : tran.gameplay.attackCooldown) * playerAttackCooldownScale;
     const float attackSweepDegrees = tran.gameplay.attackSweepDegrees;
     const float attackSweepRadiusScale = (tran.gameplay.attackSweepRadiusScale < 0.1f) ? 0.1f : tran.gameplay.attackSweepRadiusScale;
     const float attackWidthScale = (tran.gameplay.attackWidthScale < 0.1f) ? 0.1f : tran.gameplay.attackWidthScale;
@@ -748,7 +838,8 @@ void SceneGame::Update()
     const float waveEnemyAttackDamageScale = (tran.gameplay.waveEnemyAttackDamageScalePerWave < 0.0f)
         ? 0.0f : tran.gameplay.waveEnemyAttackDamageScalePerWave;
     const float waveStep = static_cast<float>((m_currentWave > 0) ? (m_currentWave - 1) : 0);
-    const float enemyAttackDamage = enemyAttackDamageBase * (1.0f + waveEnemyAttackDamageScale * waveStep);
+    const float enemyAttackDamage =
+        enemyAttackDamageBase * difficultyEnemyAttackDamageScale * (1.0f + waveEnemyAttackDamageScale * waveStep);
     const float enemyMoveSpeed = enemyMoveSpeedBase + waveEnemyMoveSpeedAdd * waveStep;
     const float enemySeparationRadius = (tran.gameplay.enemySeparationRadius < 0.0f) ? 0.0f : tran.gameplay.enemySeparationRadius;
     const float enemySeparationWeight = (tran.gameplay.enemySeparationWeight < 0.0f) ? 0.0f : tran.gameplay.enemySeparationWeight;
@@ -768,6 +859,23 @@ void SceneGame::Update()
         playerPushShare /= pushShareSum;
         enemyPushShare /= pushShareSum;
     }
+
+    tran.gameplayDebug.effectiveEnemyBaseCount = effectiveBaseEnemyCount;
+    tran.gameplayDebug.effectiveEnemyAddPerWave = effectiveWaveEnemyAdd;
+    tran.gameplayDebug.effectiveEnemyAttackDamage = enemyAttackDamage;
+    tran.gameplayDebug.playerAttackDamage = playerAttackDamage;
+    tran.gameplayDebug.playerAttackCooldownScale = playerAttackCooldownScale;
+    tran.gameplayDebug.playerEvadeCooldownScale = playerEvadeCooldownScale;
+    tran.gameplayDebug.stageClearCount = tran.roguelike.stageClearCount;
+    tran.gameplayDebug.attackPowerLevel = tran.roguelike.attackPowerLevel;
+    tran.gameplayDebug.attackSpeedLevel = tran.roguelike.attackSpeedLevel;
+    tran.gameplayDebug.evadeCooldownLevel = tran.roguelike.evadeCooldownLevel;
+    tran.gameplayDebug.lastUpgradeType = tran.roguelike.lastUpgradeType;
+    tran.gameplayDebug.upgradeSelectionPending = tran.roguelike.selectionPending;
+    tran.gameplayDebug.upgradeRerollRemain = tran.roguelike.rerollRemain;
+    tran.gameplayDebug.upgradeOffer0 = tran.roguelike.offers[0];
+    tran.gameplayDebug.upgradeOffer1 = tran.roguelike.offers[1];
+    tran.gameplayDebug.upgradeOffer2 = tran.roguelike.offers[2];
 
     if (m_pGameBgmVoice)
     {
@@ -879,6 +987,7 @@ void SceneGame::Update()
     }
 
     if (m_pPlayer) m_pPlayer->Update();
+    const bool isPlayerEvading = (tran.gameplayDebug.playerEvading != 0);
     const int enemyTotal = static_cast<int>(m_enemies.size());
     const bool heavyEnemyLoad = (enemyTotal >= 8);
     const bool runFullEnemyPairWork = !heavyEnemyLoad || ((m_enemyPerfPhase & 1u) == 0u);
@@ -1177,7 +1286,7 @@ void SceneGame::Update()
             const float diffZ = enemyBox.center.z - playerCenter.z;
             const float overlapX = (playerBox.size.x + enemyBox.size.x) * 0.5f - std::fabs(diffX);
             const float overlapZ = (playerBox.size.z + enemyBox.size.z) * 0.5f - std::fabs(diffZ);
-            if (overlapX > 0.0f && overlapZ > 0.0f)
+            if (!isPlayerEvading && overlapX > 0.0f && overlapZ > 0.0f)
             {
                 float pushDirX = 0.0f;
                 float pushDirZ = 0.0f;
@@ -1244,7 +1353,7 @@ void SceneGame::Update()
                     slot.attackWindupTimer = 0.0f;
                     slot.attackCooldownTimer = enemyAttackCooldown * typeCooldownScale;
 
-                    if (inAttackRange)
+                    if (inAttackRange && !isPlayerEvading)
                     {
                         if (m_pPlayerHitSe) PlaySound(m_pPlayerHitSe);
                         tran.player.hp -= enemyAttackDamage * typeDamageScale;
@@ -1286,7 +1395,7 @@ void SceneGame::Update()
                 attackBox.size = m_attackSize;
                 if (HitAabb(attackBox, enemyBox))
                 {
-                    slot.enemy->Damage(1);
+                    slot.enemy->Damage(playerAttackDamage);
                     slot.lastHitSwingId = m_attackSwingId;
                     ++m_attackHitCountThisSwing;
                     slot.hitFlashTimer = attackHitFlash;
@@ -1358,7 +1467,7 @@ void SceneGame::Update()
             if (m_currentWave < m_waveMax)
             {
                 ++m_currentWave;
-                m_requestedEnemyCount = CalcWaveEnemyCount(baseEnemyCount, m_currentWave, waveEnemyAddPerWave);
+                m_requestedEnemyCount = CalcWaveEnemyCount(effectiveBaseEnemyCount, m_currentWave, effectiveWaveEnemyAdd);
                 EnsureEnemyCount(m_requestedEnemyCount, stageSize);
             }
             else
@@ -1371,6 +1480,7 @@ void SceneGame::Update()
                 tran.gameplayDebug.maxWave = m_waveMax;
                 tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
                 tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+                tran.BeginUpgradeSelection();
                 SceneManager::ChangeResult(SceneManager::ResultType::Win);
                 SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
                 return;
@@ -1436,6 +1546,7 @@ void SceneGame::Update()
             tran.gameplayDebug.maxWave = m_waveMax;
             tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
             tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+            tran.BeginUpgradeSelection();
             SceneManager::ChangeResult(SceneManager::ResultType::Win);
             SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
             return;

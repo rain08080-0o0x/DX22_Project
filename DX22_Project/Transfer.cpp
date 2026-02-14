@@ -1,4 +1,4 @@
-#include "Transfer.h"
+﻿#include "Transfer.h"
 #include <fstream>
 #include <string>
 #include <cstdlib>
@@ -54,12 +54,121 @@ namespace
 		}
 		return v;
 	}
+
+	int ClampInt(int v, int lo, int hi)
+	{
+		if (v < lo) return lo;
+		if (v > hi) return hi;
+		return v;
+	}
+
+	int RandRangeInt(int minValue, int maxValue)
+	{
+		if (maxValue <= minValue) return minValue;
+		const int span = maxValue - minValue + 1;
+		return minValue + (std::rand() % span);
+	}
+
+	const int kUpgradeOfferCount = 3;
+	const int kUpgradeTypeCount = 6;
+
+	void GenerateUpgradeOffers(int offers[kUpgradeOfferCount])
+	{
+		int pool[kUpgradeTypeCount] =
+		{
+			0, 1, 2, 3, 4, 5
+		};
+
+		for (int i = 0; i < kUpgradeTypeCount; ++i)
+		{
+			const int j = RandRangeInt(i, kUpgradeTypeCount - 1);
+			const int tmp = pool[i];
+			pool[i] = pool[j];
+			pool[j] = tmp;
+		}
+
+		for (int i = 0; i < kUpgradeOfferCount; ++i)
+		{
+			offers[i] = pool[i];
+		}
+	}
+
+	void ApplyUpgradeType(int& attackPowerLevel, int& attackSpeedLevel, int& evadeCooldownLevel, int upgradeType)
+	{
+		switch (upgradeType)
+		{
+		case 0:
+			attackPowerLevel += 1;
+			break;
+		case 1:
+			attackSpeedLevel += 1;
+			break;
+		case 2:
+			evadeCooldownLevel += 1;
+			break;
+		case 3:
+			attackPowerLevel += 2;
+			break;
+		case 4:
+			attackSpeedLevel += 2;
+			break;
+		case 5:
+			evadeCooldownLevel += 2;
+			break;
+		default:
+			break;
+		}
+	}
 }
 
 void Transfer::ResetGameplayTuningToDefault()
 {
 	gameplay = GameplayTuning{};
 }
+
+void Transfer::ResetRoguelikeUpgrade()
+{
+	roguelike = RoguelikeUpgrade{};
+}
+
+void Transfer::ApplyStageClearUpgrade()
+{
+	const int nextType = roguelike.stageClearCount % 3;
+	++roguelike.stageClearCount;
+	roguelike.lastUpgradeType = nextType;
+	ApplyUpgradeType(roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel, nextType);
+}
+
+void Transfer::BeginUpgradeSelection()
+{
+	roguelike.selectionPending = 1;
+	roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+	GenerateUpgradeOffers(roguelike.offers);
+}
+
+bool Transfer::RerollUpgradeSelection()
+{
+	if (roguelike.selectionPending == 0) return false;
+	if (roguelike.rerollRemain <= 0) return false;
+	--roguelike.rerollRemain;
+	GenerateUpgradeOffers(roguelike.offers);
+	return true;
+}
+
+bool Transfer::ApplyUpgradeSelection(int offerIndex)
+{
+	if (roguelike.selectionPending == 0) return false;
+	if (offerIndex < 0 || offerIndex >= RoguelikeUpgrade::kOfferCount) return false;
+
+	const int selectedType = roguelike.offers[offerIndex];
+	ApplyUpgradeType(roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel, selectedType);
+	++roguelike.stageClearCount;
+	roguelike.lastUpgradeType = selectedType;
+	roguelike.selectionPending = 0;
+	roguelike.rerollRemain = 0;
+	return true;
+}
+
 
 const char* Transfer::GetGameplayTuningPath() const
 {
@@ -77,6 +186,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 
 	GameplayTuning loaded{};
 	int loadedPreset = gameplayDebug.difficultyPreset;
+	RoguelikeUpgrade loadedRogue = roguelike;
 
 	std::string line;
 	while (std::getline(ifs, line))
@@ -137,12 +247,27 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "playerPushShare") loaded.playerPushShare = ToFloat(value, loaded.playerPushShare);
 		else if (key == "enemyPushShare") loaded.enemyPushShare = ToFloat(value, loaded.enemyPushShare);
 		else if (key == "difficultyPreset") loadedPreset = ToInt(value, loadedPreset);
+		else if (key == "stageClearCount") loadedRogue.stageClearCount = ToInt(value, loadedRogue.stageClearCount);
+		else if (key == "attackPowerLevel") loadedRogue.attackPowerLevel = ToInt(value, loadedRogue.attackPowerLevel);
+		else if (key == "attackSpeedLevel") loadedRogue.attackSpeedLevel = ToInt(value, loadedRogue.attackSpeedLevel);
+		else if (key == "evadeCooldownLevel") loadedRogue.evadeCooldownLevel = ToInt(value, loadedRogue.evadeCooldownLevel);
+		else if (key == "lastUpgradeType") loadedRogue.lastUpgradeType = ToInt(value, loadedRogue.lastUpgradeType);
+		else if (key == "upgradeRerollMax") loadedRogue.rerollMaxPerStage = ToInt(value, loadedRogue.rerollMaxPerStage);
 	}
 
 	gameplay = loaded;
-	if (loadedPreset < 0) loadedPreset = 0;
-	if (loadedPreset > 2) loadedPreset = 2;
+	loadedPreset = ClampInt(loadedPreset, 0, 2);
 	gameplayDebug.difficultyPreset = loadedPreset;
+	loadedRogue.stageClearCount = ClampInt(loadedRogue.stageClearCount, 0, 9999);
+	loadedRogue.attackPowerLevel = ClampInt(loadedRogue.attackPowerLevel, 0, 999);
+	loadedRogue.attackSpeedLevel = ClampInt(loadedRogue.attackSpeedLevel, 0, 999);
+	loadedRogue.evadeCooldownLevel = ClampInt(loadedRogue.evadeCooldownLevel, 0, 999);
+	loadedRogue.lastUpgradeType = ClampInt(loadedRogue.lastUpgradeType, -1, RoguelikeUpgrade::UpgradeTypeCount - 1);
+	loadedRogue.rerollMaxPerStage = ClampInt(loadedRogue.rerollMaxPerStage, 0, 9);
+	loadedRogue.rerollRemain = 0;
+	loadedRogue.selectionPending = 0;
+	GenerateUpgradeOffers(loadedRogue.offers);
+	roguelike = loadedRogue;
 	return true;
 }
 
@@ -199,5 +324,11 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 	ofs << "playerPushShare=" << gameplay.playerPushShare << "\n";
 	ofs << "enemyPushShare=" << gameplay.enemyPushShare << "\n";
 	ofs << "difficultyPreset=" << gameplayDebug.difficultyPreset << "\n";
+	ofs << "stageClearCount=" << roguelike.stageClearCount << "\n";
+	ofs << "attackPowerLevel=" << roguelike.attackPowerLevel << "\n";
+	ofs << "attackSpeedLevel=" << roguelike.attackSpeedLevel << "\n";
+	ofs << "evadeCooldownLevel=" << roguelike.evadeCooldownLevel << "\n";
+	ofs << "lastUpgradeType=" << roguelike.lastUpgradeType << "\n";
+	ofs << "upgradeRerollMax=" << roguelike.rerollMaxPerStage << "\n";
 	return ofs.good();
 }

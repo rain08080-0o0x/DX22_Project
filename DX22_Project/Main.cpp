@@ -93,6 +93,32 @@ void Draw()
 
 #ifdef _DEBUG
 	TRAN_INS;
+	auto upgradeLabel = [](int upgradeType) -> const char*
+	{
+		switch (upgradeType)
+		{
+		case 0: return u8"攻撃力+1";
+		case 1: return u8"攻撃頻度+1";
+		case 2: return u8"回避CT短縮+1";
+		case 3: return u8"攻撃力+2";
+		case 4: return u8"攻撃頻度+2";
+		case 5: return u8"回避CT短縮+2";
+		default: return u8"なし";
+		}
+	};
+	auto upgradeDesc = [](int upgradeType) -> const char*
+	{
+		switch (upgradeType)
+		{
+		case 0: return u8"与ダメージを少し上げる";
+		case 1: return u8"攻撃クールタイムを少し短縮";
+		case 2: return u8"回避クールタイムを少し短縮";
+		case 3: return u8"与ダメージを大きく上げる";
+		case 4: return u8"攻撃クールタイムを大きく短縮";
+		case 5: return u8"回避クールタイムを大きく短縮";
+		default: return u8"";
+		}
+	};
 
 	// Docking用のルート（上下左右の吸着・分割/再結合）
 	if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable)
@@ -155,9 +181,9 @@ void Draw()
 				DragFloat3(u8"サイズ", reinterpret_cast<float*>(&tran.player.size), 0.05f);
 				DragFloat3(u8"速度", reinterpret_cast<float*>(&tran.player.velocity), 0.05f);
 				DragFloat(u8"移動速度", &tran.player.moveSpeed, 0.01f, 0.0f, 10.0f);
-				DragFloat(u8"ダッシュ距離", &tran.player.dashDistance, 0.05f, 0.0f, 10.0f);
-				DragFloat(u8"ダッシュCT", &tran.player.dashCooldown, 0.01f, 0.0f, 5.0f);
-				DragFloat(u8"ダッシュ時間", &tran.player.dashDuration, 0.01f, 0.01f, 1.0f);
+				DragFloat(u8"回避距離", &tran.player.dashDistance, 0.05f, 0.0f, 10.0f);
+				DragFloat(u8"回避CT", &tran.player.dashCooldown, 0.01f, 0.0f, 5.0f);
+				DragFloat(u8"回避時間", &tran.player.dashDuration, 0.01f, 0.01f, 1.0f);
 				DragFloat(u8"ステージサイズ", &tran.player.stageSize, 0.1f, 1.0f, 20.0f);
 				ColorEdit4(u8"色", reinterpret_cast<float*>(&tran.player.color));
 				EndTabItem();
@@ -228,6 +254,7 @@ void Draw()
 				DragInt(u8"敵数(基準)", &tran.gameplay.enemyCount, 1.0f, 0, 16);
 				DragInt(u8"最大Wave", &tran.gameplay.waveMax, 1.0f, 1, 32);
 				DragInt(u8"Wave毎の敵追加数", &tran.gameplay.waveEnemyAddPerWave, 1.0f, 0, 16);
+				DragInt(u8"強化リロール上限", &tran.roguelike.rerollMaxPerStage, 1.0f, 0, 9);
 				ImGui::TextDisabled(u8"初期値: 敵数3 / 最大Wave3 / Wave追加1");
 
 				ImGui::SeparatorText(u8"プレイヤー攻撃");
@@ -298,6 +325,13 @@ void Draw()
 				ImGui::Text(u8"Wave: %d / %d", tran.gameplayDebug.currentWave, tran.gameplayDebug.maxWave);
 				ImGui::Text(u8"敵数: %d / %d", tran.gameplayDebug.enemiesAlive, tran.gameplayDebug.enemiesTarget);
 				ImGui::Text(u8"難易度: %s", difficultyText);
+				ImGui::Text(u8"実効敵数設定: 基準%d / Wave加算%d", tran.gameplayDebug.effectiveEnemyBaseCount, tran.gameplayDebug.effectiveEnemyAddPerWave);
+				ImGui::Text(u8"実効敵ダメージ: %.2f", tran.gameplayDebug.effectiveEnemyAttackDamage);
+				ImGui::Text(u8"実効攻撃力: %d", tran.gameplayDebug.playerAttackDamage);
+				ImGui::Text(u8"攻撃CT倍率: %.2f", tran.gameplayDebug.playerAttackCooldownScale);
+				ImGui::Text(u8"回避CT倍率: %.2f", tran.gameplayDebug.playerEvadeCooldownScale);
+				ImGui::Text(u8"回避中: %s", tran.gameplayDebug.playerEvading ? u8"はい" : u8"いいえ");
+				ImGui::Text(u8"強化選択待ち: %d / リロール残り: %d", tran.gameplayDebug.upgradeSelectionPending, tran.gameplayDebug.upgradeRerollRemain);
 				ImGui::TextDisabled(u8"ゲーム進行: 敵全滅で次Wave、最終Wave全滅で勝利");
 				ImGui::TextDisabled(u8"敵AABB色: 赤=被弾 / 橙=予兆 / 黄=攻撃可能");
 				ImGui::TextDisabled(u8"敵AABB色: 水=射程内(CT中) / 緑=射程外");
@@ -319,7 +353,42 @@ void Draw()
 					tran.ResetGameplayTuningToDefault();
 					tran.gameplayDebug.difficultyPreset = 1;
 				}
+				SameLine();
+				if (Button(u8"強化状態をリセット"))
+				{
+					tran.ResetRoguelikeUpgrade();
+				}
 
+				EndTabItem();
+			}
+			if (BeginTabItem(u8"強化状態"))
+			{
+				const char* lastUpgradeText =
+					(tran.gameplayDebug.lastUpgradeType >= 0)
+					? upgradeLabel(tran.gameplayDebug.lastUpgradeType)
+					: u8"なし";
+
+				ImGui::Text(u8"ステージクリア回数: %d", tran.gameplayDebug.stageClearCount);
+				ImGui::Text(u8"直近の強化: %s", lastUpgradeText);
+				ImGui::SeparatorText(u8"強化レベル");
+				ImGui::Text(u8"攻撃力 Lv.%d", tran.gameplayDebug.attackPowerLevel);
+				ImGui::Text(u8"攻撃頻度 Lv.%d", tran.gameplayDebug.attackSpeedLevel);
+				ImGui::Text(u8"回避CT Lv.%d", tran.gameplayDebug.evadeCooldownLevel);
+				ImGui::SeparatorText(u8"現在の実効値");
+				ImGui::Text(u8"攻撃ダメージ: %d", tran.gameplayDebug.playerAttackDamage);
+				ImGui::Text(u8"攻撃CT倍率: %.2f", tran.gameplayDebug.playerAttackCooldownScale);
+				ImGui::Text(u8"回避CT倍率: %.2f", tran.gameplayDebug.playerEvadeCooldownScale);
+				ImGui::Text(u8"強化選択待ち: %s", tran.roguelike.selectionPending ? u8"あり" : u8"なし");
+				ImGui::Text(u8"リロール残り: %d / %d", tran.roguelike.rerollRemain, tran.roguelike.rerollMaxPerStage);
+				ImGui::SeparatorText(u8"現在の候補");
+				ImGui::Text(u8"[1] %s", upgradeLabel(tran.roguelike.offers[0]));
+				ImGui::Text(u8"[2] %s", upgradeLabel(tran.roguelike.offers[1]));
+				ImGui::Text(u8"[3] %s", upgradeLabel(tran.roguelike.offers[2]));
+				ImGui::TextDisabled(u8"勝利時に3候補から1つ選択（Rでリロール、回数上限あり）");
+				if (Button(u8"強化状態をリセット##upgrade_tab"))
+				{
+					tran.ResetRoguelikeUpgrade();
+				}
 				EndTabItem();
 			}
 			if (BeginTabItem(u8"モデル編集"))
@@ -678,6 +747,22 @@ void Draw()
 			row_i1("gameplay.enemiesAlive", tran.gameplayDebug.enemiesAlive);
 			row_i1("gameplay.enemiesTarget", tran.gameplayDebug.enemiesTarget);
 			row_i1("gameplay.difficultyPreset", tran.gameplayDebug.difficultyPreset);
+			row_i1("gameplay.effectiveEnemyBase", tran.gameplayDebug.effectiveEnemyBaseCount);
+			row_i1("gameplay.effectiveEnemyAdd", tran.gameplayDebug.effectiveEnemyAddPerWave);
+			row_f1("gameplay.effectiveEnemyDamage", tran.gameplayDebug.effectiveEnemyAttackDamage);
+			row_i1("gameplay.playerAttackDamage", tran.gameplayDebug.playerAttackDamage);
+			row_f1("gameplay.playerAtkCdScale", tran.gameplayDebug.playerAttackCooldownScale);
+			row_f1("gameplay.playerEvdCdScale", tran.gameplayDebug.playerEvadeCooldownScale);
+			row_i1("gameplay.playerEvading", tran.gameplayDebug.playerEvading);
+			row_i1("rogue.stageClearCount", tran.gameplayDebug.stageClearCount);
+			row_i1("rogue.attackPowerLevel", tran.gameplayDebug.attackPowerLevel);
+			row_i1("rogue.attackSpeedLevel", tran.gameplayDebug.attackSpeedLevel);
+			row_i1("rogue.evadeCooldownLevel", tran.gameplayDebug.evadeCooldownLevel);
+			row_i1("upgrade.pending", tran.gameplayDebug.upgradeSelectionPending);
+			row_i1("upgrade.rerollRemain", tran.gameplayDebug.upgradeRerollRemain);
+			row_i1("upgrade.offer0", tran.gameplayDebug.upgradeOffer0);
+			row_i1("upgrade.offer1", tran.gameplayDebug.upgradeOffer1);
+			row_i1("upgrade.offer2", tran.gameplayDebug.upgradeOffer2);
 
 			ImGui::EndTable();
 		}
@@ -732,12 +817,15 @@ void Draw()
 		char gameplayHud[256];
 		sprintf_s(
 			gameplayHud,
-			u8"難易度: %s\n現在Wave: %d / %d\n残り敵数: %d / %d\nクリア条件: 最終Waveで敵を全滅",
+			u8"難易度: %s\n現在Wave: %d / %d\n残り敵数: %d / %d\n強化: 攻撃Lv%d / 攻撃頻度Lv%d / 回避Lv%d\nクリア条件: 最終Waveで敵を全滅",
 			difficultyText,
 			tran.gameplayDebug.currentWave,
 			tran.gameplayDebug.maxWave,
 			tran.gameplayDebug.enemiesAlive,
-			tran.gameplayDebug.enemiesTarget);
+			tran.gameplayDebug.enemiesTarget,
+			tran.gameplayDebug.attackPowerLevel,
+			tran.gameplayDebug.attackSpeedLevel,
+			tran.gameplayDebug.evadeCooldownLevel);
 
 		const ImVec2 pad(10.0f, 8.0f);
 		const ImVec2 textSize = ImGui::CalcTextSize(gameplayHud);
@@ -747,6 +835,40 @@ void Draw()
 		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 6.0f);
 		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 6.0f);
 		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), gameplayHud);
+	}
+	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
+		SceneManager::GetResultType() == SceneManager::ResultType::Win &&
+		tran.roguelike.selectionPending != 0)
+	{
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+
+		const char* l0 = upgradeLabel(tran.roguelike.offers[0]);
+		const char* l1 = upgradeLabel(tran.roguelike.offers[1]);
+		const char* l2 = upgradeLabel(tran.roguelike.offers[2]);
+		const char* d0 = upgradeDesc(tran.roguelike.offers[0]);
+		const char* d1 = upgradeDesc(tran.roguelike.offers[1]);
+		const char* d2 = upgradeDesc(tran.roguelike.offers[2]);
+
+		char upgradeHud[1024];
+		sprintf_s(
+			upgradeHud,
+			u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
+			l0, d0,
+			l1, d1,
+			l2, d2,
+			tran.roguelike.rerollRemain,
+			tran.roguelike.rerollMaxPerStage);
+
+		const ImVec2 pad(14.0f, 12.0f);
+		const ImVec2 textSize = ImGui::CalcTextSize(upgradeHud);
+		const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - textSize.x) * 0.5f - pad.x,
+							vp->Pos.y + (vp->Size.y - textSize.y) * 0.5f - pad.y);
+		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+
+		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 210), 8.0f);
+		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 160), 8.0f);
+		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), upgradeHud);
 	}
 
 	// DrawList overlay（画面上に線や矩形などを描く）

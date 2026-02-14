@@ -176,6 +176,52 @@ private:
 		int enemiesAlive = 0;
 		int enemiesTarget = 0;
 		int difficultyPreset = 1; // 0:Easy 1:Normal 2:Hard
+		int effectiveEnemyBaseCount = 3;
+		int effectiveEnemyAddPerWave = 1;
+		float effectiveEnemyAttackDamage = 1.0f;
+		int playerAttackDamage = 1;
+		float playerAttackCooldownScale = 1.0f;
+		float playerEvadeCooldownScale = 1.0f;
+		int playerEvading = 0;
+		int stageClearCount = 0;
+		int attackPowerLevel = 0;
+		int attackSpeedLevel = 0;
+		int evadeCooldownLevel = 0;
+		int lastUpgradeType = -1; // UpgradeType
+		int upgradeSelectionPending = 0;
+		int upgradeRerollRemain = 0;
+		int upgradeOffer0 = -1;
+		int upgradeOffer1 = -1;
+		int upgradeOffer2 = -1;
+	};
+	struct RoguelikeUpgrade
+	{
+		static const int kOfferCount = 3;
+		enum UpgradeType
+		{
+			UpgradeAttackPower = 0,
+			UpgradeAttackSpeed = 1,
+			UpgradeEvadeCooldown = 2,
+			UpgradeAttackPowerLarge = 3,
+			UpgradeAttackSpeedLarge = 4,
+			UpgradeEvadeCooldownLarge = 5,
+			UpgradeTypeCount = 6
+		};
+
+		int stageClearCount = 0;
+		int attackPowerLevel = 0;
+		int attackSpeedLevel = 0;
+		int evadeCooldownLevel = 0;
+		int lastUpgradeType = -1; // UpgradeType
+		int rerollMaxPerStage = 2;
+		int rerollRemain = 0;
+		int selectionPending = 0;
+		int offers[kOfferCount] =
+		{
+			UpgradeAttackPower,
+			UpgradeAttackSpeed,
+			UpgradeEvadeCooldown
+		};
 	};
 public:
 	static Transfer& GetInstance()
@@ -184,6 +230,11 @@ public:
 		return instance;
 	}
 	void ResetGameplayTuningToDefault();
+	void ResetRoguelikeUpgrade();
+	void ApplyStageClearUpgrade();
+	void BeginUpgradeSelection();
+	bool RerollUpgradeSelection();
+	bool ApplyUpgradeSelection(int offerIndex);
 	bool LoadGameplayTuning(const char* path = nullptr);
 	bool SaveGameplayTuning(const char* path = nullptr) const;
 	const char* GetGameplayTuningPath() const;
@@ -206,4 +257,5 @@ public:
 	Arrow arrow;
 	GameplayTuning gameplay;
 	GameplayDebug gameplayDebug;
+	RoguelikeUpgrade roguelike;
 };

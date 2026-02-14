@@ -59,6 +59,26 @@ void SceneResult::Update()
 		SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
 		return;
 	}
+	if (m_current == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0)
+	{
+		if (IsKeyTrigger('R'))
+		{
+			tran.RerollUpgradeSelection();
+		}
+
+		int selectedIndex = -1;
+		if (IsKeyTrigger('1')) selectedIndex = 0;
+		else if (IsKeyTrigger('2')) selectedIndex = 1;
+		else if (IsKeyTrigger('3')) selectedIndex = 2;
+
+		if (selectedIndex >= 0 && tran.ApplyUpgradeSelection(selectedIndex))
+		{
+			SceneManager::ChangeResult(SceneManager::ResultType::None);
+			SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+			return;
+		}
+		return;
+	}
 	if (IsKeyTrigger(VK_RETURN))
 	{
 		SceneManager::ChangeResult(SceneManager::ResultType::None);

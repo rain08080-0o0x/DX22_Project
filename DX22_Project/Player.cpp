@@ -21,6 +21,12 @@ namespace
         if (v > hi) return hi;
         return v;
     }
+
+    float CalcEvadeCooldownScale(int evadeCooldownLevel)
+    {
+        const float scale = 1.0f - 0.10f * static_cast<float>(evadeCooldownLevel);
+        return ClampFloat(scale, 0.30f, 1.0f);
+    }
 }
 
 
@@ -196,10 +202,13 @@ void Player::SyncToTransfer()
     tran.player.dashCooldown = m_dashCooldown;
     tran.player.dashDuration = m_dashDuration;
     tran.player.stageSize = m_stageSize;
+    tran.gameplayDebug.playerEvading = m_isDashing ? 1 : 0;
+    tran.gameplayDebug.playerEvadeCooldownScale = CalcEvadeCooldownScale(tran.roguelike.evadeCooldownLevel);
 }
 
 void Player::ApplyMovement(float dt)
 {
+    TRAN_INS;
     float dirX = 0.0f;
     float dirZ = 0.0f;
 
@@ -220,6 +229,10 @@ void Player::ApplyMovement(float dt)
         dirZ = 0.0f;
     }
 
+    const float evadeCooldownScale = CalcEvadeCooldownScale(tran.roguelike.evadeCooldownLevel);
+    const float effectiveDashCooldown = m_dashCooldown * evadeCooldownScale;
+    tran.gameplayDebug.playerEvadeCooldownScale = evadeCooldownScale;
+
     if (m_dashCooldownTimer > 0.0f)
     {
         m_dashCooldownTimer -= dt;
@@ -232,7 +245,7 @@ void Player::ApplyMovement(float dt)
         {
             m_isDashing = true;
             m_dashTimer = m_dashDuration;
-            m_dashCooldownTimer = m_dashCooldown;
+            m_dashCooldownTimer = effectiveDashCooldown;
             m_dashDir = DirectX::XMFLOAT3(dirX, 0.0f, dirZ);
         }
     }

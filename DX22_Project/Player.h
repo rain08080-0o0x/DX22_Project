@@ -18,6 +18,7 @@ public:
     void Draw() override;
 
     void SetCamera(Camera*set);
+    bool IsEvading() const { return m_isDashing; }
 
 private:
     void SyncFromTransfer();
