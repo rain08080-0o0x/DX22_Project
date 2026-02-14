@@ -14,6 +14,10 @@
 //----------
 HRESULT InitSound(void);
 void UninitSound(void);
+void UpdateSound(void);
+void SetMasterVolume(float volume);
+void SetBgmVolume(float volume);
+void SetSeVolume(float volume);
 
 // サウンドファイルの読み込み
 XAUDIO2_BUFFER* LoadSound(const char *file, bool loop = false);

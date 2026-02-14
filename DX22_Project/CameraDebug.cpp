@@ -1,4 +1,4 @@
-﻿﻿#include "CameraDebug.h"
+﻿#include "CameraDebug.h"
 #include "Transfer.h"
 #include <cmath>
 const float CameraSpeed = 0.1f;

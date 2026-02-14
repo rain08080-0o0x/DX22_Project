@@ -58,6 +58,17 @@ using SoundMap = std::map<std::string, SoundData>;
 IXAudio2*				g_pXAudio;
 IXAudio2MasteringVoice*	g_pMasterVoice;
 SoundMap				g_soundMap;
+std::vector<IXAudio2SourceVoice*> g_oneShotVoices;
+float g_masterVolume = 1.0f;
+float g_bgmVolume = 0.7f;
+float g_seVolume = 1.0f;
+
+float ClampVolume(float v)
+{
+	if (v < 0.0f) return 0.0f;
+	if (v > 2.0f) return 2.0f;
+	return v;
+}
 
 /**
  * @brief 初期化
@@ -87,11 +98,60 @@ HRESULT InitSound(void)
 	return hr;
 }
 
+void SetMasterVolume(float volume)
+{
+	g_masterVolume = ClampVolume(volume);
+}
+
+void SetBgmVolume(float volume)
+{
+	g_bgmVolume = ClampVolume(volume);
+}
+
+void SetSeVolume(float volume)
+{
+	g_seVolume = ClampVolume(volume);
+}
+
+void UpdateSound(void)
+{
+	for (size_t i = 0; i < g_oneShotVoices.size();)
+	{
+		IXAudio2SourceVoice* voice = g_oneShotVoices[i];
+		if (!voice)
+		{
+			g_oneShotVoices.erase(g_oneShotVoices.begin() + i);
+			continue;
+		}
+
+		XAUDIO2_VOICE_STATE state{};
+		voice->GetState(&state);
+		if (state.BuffersQueued == 0)
+		{
+			voice->DestroyVoice();
+			g_oneShotVoices.erase(g_oneShotVoices.begin() + i);
+		}
+		else
+		{
+			++i;
+		}
+	}
+}
+
 /**
  * @brief 終了処理
  */
 void UninitSound(void)
 {
+	for (IXAudio2SourceVoice* voice : g_oneShotVoices)
+	{
+		if (voice)
+		{
+			voice->DestroyVoice();
+		}
+	}
+	g_oneShotVoices.clear();
+
 	// サウンドデータの削除
 	SoundMap::iterator it = g_soundMap.begin();
 	while (it != g_soundMap.end())
@@ -99,6 +159,7 @@ void UninitSound(void)
 		delete[] it->second.pBuffer;
 		++it;
 	}
+	g_soundMap.clear();
 
 	// XAudio2のオブジェクトを削除
 	if (g_pMasterVoice != NULL)
@@ -214,10 +275,17 @@ IXAudio2SourceVoice* PlaySound(XAUDIO2_BUFFER* pSound)
 		return NULL;
 	}
 	pSource->SubmitSourceBuffer(pSound);
+	const bool isLoop = (pSound->LoopCount != 0);
+	const float categoryVolume = isLoop ? g_bgmVolume : g_seVolume;
+	pSource->SetVolume(ClampVolume(g_masterVolume * categoryVolume));
 
 	// 再生
 	pSource->Start();
 
+	if (!isLoop)
+	{
+		g_oneShotVoices.push_back(pSource);
+	}
 
 	return pSource;
 }

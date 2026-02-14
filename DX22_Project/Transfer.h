@@ -47,6 +47,7 @@ private:
 		float hp = 0.0f;
 		float maxHp = 0.0f;
 		int state = -1;
+		int type = -1;
 		int exists = 0;
 	};
 
@@ -117,12 +118,75 @@ private:
 		DirectX::XMFLOAT3 rotate;
 		DirectX::XMFLOAT3 scale;
 	};
+	struct GameplayTuning
+	{
+		int enemyCount = 3;
+		int waveMax = 3;
+		int waveEnemyAddPerWave = 1;
+
+		float attackWindup = 0.04f;
+		float attackDuration = 0.12f;
+		float attackRecovery = 0.10f;
+		float attackCooldown = 0.24f;
+		float attackSweepDegrees = 120.0f;
+		float attackSweepRadiusScale = 1.25f;
+		float attackWidthScale = 1.2f;
+		float attackDepthScale = 1.0f;
+		float attackHitStop = 0.05f;
+		float attackKnockback = 0.45f;
+		float attackHitFlash = 0.10f;
+		float attackTrailInterval = 0.02f;
+		float attackTrailLife = 0.16f;
+		float attackTrailScale = 0.75f;
+		float playerDamageFlash = 0.20f;
+		float playerDamageFlashScale = 1.65f;
+		float enemyDefeatFlash = 0.28f;
+		float enemyDefeatFlashScale = 1.60f;
+		float volumeMaster = 1.0f;
+		float volumeBgm = 0.7f;
+		float volumeSe = 1.0f;
+
+		float enemyAttackWindup = 0.55f;
+		float enemyAttackCooldown = 1.00f;
+		float enemyAttackRangeMin = 0.8f;
+		float enemyAttackRangeScale = 1.35f;
+		float enemyAttackDamage = 1.0f;
+		float enemyMoveSpeed = 1.2f;
+		float waveEnemyMoveSpeedAdd = 0.15f;
+		float waveEnemyAttackDamageScalePerWave = 0.20f;
+		float enemySeparationRadius = 1.1f;
+		float enemySeparationWeight = 0.8f;
+		float enemySeparationMaxOffset = 0.8f;
+		float enemySpawnRingScale = 0.35f;
+		float enemySpawnJitterScale = 0.10f;
+		float enemySpawnMinPlayerDist = 1.5f;
+		float enemySpawnMinEnemyDist = 0.9f;
+
+		float pushSlop = 0.01f;
+		float playerPushShare = 0.55f;
+		float enemyPushShare = 0.45f;
+	};
+	struct GameplayDebug
+	{
+		int attackSwingId = 0;
+		int swingHitCount = 0;
+		int attackActive = 0;
+		int currentWave = 1;
+		int maxWave = 1;
+		int enemiesAlive = 0;
+		int enemiesTarget = 0;
+		int difficultyPreset = 1; // 0:Easy 1:Normal 2:Hard
+	};
 public:
 	static Transfer& GetInstance()
 	{
 		static Transfer instance;
 		return instance;
 	}
+	void ResetGameplayTuningToDefault();
+	bool LoadGameplayTuning(const char* path = nullptr);
+	bool SaveGameplayTuning(const char* path = nullptr) const;
+	const char* GetGameplayTuningPath() const;
 public:
 	PlayerInfo player;
 	EnemyInfo enemy;
@@ -140,4 +204,6 @@ public:
 	Tyabudai tyawan;
 	ModelEditer modelediter;
 	Arrow arrow;
+	GameplayTuning gameplay;
+	GameplayDebug gameplayDebug;
 };

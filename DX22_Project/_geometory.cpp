@@ -1,4 +1,4 @@
-﻿﻿#include "Geometory.h"
+﻿#include "Geometory.h"
 #include<cmath>
 #include<vector>
 using namespace std;

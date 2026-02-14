@@ -1,4 +1,4 @@
-﻿﻿#include "Scene3DEditor.h"
+﻿#include "Scene3DEditor.h"
 #include "Geometory.h"
 #include "Transfer.h"
 #include "CameraDebug.h"

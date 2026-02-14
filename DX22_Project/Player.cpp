@@ -1,4 +1,4 @@
-﻿﻿#include "Player.h"
+﻿#include "Player.h"
 #include "Input.h"
 #include "Transfer.h"
 #include <cmath>
@@ -9,7 +9,7 @@ namespace
     const char* kPlayerTexture = "Assets/Texture/Chracter/genbaneko.png";
     const float kDefaultStageSize = 5.0f;
     const float kDefaultMoveSpeed = 2.4f;
-    const float kDefaultMaxHp = 10.0f;
+    const float kDefaultMaxHp = 100.0f;
     const float kDefaultDashDistance = 1.4f;
     const float kDefaultDashCooldown = 0.4f;
     const float kDefaultDashDuration = 0.12f;

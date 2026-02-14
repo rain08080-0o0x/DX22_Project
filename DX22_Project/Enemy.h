@@ -9,6 +9,13 @@
 class Enemy : public GameObject
 {
 public:
+    enum class Type
+    {
+        Speed = 0,
+        Tank = 1,
+        Ranged = 2
+    };
+
     Enemy();
     ~Enemy();
 
@@ -18,6 +25,7 @@ public:
     void SetSize(const DirectX::XMFLOAT3& size);
     void SetStageSize(float size);
     void SetMoveSpeed(float speed);
+    void SetType(Type type);
     DirectX::XMFLOAT3 GetSize() const;
     Collision::Box GetCollision() const;
     void Damage(int amount);
@@ -25,6 +33,11 @@ public:
     int GetHp() const;
     int GetMaxHp() const;
     int GetState() const;
+    int GetType() const;
+    float GetAttackRangeScale() const;
+    float GetAttackWindupScale() const;
+    float GetAttackCooldownScale() const;
+    float GetAttackDamageScale() const;
     void SetCamera(Camera*);
 
     void SetTargetPos(DirectX::XMFLOAT3);
@@ -40,10 +53,17 @@ private:
     DirectX::XMFLOAT3 m_size;
     DirectX::XMFLOAT4 m_color;
     float m_moveSpeed;
+    float m_moveSpeedBase;
+    float m_moveSpeedScale;
     float m_stageSize;
     float m_moveDirX;
     int m_hp;
     int m_maxHp;
+    Type m_type;
+    float m_attackRangeScale;
+    float m_attackWindupScale;
+    float m_attackCooldownScale;
+    float m_attackDamageScale;
     DirectX::XMFLOAT3 m_targetPos;
     DirectX::XMFLOAT3 m_wanderTarget;
     float m_wanderTimer;

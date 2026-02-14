@@ -1,4 +1,4 @@
-﻿﻿#include "GaugeUI.h"
+﻿#include "GaugeUI.h"
 #include "DirectXMath.h"
 #include "Defines.h"
 #include "ShaderList.h"

@@ -8,6 +8,7 @@ namespace
     const int kDefaultEnemyHp = 3;
     const float kDefaultStageSize = 5.0f;
     const float kDefaultMoveSpeed = 1.2f;
+    const float kDefaultMoveSpeedScale = 1.0f;
     const float kMoveDt = 1.0f / 60.0f;
     const float kChaseStartRatio = 0.45f;
     const float kChaseEndRatio = 0.60f;
@@ -41,16 +42,24 @@ Enemy::Enemy()
     , m_size(0.5f, 1.0f, 0.5f)
     , m_color(1.0f, 0.25f, 0.25f, 1.0f)
     , m_moveSpeed(kDefaultMoveSpeed)
+    , m_moveSpeedBase(kDefaultMoveSpeed)
+    , m_moveSpeedScale(kDefaultMoveSpeedScale)
     , m_stageSize(kDefaultStageSize)
     , m_moveDirX(1.0f)
     , m_hp(kDefaultEnemyHp)
     , m_maxHp(kDefaultEnemyHp)
+    , m_type(Type::Speed)
+    , m_attackRangeScale(1.0f)
+    , m_attackWindupScale(1.0f)
+    , m_attackCooldownScale(1.0f)
+    , m_attackDamageScale(1.0f)
     , m_targetPos({2,0,0})
     , m_wanderTarget(0.0f, 0.0f, 0.0f)
     , m_wanderTimer(0.0f)
     , m_state(MoveState::Wander)
 {
     m_pos = { 0.0f, 0.0f, 0.0f };
+    SetType(Type::Speed);
 
     m_pTexture = new Texture();
     if (FAILED(m_pTexture->Create(kEnemyTexture)))
@@ -222,7 +231,48 @@ void Enemy::SetStageSize(float size)
 
 void Enemy::SetMoveSpeed(float speed)
 {
-    m_moveSpeed = speed;
+    m_moveSpeedBase = speed;
+    m_moveSpeed = m_moveSpeedBase * m_moveSpeedScale;
+}
+
+void Enemy::SetType(Type type)
+{
+    m_type = type;
+    switch (m_type)
+    {
+    case Type::Speed:
+        m_maxHp = 2;
+        m_hp = m_maxHp;
+        m_moveSpeedScale = 1.45f;
+        m_attackRangeScale = 0.95f;
+        m_attackWindupScale = 0.75f;
+        m_attackCooldownScale = 0.75f;
+        m_attackDamageScale = 0.85f;
+        m_color = { 1.0f, 0.50f, 0.25f, 1.0f };
+        break;
+    case Type::Tank:
+        m_maxHp = 6;
+        m_hp = m_maxHp;
+        m_moveSpeedScale = 0.75f;
+        m_attackRangeScale = 0.90f;
+        m_attackWindupScale = 1.20f;
+        m_attackCooldownScale = 1.10f;
+        m_attackDamageScale = 1.40f;
+        m_color = { 0.35f, 0.60f, 1.0f, 1.0f };
+        break;
+    case Type::Ranged:
+    default:
+        m_maxHp = 3;
+        m_hp = m_maxHp;
+        m_moveSpeedScale = 0.95f;
+        m_attackRangeScale = 1.80f;
+        m_attackWindupScale = 1.05f;
+        m_attackCooldownScale = 1.25f;
+        m_attackDamageScale = 0.75f;
+        m_color = { 0.45f, 1.0f, 0.45f, 1.0f };
+        break;
+    }
+    m_moveSpeed = m_moveSpeedBase * m_moveSpeedScale;
 }
 
 DirectX::XMFLOAT3 Enemy::GetSize() const
@@ -267,6 +317,31 @@ int Enemy::GetMaxHp() const
 int Enemy::GetState() const
 {
     return (m_state == MoveState::Chase) ? 1 : 0;
+}
+
+int Enemy::GetType() const
+{
+    return static_cast<int>(m_type);
+}
+
+float Enemy::GetAttackRangeScale() const
+{
+    return m_attackRangeScale;
+}
+
+float Enemy::GetAttackWindupScale() const
+{
+    return m_attackWindupScale;
+}
+
+float Enemy::GetAttackCooldownScale() const
+{
+    return m_attackCooldownScale;
+}
+
+float Enemy::GetAttackDamageScale() const
+{
+    return m_attackDamageScale;
 }
 
 
