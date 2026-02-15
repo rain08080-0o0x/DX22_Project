@@ -725,3 +725,23 @@ DX22_Project にて、敵・攻撃・当たり判定可視化・影・敵HP表�
 - 更新
   - TEST_CHECKLIST_2026-02-14.md
   - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-02-15 / コミット・Push記録）
+
+## 実施内容
+- 変更を「ドキュメント」と「実装」で分割してコミット。
+  1. `1d8fd74` `docs: sync report/checklist with current task progress`
+     - 対象: `WORK_REPORT_2026-02-02.md` / `TEST_CHECKLIST_2026-02-14.md`
+  2. `da59db0` `feat: align gameplay systems and build workflow updates`
+     - 対象: `Main.cpp` / `SceneGame.*` / `Transfer.*` / `DX22_Project.vcxproj*` / `Assets/gameplay_tuning.cfg` / `imgui.ini` / `build_debug_x64.ps1`
+- `origin` の `ActionGame` ブランチへ Push 実施。
+  - 反映結果: `ActionGame -> origin/ActionGame`
+- `DX22_Project/Sound.h` は変更表示が出ていたため追加確認。
+  - `git add` 後に差分なし判定となり、追加コミットは不要（`Everything up-to-date`）。
+
+## 追加/更新ファイル
+- 更新
+  - WORK_REPORT_2026-02-02.md
