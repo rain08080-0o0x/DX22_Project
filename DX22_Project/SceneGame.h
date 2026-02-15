@@ -5,7 +5,6 @@
 #include "Camera.h"
 #include "Player.h"
 #include "UIObjectManager.h"
-#include "Goal.h"
 #include <vector>
 
 class UIObject;
@@ -43,6 +42,14 @@ private:
         float duration = 0.0f;
         float growScale = 1.0f;
     };
+    struct EnemyProjectile
+    {
+        DirectX::XMFLOAT3 pos = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 vel = { 0.0f, 0.0f, 0.0f };
+        float radius = 0.2f;
+        float life = 0.0f;
+        float damage = 0.0f;
+    };
 
     void UpdateHpGauge();
     void SpawnEnemyByIndex(int index, float stageSize);
@@ -59,6 +66,7 @@ private:
     Player* m_pPlayer;
     std::vector<EnemySlot> m_enemies;
     std::vector<MarkerEffect> m_markerEffects;
+    std::vector<EnemyProjectile> m_enemyProjectiles;
     Texture* m_pShadow;
     Texture* m_pAttackMarker;
     XAUDIO2_BUFFER* m_pAttackSe;
@@ -94,7 +102,6 @@ private:
     DirectX::XMFLOAT3 m_lastMoveDir;
     DirectX::XMFLOAT3 m_attackCenter;
     DirectX::XMFLOAT3 m_attackSize;
-    Goal* m_pGoal;
 };
 
 #endif // __SCENE_GAME_H__

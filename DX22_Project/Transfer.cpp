@@ -6,10 +6,18 @@
 namespace
 {
 	const char* kDefaultGameplayTuningPath = "Assets/gameplay_tuning.cfg";
+	const char* kMirrorGameplayTuningPath = "DX22_Project/Assets/gameplay_tuning.cfg";
+	const char* kDebugGameplayTuningPath = "x64/Debug/Assets/gameplay_tuning.cfg";
+	const char* kUpstreamMirrorGameplayTuningPath = "../../DX22_Project/Assets/gameplay_tuning.cfg";
+
+	bool IsDefaultPathArgument(const char* path)
+	{
+		return !(path && path[0] != '\0');
+	}
 
 	const char* ResolvePath(const char* path)
 	{
-		if (path && path[0] != '\0')
+		if (!IsDefaultPathArgument(path))
 		{
 			return path;
 		}
@@ -179,6 +187,26 @@ bool Transfer::LoadGameplayTuning(const char* path)
 {
 	const char* resolvedPath = ResolvePath(path);
 	std::ifstream ifs(resolvedPath);
+	if (!ifs.is_open() && IsDefaultPathArgument(path))
+	{
+		const char* fallbackPaths[] =
+		{
+			kDebugGameplayTuningPath,
+			kMirrorGameplayTuningPath,
+			kUpstreamMirrorGameplayTuningPath
+		};
+		for (const char* fallback : fallbackPaths)
+		{
+			ifs.clear();
+			ifs.open(fallback);
+			if (ifs.is_open())
+			{
+				resolvedPath = fallback;
+				break;
+			}
+		}
+	}
+
 	if (!ifs.is_open())
 	{
 		return false;
@@ -236,6 +264,10 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "enemyMoveSpeed") loaded.enemyMoveSpeed = ToFloat(value, loaded.enemyMoveSpeed);
 		else if (key == "waveEnemyMoveSpeedAdd") loaded.waveEnemyMoveSpeedAdd = ToFloat(value, loaded.waveEnemyMoveSpeedAdd);
 		else if (key == "waveEnemyAttackDamageScalePerWave") loaded.waveEnemyAttackDamageScalePerWave = ToFloat(value, loaded.waveEnemyAttackDamageScalePerWave);
+		else if (key == "enemyProjectileSpeed") loaded.enemyProjectileSpeed = ToFloat(value, loaded.enemyProjectileSpeed);
+		else if (key == "enemyProjectileLife") loaded.enemyProjectileLife = ToFloat(value, loaded.enemyProjectileLife);
+		else if (key == "enemyProjectileRadius") loaded.enemyProjectileRadius = ToFloat(value, loaded.enemyProjectileRadius);
+		else if (key == "enemyProjectileDamageScale") loaded.enemyProjectileDamageScale = ToFloat(value, loaded.enemyProjectileDamageScale);
 		else if (key == "enemySeparationRadius") loaded.enemySeparationRadius = ToFloat(value, loaded.enemySeparationRadius);
 		else if (key == "enemySeparationWeight") loaded.enemySeparationWeight = ToFloat(value, loaded.enemySeparationWeight);
 		else if (key == "enemySeparationMaxOffset") loaded.enemySeparationMaxOffset = ToFloat(value, loaded.enemySeparationMaxOffset);
@@ -268,67 +300,102 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	loadedRogue.selectionPending = 0;
 	GenerateUpgradeOffers(loadedRogue.offers);
 	roguelike = loadedRogue;
+
+	if (IsDefaultPathArgument(path))
+	{
+		// Keep runtime/source copies aligned after loading default configuration.
+		SaveGameplayTuning();
+	}
+
 	return true;
 }
 
 bool Transfer::SaveGameplayTuning(const char* path) const
 {
-	const char* resolvedPath = ResolvePath(path);
-	std::ofstream ofs(resolvedPath, std::ios::trunc);
-	if (!ofs.is_open())
+	auto writeToPath = [&](const char* targetPath) -> bool
 	{
-		return false;
+		std::ofstream ofs(targetPath, std::ios::trunc);
+		if (!ofs.is_open())
+		{
+			return false;
+		}
+
+		ofs << "# DX22 gameplay tuning\n";
+		ofs << "enemyCount=" << gameplay.enemyCount << "\n";
+		ofs << "waveMax=" << gameplay.waveMax << "\n";
+		ofs << "waveEnemyAddPerWave=" << gameplay.waveEnemyAddPerWave << "\n";
+		ofs << "attackWindup=" << gameplay.attackWindup << "\n";
+		ofs << "attackDuration=" << gameplay.attackDuration << "\n";
+		ofs << "attackRecovery=" << gameplay.attackRecovery << "\n";
+		ofs << "attackCooldown=" << gameplay.attackCooldown << "\n";
+		ofs << "attackSweepDegrees=" << gameplay.attackSweepDegrees << "\n";
+		ofs << "attackSweepRadiusScale=" << gameplay.attackSweepRadiusScale << "\n";
+		ofs << "attackWidthScale=" << gameplay.attackWidthScale << "\n";
+		ofs << "attackDepthScale=" << gameplay.attackDepthScale << "\n";
+		ofs << "attackHitStop=" << gameplay.attackHitStop << "\n";
+		ofs << "attackKnockback=" << gameplay.attackKnockback << "\n";
+		ofs << "attackHitFlash=" << gameplay.attackHitFlash << "\n";
+		ofs << "attackTrailInterval=" << gameplay.attackTrailInterval << "\n";
+		ofs << "attackTrailLife=" << gameplay.attackTrailLife << "\n";
+		ofs << "attackTrailScale=" << gameplay.attackTrailScale << "\n";
+		ofs << "playerDamageFlash=" << gameplay.playerDamageFlash << "\n";
+		ofs << "playerDamageFlashScale=" << gameplay.playerDamageFlashScale << "\n";
+		ofs << "enemyDefeatFlash=" << gameplay.enemyDefeatFlash << "\n";
+		ofs << "enemyDefeatFlashScale=" << gameplay.enemyDefeatFlashScale << "\n";
+		ofs << "volumeMaster=" << gameplay.volumeMaster << "\n";
+		ofs << "volumeBgm=" << gameplay.volumeBgm << "\n";
+		ofs << "volumeSe=" << gameplay.volumeSe << "\n";
+		ofs << "enemyAttackWindup=" << gameplay.enemyAttackWindup << "\n";
+		ofs << "enemyAttackCooldown=" << gameplay.enemyAttackCooldown << "\n";
+		ofs << "enemyAttackRangeMin=" << gameplay.enemyAttackRangeMin << "\n";
+		ofs << "enemyAttackRangeScale=" << gameplay.enemyAttackRangeScale << "\n";
+		ofs << "enemyAttackDamage=" << gameplay.enemyAttackDamage << "\n";
+		ofs << "enemyMoveSpeed=" << gameplay.enemyMoveSpeed << "\n";
+		ofs << "waveEnemyMoveSpeedAdd=" << gameplay.waveEnemyMoveSpeedAdd << "\n";
+		ofs << "waveEnemyAttackDamageScalePerWave=" << gameplay.waveEnemyAttackDamageScalePerWave << "\n";
+		ofs << "enemyProjectileSpeed=" << gameplay.enemyProjectileSpeed << "\n";
+		ofs << "enemyProjectileLife=" << gameplay.enemyProjectileLife << "\n";
+		ofs << "enemyProjectileRadius=" << gameplay.enemyProjectileRadius << "\n";
+		ofs << "enemyProjectileDamageScale=" << gameplay.enemyProjectileDamageScale << "\n";
+		ofs << "enemySeparationRadius=" << gameplay.enemySeparationRadius << "\n";
+		ofs << "enemySeparationWeight=" << gameplay.enemySeparationWeight << "\n";
+		ofs << "enemySeparationMaxOffset=" << gameplay.enemySeparationMaxOffset << "\n";
+		ofs << "enemySpawnRingScale=" << gameplay.enemySpawnRingScale << "\n";
+		ofs << "enemySpawnJitterScale=" << gameplay.enemySpawnJitterScale << "\n";
+		ofs << "enemySpawnMinPlayerDist=" << gameplay.enemySpawnMinPlayerDist << "\n";
+		ofs << "enemySpawnMinEnemyDist=" << gameplay.enemySpawnMinEnemyDist << "\n";
+		ofs << "pushSlop=" << gameplay.pushSlop << "\n";
+		ofs << "playerPushShare=" << gameplay.playerPushShare << "\n";
+		ofs << "enemyPushShare=" << gameplay.enemyPushShare << "\n";
+		ofs << "difficultyPreset=" << gameplayDebug.difficultyPreset << "\n";
+		ofs << "stageClearCount=" << roguelike.stageClearCount << "\n";
+		ofs << "attackPowerLevel=" << roguelike.attackPowerLevel << "\n";
+		ofs << "attackSpeedLevel=" << roguelike.attackSpeedLevel << "\n";
+		ofs << "evadeCooldownLevel=" << roguelike.evadeCooldownLevel << "\n";
+		ofs << "lastUpgradeType=" << roguelike.lastUpgradeType << "\n";
+		ofs << "upgradeRerollMax=" << roguelike.rerollMaxPerStage << "\n";
+		return ofs.good();
+	};
+
+	if (!IsDefaultPathArgument(path))
+	{
+		return writeToPath(ResolvePath(path));
 	}
 
-	ofs << "# DX22 gameplay tuning\n";
-	ofs << "enemyCount=" << gameplay.enemyCount << "\n";
-	ofs << "waveMax=" << gameplay.waveMax << "\n";
-	ofs << "waveEnemyAddPerWave=" << gameplay.waveEnemyAddPerWave << "\n";
-	ofs << "attackWindup=" << gameplay.attackWindup << "\n";
-	ofs << "attackDuration=" << gameplay.attackDuration << "\n";
-	ofs << "attackRecovery=" << gameplay.attackRecovery << "\n";
-	ofs << "attackCooldown=" << gameplay.attackCooldown << "\n";
-	ofs << "attackSweepDegrees=" << gameplay.attackSweepDegrees << "\n";
-	ofs << "attackSweepRadiusScale=" << gameplay.attackSweepRadiusScale << "\n";
-	ofs << "attackWidthScale=" << gameplay.attackWidthScale << "\n";
-	ofs << "attackDepthScale=" << gameplay.attackDepthScale << "\n";
-	ofs << "attackHitStop=" << gameplay.attackHitStop << "\n";
-	ofs << "attackKnockback=" << gameplay.attackKnockback << "\n";
-	ofs << "attackHitFlash=" << gameplay.attackHitFlash << "\n";
-	ofs << "attackTrailInterval=" << gameplay.attackTrailInterval << "\n";
-	ofs << "attackTrailLife=" << gameplay.attackTrailLife << "\n";
-	ofs << "attackTrailScale=" << gameplay.attackTrailScale << "\n";
-	ofs << "playerDamageFlash=" << gameplay.playerDamageFlash << "\n";
-	ofs << "playerDamageFlashScale=" << gameplay.playerDamageFlashScale << "\n";
-	ofs << "enemyDefeatFlash=" << gameplay.enemyDefeatFlash << "\n";
-	ofs << "enemyDefeatFlashScale=" << gameplay.enemyDefeatFlashScale << "\n";
-	ofs << "volumeMaster=" << gameplay.volumeMaster << "\n";
-	ofs << "volumeBgm=" << gameplay.volumeBgm << "\n";
-	ofs << "volumeSe=" << gameplay.volumeSe << "\n";
-	ofs << "enemyAttackWindup=" << gameplay.enemyAttackWindup << "\n";
-	ofs << "enemyAttackCooldown=" << gameplay.enemyAttackCooldown << "\n";
-	ofs << "enemyAttackRangeMin=" << gameplay.enemyAttackRangeMin << "\n";
-	ofs << "enemyAttackRangeScale=" << gameplay.enemyAttackRangeScale << "\n";
-	ofs << "enemyAttackDamage=" << gameplay.enemyAttackDamage << "\n";
-	ofs << "enemyMoveSpeed=" << gameplay.enemyMoveSpeed << "\n";
-	ofs << "waveEnemyMoveSpeedAdd=" << gameplay.waveEnemyMoveSpeedAdd << "\n";
-	ofs << "waveEnemyAttackDamageScalePerWave=" << gameplay.waveEnemyAttackDamageScalePerWave << "\n";
-	ofs << "enemySeparationRadius=" << gameplay.enemySeparationRadius << "\n";
-	ofs << "enemySeparationWeight=" << gameplay.enemySeparationWeight << "\n";
-	ofs << "enemySeparationMaxOffset=" << gameplay.enemySeparationMaxOffset << "\n";
-	ofs << "enemySpawnRingScale=" << gameplay.enemySpawnRingScale << "\n";
-	ofs << "enemySpawnJitterScale=" << gameplay.enemySpawnJitterScale << "\n";
-	ofs << "enemySpawnMinPlayerDist=" << gameplay.enemySpawnMinPlayerDist << "\n";
-	ofs << "enemySpawnMinEnemyDist=" << gameplay.enemySpawnMinEnemyDist << "\n";
-	ofs << "pushSlop=" << gameplay.pushSlop << "\n";
-	ofs << "playerPushShare=" << gameplay.playerPushShare << "\n";
-	ofs << "enemyPushShare=" << gameplay.enemyPushShare << "\n";
-	ofs << "difficultyPreset=" << gameplayDebug.difficultyPreset << "\n";
-	ofs << "stageClearCount=" << roguelike.stageClearCount << "\n";
-	ofs << "attackPowerLevel=" << roguelike.attackPowerLevel << "\n";
-	ofs << "attackSpeedLevel=" << roguelike.attackSpeedLevel << "\n";
-	ofs << "evadeCooldownLevel=" << roguelike.evadeCooldownLevel << "\n";
-	ofs << "lastUpgradeType=" << roguelike.lastUpgradeType << "\n";
-	ofs << "upgradeRerollMax=" << roguelike.rerollMaxPerStage << "\n";
-	return ofs.good();
+	bool anySaved = false;
+	const char* syncPaths[] =
+	{
+		kDefaultGameplayTuningPath,
+		kDebugGameplayTuningPath,
+		kMirrorGameplayTuningPath,
+		kUpstreamMirrorGameplayTuningPath
+	};
+	for (const char* syncPath : syncPaths)
+	{
+		if (writeToPath(syncPath))
+		{
+			anySaved = true;
+		}
+	}
+	return anySaved;
 }

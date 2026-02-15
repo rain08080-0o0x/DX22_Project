@@ -154,6 +154,10 @@ private:
 		float enemyMoveSpeed = 1.2f;
 		float waveEnemyMoveSpeedAdd = 0.15f;
 		float waveEnemyAttackDamageScalePerWave = 0.20f;
+		float enemyProjectileSpeed = 6.5f;
+		float enemyProjectileLife = 1.4f;
+		float enemyProjectileRadius = 0.22f;
+		float enemyProjectileDamageScale = 0.85f;
 		float enemySeparationRadius = 1.1f;
 		float enemySeparationWeight = 0.8f;
 		float enemySeparationMaxOffset = 0.8f;

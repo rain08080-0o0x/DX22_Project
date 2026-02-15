@@ -155,7 +155,6 @@
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GaugeUI.cpp" />
     <ClCompile Include="Geometory.cpp" />
-    <ClCompile Include="Goal.cpp" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
     <ClCompile Include="imgui_impl_dx11.cpp" />
@@ -206,7 +205,6 @@
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GaugeUI.h" />
     <ClInclude Include="Geometory.h" />
-    <ClInclude Include="Goal.h" />
     <ClInclude Include="imconfig.h" />
     <ClInclude Include="imgui.h" />
     <ClInclude Include="imgui_impl_dx11.h" />

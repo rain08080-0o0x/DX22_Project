@@ -298,6 +298,12 @@ void Draw()
 				DragFloat(u8"敵移動速度", &tran.gameplay.enemyMoveSpeed, 0.01f, 0.1f, 8.0f);
 				DragFloat(u8"Wave毎 速度加算", &tran.gameplay.waveEnemyMoveSpeedAdd, 0.01f, 0.0f, 2.0f);
 				DragFloat(u8"Wave毎 ダメ倍率加算", &tran.gameplay.waveEnemyAttackDamageScalePerWave, 0.01f, 0.0f, 3.0f);
+				ImGui::SeparatorText(u8"遠距離型の敵弾");
+				ImGui::TextDisabled(u8"初期値: 速度6.50 / 寿命1.40 / 半径0.22 / ダメ倍率0.85");
+				DragFloat(u8"敵弾速度", &tran.gameplay.enemyProjectileSpeed, 0.05f, 0.1f, 20.0f);
+				DragFloat(u8"敵弾寿命", &tran.gameplay.enemyProjectileLife, 0.01f, 0.05f, 5.0f);
+				DragFloat(u8"敵弾半径", &tran.gameplay.enemyProjectileRadius, 0.01f, 0.05f, 2.0f);
+				DragFloat(u8"敵弾ダメ倍率", &tran.gameplay.enemyProjectileDamageScale, 0.01f, 0.0f, 3.0f);
 
 				ImGui::SeparatorText(u8"敵の分離行動");
 				ImGui::TextDisabled(u8"初期値: 半径1.10 / 重み0.80 / 最大オフセット0.80");
@@ -333,6 +339,7 @@ void Draw()
 				ImGui::Text(u8"回避中: %s", tran.gameplayDebug.playerEvading ? u8"はい" : u8"いいえ");
 				ImGui::Text(u8"強化選択待ち: %d / リロール残り: %d", tran.gameplayDebug.upgradeSelectionPending, tran.gameplayDebug.upgradeRerollRemain);
 				ImGui::TextDisabled(u8"ゲーム進行: 敵全滅で次Wave、最終Wave全滅で勝利");
+				ImGui::TextDisabled(u8"敵タイプ差: 遠距離型は予兆後に敵弾を発射");
 				ImGui::TextDisabled(u8"敵AABB色: 赤=被弾 / 橙=予兆 / 黄=攻撃可能");
 				ImGui::TextDisabled(u8"敵AABB色: 水=射程内(CT中) / 緑=射程外");
 				ImGui::TextDisabled(u8"射程枠(デバッグカメラ): 水=射程内 / 青=射程外");
@@ -702,17 +709,16 @@ void Draw()
 					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(name);
 					ImGui::TableSetColumnIndex(1); ImGui::Text("%d", v);
 				};
-
 			// Transfer の中身を例として監視
-			row_f3("player.pos", tran.player.pos);
-			row_f3("player.velocity", tran.player.velocity);
-			row_f1("player.hp", tran.player.hp);
-			row_f1("player.maxHp", tran.player.maxHp);
+			row_f3(u8"プレイヤー位置", tran.player.pos);
+			row_f3(u8"プレイヤー速度", tran.player.velocity);
+			row_f1(u8"プレイヤーHP", tran.player.hp);
+			row_f1(u8"プレイヤー最大HP", tran.player.maxHp);
 
-			row_i1("enemy.exists", tran.enemy.exists);
-			row_f3("enemy.pos", tran.enemy.pos);
-			row_f1("enemy.hp", tran.enemy.hp);
-			row_f1("enemy.maxHp", tran.enemy.maxHp);
+			row_i1(u8"敵存在", tran.enemy.exists);
+			row_f3(u8"敵位置", tran.enemy.pos);
+			row_f1(u8"敵HP", tran.enemy.hp);
+			row_f1(u8"敵最大HP", tran.enemy.maxHp);
 			const char* enemyStateText = u8"なし";
 			switch (tran.enemy.state)
 			{
@@ -721,7 +727,7 @@ void Draw()
 			default: enemyStateText = u8"なし"; break;
 			}
 			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("enemy.state");
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"敵状態");
 			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.enemy.state, enemyStateText);
 			const char* enemyTypeText = u8"なし";
 			switch (tran.enemy.type)
@@ -732,37 +738,55 @@ void Draw()
 			default: enemyTypeText = u8"なし"; break;
 			}
 			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("enemy.type");
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"敵タイプ");
 			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.enemy.type, enemyTypeText);
 
 
-			row_f3("dice.pos", tran.dice.pos);
-			row_f3("dice.velocity", tran.dice.velocity);
-			row_f4("dice.rot", tran.dice.rot);
-			row_f1("dice.underVel", tran.dice.underVel);
+			row_f3(u8"サイコロ位置", tran.dice.pos);
+			row_f3(u8"サイコロ速度", tran.dice.velocity);
+			row_f4(u8"サイコロ回転", tran.dice.rot);
+			row_f1(u8"停止しきい値速度", tran.dice.underVel);
 
-			row_i1("cameraMode", tran.cameraMode);
-			row_i1("gameplay.waveCurrent", tran.gameplayDebug.currentWave);
-			row_i1("gameplay.waveMax", tran.gameplayDebug.maxWave);
-			row_i1("gameplay.enemiesAlive", tran.gameplayDebug.enemiesAlive);
-			row_i1("gameplay.enemiesTarget", tran.gameplayDebug.enemiesTarget);
-			row_i1("gameplay.difficultyPreset", tran.gameplayDebug.difficultyPreset);
-			row_i1("gameplay.effectiveEnemyBase", tran.gameplayDebug.effectiveEnemyBaseCount);
-			row_i1("gameplay.effectiveEnemyAdd", tran.gameplayDebug.effectiveEnemyAddPerWave);
-			row_f1("gameplay.effectiveEnemyDamage", tran.gameplayDebug.effectiveEnemyAttackDamage);
-			row_i1("gameplay.playerAttackDamage", tran.gameplayDebug.playerAttackDamage);
-			row_f1("gameplay.playerAtkCdScale", tran.gameplayDebug.playerAttackCooldownScale);
-			row_f1("gameplay.playerEvdCdScale", tran.gameplayDebug.playerEvadeCooldownScale);
-			row_i1("gameplay.playerEvading", tran.gameplayDebug.playerEvading);
-			row_i1("rogue.stageClearCount", tran.gameplayDebug.stageClearCount);
-			row_i1("rogue.attackPowerLevel", tran.gameplayDebug.attackPowerLevel);
-			row_i1("rogue.attackSpeedLevel", tran.gameplayDebug.attackSpeedLevel);
-			row_i1("rogue.evadeCooldownLevel", tran.gameplayDebug.evadeCooldownLevel);
-			row_i1("upgrade.pending", tran.gameplayDebug.upgradeSelectionPending);
-			row_i1("upgrade.rerollRemain", tran.gameplayDebug.upgradeRerollRemain);
-			row_i1("upgrade.offer0", tran.gameplayDebug.upgradeOffer0);
-			row_i1("upgrade.offer1", tran.gameplayDebug.upgradeOffer1);
-			row_i1("upgrade.offer2", tran.gameplayDebug.upgradeOffer2);
+			const char* cameraModeText = (tran.cameraMode == 1) ? u8"デバッグ" : u8"ゲーム";
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"カメラモード");
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.cameraMode, cameraModeText);
+			row_i1(u8"現在Wave", tran.gameplayDebug.currentWave);
+			row_i1(u8"最大Wave", tran.gameplayDebug.maxWave);
+			row_i1(u8"生存敵数", tran.gameplayDebug.enemiesAlive);
+			row_i1(u8"目標敵数", tran.gameplayDebug.enemiesTarget);
+			const char* difficultyPresetText = u8"ノーマル";
+			switch (tran.gameplayDebug.difficultyPreset)
+			{
+			case 0: difficultyPresetText = u8"イージー"; break;
+			case 2: difficultyPresetText = u8"ハード"; break;
+			default: difficultyPresetText = u8"ノーマル"; break;
+			}
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"難易度プリセット");
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.difficultyPreset, difficultyPresetText);
+			row_i1(u8"実効基準敵数", tran.gameplayDebug.effectiveEnemyBaseCount);
+			row_i1(u8"実効Wave追加敵数", tran.gameplayDebug.effectiveEnemyAddPerWave);
+			row_f1(u8"実効敵攻撃ダメージ", tran.gameplayDebug.effectiveEnemyAttackDamage);
+			row_i1(u8"実効プレイヤー攻撃力", tran.gameplayDebug.playerAttackDamage);
+			row_f1(u8"実効プレイヤー攻撃CT倍率", tran.gameplayDebug.playerAttackCooldownScale);
+			row_f1(u8"実効プレイヤー回避CT倍率", tran.gameplayDebug.playerEvadeCooldownScale);
+			row_i1(u8"プレイヤー回避中", tran.gameplayDebug.playerEvading);
+			row_i1(u8"ステージクリア回数", tran.gameplayDebug.stageClearCount);
+			row_i1(u8"強化:攻撃力Lv", tran.gameplayDebug.attackPowerLevel);
+			row_i1(u8"強化:攻撃頻度Lv", tran.gameplayDebug.attackSpeedLevel);
+			row_i1(u8"強化:回避CTLv", tran.gameplayDebug.evadeCooldownLevel);
+			row_i1(u8"強化選択待ち", tran.gameplayDebug.upgradeSelectionPending);
+			row_i1(u8"強化リロール残り", tran.gameplayDebug.upgradeRerollRemain);
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"強化候補1");
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer0, upgradeLabel(tran.gameplayDebug.upgradeOffer0));
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"強化候補2");
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer1, upgradeLabel(tran.gameplayDebug.upgradeOffer1));
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"強化候補3");
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer2, upgradeLabel(tran.gameplayDebug.upgradeOffer2));
 
 			ImGui::EndTable();
 		}

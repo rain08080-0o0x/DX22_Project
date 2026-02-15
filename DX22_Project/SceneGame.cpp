@@ -42,8 +42,7 @@ namespace
     const DirectX::XMFLOAT4 kDebugEnemyColorHit = { 1.0f, 0.0f, 0.0f, 1.0f };
     const DirectX::XMFLOAT4 kDebugRangeColorOut = { 0.2f, 0.2f, 0.7f, 1.0f };
     const DirectX::XMFLOAT4 kDebugRangeColorIn = { 0.0f, 0.8f, 1.0f, 1.0f };
-    const DirectX::XMFLOAT3 kGoalSize = { 1.0f, 1.0f, 1.0f };
-    const float kGoalY = 1.0f;
+    const DirectX::XMFLOAT4 kEnemyProjectileColor = { 0.25f, 0.95f, 1.0f, 0.90f };
     const DirectX::XMFLOAT3 kEnemySpawnPositions[] =
     {
         { 2.0f, 0.0f, 0.0f },
@@ -380,6 +379,7 @@ SceneGame::SceneGame()
     , m_pPlayer(nullptr)
     , m_enemies()
     , m_markerEffects()
+    , m_enemyProjectiles()
     , m_pShadow(nullptr)
     , m_pAttackMarker(nullptr)
     , m_pAttackSe(nullptr)
@@ -394,7 +394,6 @@ SceneGame::SceneGame()
     , m_pEnemyHpGauge(nullptr)
     , m_pHpFrame(nullptr)
     , m_pHpGauge(nullptr)
-    , m_pGoal(nullptr)
     , m_stageSize(5.0f)
     , m_requestedEnemyCount(0)
     , m_currentWave(1)
@@ -524,13 +523,6 @@ SceneGame::SceneGame()
         MessageBox(NULL, "Texture load failed.\nUIGauge.png", "Error", MB_OK);
     }
 
-    m_pGoal = new Goal(kGoalSize);
-    if (m_pGoal)
-    {
-        m_pGoal->SetCamera(m_pCamera);
-        m_pGoal->SetPos({ m_stageSize * 0.75f, kGoalY, m_stageSize * 0.75f });
-    }
-
     const float frameX = kUiMargin + kHpFrameWidth * 0.5f;
     const float frameY = kUiMargin + kHpFrameHeight * 0.5f;
     m_pHpFrame = new UIObject("UIFrame.png", frameX, frameY, kHpFrameWidth, kHpFrameHeight);
@@ -625,11 +617,6 @@ SceneGame::~SceneGame()
         m_pCameraDebug = nullptr;
     }
     m_pCamera = nullptr;
-    if (m_pGoal)
-    {
-        delete m_pGoal;
-        m_pGoal = nullptr;
-    }
 }
 
 void SceneGame::SpawnEnemyByIndex(int index, float stageSize)
@@ -844,6 +831,10 @@ void SceneGame::Update()
     const float enemySeparationRadius = (tran.gameplay.enemySeparationRadius < 0.0f) ? 0.0f : tran.gameplay.enemySeparationRadius;
     const float enemySeparationWeight = (tran.gameplay.enemySeparationWeight < 0.0f) ? 0.0f : tran.gameplay.enemySeparationWeight;
     const float enemySeparationMaxOffset = (tran.gameplay.enemySeparationMaxOffset < 0.0f) ? 0.0f : tran.gameplay.enemySeparationMaxOffset;
+    const float enemyProjectileSpeed = (tran.gameplay.enemyProjectileSpeed < 0.1f) ? 0.1f : tran.gameplay.enemyProjectileSpeed;
+    const float enemyProjectileLife = (tran.gameplay.enemyProjectileLife < 0.05f) ? 0.05f : tran.gameplay.enemyProjectileLife;
+    const float enemyProjectileRadius = (tran.gameplay.enemyProjectileRadius < 0.05f) ? 0.05f : tran.gameplay.enemyProjectileRadius;
+    const float enemyProjectileDamageScale = (tran.gameplay.enemyProjectileDamageScale < 0.0f) ? 0.0f : tran.gameplay.enemyProjectileDamageScale;
 
     const float pushSlop = (tran.gameplay.pushSlop < 0.0f) ? 0.0f : tran.gameplay.pushSlop;
     float playerPushShare = Clamp01(tran.gameplay.playerPushShare);
@@ -922,7 +913,6 @@ void SceneGame::Update()
         {
             if (slot.enemy) slot.enemy->SetCamera(m_pCamera);
         }
-        if (m_pGoal) m_pGoal->SetCamera(m_pCamera);
     }
 
     if (m_cameraMode == kCameraModeDebug)
@@ -988,6 +978,98 @@ void SceneGame::Update()
 
     if (m_pPlayer) m_pPlayer->Update();
     const bool isPlayerEvading = (tran.gameplayDebug.playerEvading != 0);
+    const auto commitLose = [&]()
+    {
+        tran.gameplayDebug.attackSwingId = m_attackSwingId;
+        tran.gameplayDebug.swingHitCount = m_attackHitCountThisSwing;
+        tran.gameplayDebug.attackActive = m_attackActive ? 1 : 0;
+        tran.gameplayDebug.currentWave = m_currentWave;
+        tran.gameplayDebug.maxWave = m_waveMax;
+        tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
+        tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+        SceneManager::ChangeResult(SceneManager::ResultType::Lose);
+        SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+    };
+    const auto applyPlayerDamage = [&](float damage) -> bool
+    {
+        if (damage <= 0.0f || isPlayerEvading)
+        {
+            return false;
+        }
+        if (m_pPlayerHitSe) PlaySound(m_pPlayerHitSe);
+        tran.player.hp -= damage;
+        if (m_playerDamageFlashTimer < playerDamageFlash)
+        {
+            m_playerDamageFlashTimer = playerDamageFlash;
+        }
+        if (tran.player.hp < 0.0f) tran.player.hp = 0.0f;
+        if (tran.player.hp <= 0.0f)
+        {
+            commitLose();
+            return true;
+        }
+        return false;
+    };
+
+    if (m_pPlayer && !m_enemyProjectiles.empty())
+    {
+        Collision::Box playerBox = MakeAabb({
+            tran.player.pos.x,
+            tran.player.pos.y + tran.player.size.y * 0.5f,
+            tran.player.pos.z
+        }, tran.player.size);
+        const float stageHalf = stageSize * 0.5f;
+        const float outsideMargin = enemyProjectileRadius + 0.5f;
+
+        for (auto& shot : m_enemyProjectiles)
+        {
+            if (shot.life <= 0.0f) continue;
+            shot.pos.x += shot.vel.x * kFixedDt;
+            shot.pos.y += shot.vel.y * kFixedDt;
+            shot.pos.z += shot.vel.z * kFixedDt;
+            shot.life -= kFixedDt;
+            if (shot.life <= 0.0f)
+            {
+                shot.life = 0.0f;
+                continue;
+            }
+            if (std::fabs(shot.pos.x) > stageHalf + outsideMargin ||
+                std::fabs(shot.pos.z) > stageHalf + outsideMargin)
+            {
+                shot.life = 0.0f;
+                continue;
+            }
+
+            if (!isPlayerEvading)
+            {
+                Collision::Box shotBox = MakeAabb(
+                {
+                    shot.pos.x,
+                    shot.pos.y,
+                    shot.pos.z
+                },
+                {
+                    shot.radius * 2.0f,
+                    shot.radius * 2.0f,
+                    shot.radius * 2.0f
+                });
+                if (HitAabb(shotBox, playerBox))
+                {
+                    shot.life = 0.0f;
+                    if (applyPlayerDamage(shot.damage))
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        m_enemyProjectiles.erase(
+            std::remove_if(m_enemyProjectiles.begin(), m_enemyProjectiles.end(),
+                           [](const EnemyProjectile& shot) { return shot.life <= 0.0f; }),
+            m_enemyProjectiles.end());
+    }
+
     const int enemyTotal = static_cast<int>(m_enemies.size());
     const bool heavyEnemyLoad = (enemyTotal >= 8);
     const bool runFullEnemyPairWork = !heavyEnemyLoad || ((m_enemyPerfPhase & 1u) == 0u);
@@ -1337,6 +1419,7 @@ void SceneGame::Update()
             const float typeWindupScale = slot.enemy->GetAttackWindupScale();
             const float typeCooldownScale = slot.enemy->GetAttackCooldownScale();
             const float typeDamageScale = slot.enemy->GetAttackDamageScale();
+            const bool isRangedEnemy = (slot.enemy->GetType() == static_cast<int>(Enemy::Type::Ranged));
             const float enemyRangeSize = (enemyBox.size.x > enemyBox.size.z) ? enemyBox.size.x : enemyBox.size.z;
             const float playerRangeSize = (playerBox.size.x > playerBox.size.z) ? playerBox.size.x : playerBox.size.z;
             float attackRange = (enemyRangeSize + playerRangeSize) * enemyAttackRangeScale * typeRangeScale;
@@ -1353,26 +1436,38 @@ void SceneGame::Update()
                     slot.attackWindupTimer = 0.0f;
                     slot.attackCooldownTimer = enemyAttackCooldown * typeCooldownScale;
 
-                    if (inAttackRange && !isPlayerEvading)
+                    if (inAttackRange)
                     {
-                        if (m_pPlayerHitSe) PlaySound(m_pPlayerHitSe);
-                        tran.player.hp -= enemyAttackDamage * typeDamageScale;
-                        if (m_playerDamageFlashTimer < playerDamageFlash)
+                        if (isRangedEnemy)
                         {
-                            m_playerDamageFlashTimer = playerDamageFlash;
+                            DirectX::XMFLOAT3 dir = {
+                                playerBox.center.x - enemyBox.center.x,
+                                0.0f,
+                                playerBox.center.z - enemyBox.center.z
+                            };
+                            dir = NormalizeXZ(dir, { 0.0f, 0.0f, 1.0f });
+
+                            EnemyProjectile shot{};
+                            shot.pos = {
+                                enemyBox.center.x,
+                                playerBox.center.y,
+                                enemyBox.center.z
+                            };
+                            shot.vel = {
+                                dir.x * enemyProjectileSpeed,
+                                0.0f,
+                                dir.z * enemyProjectileSpeed
+                            };
+                            shot.radius = enemyProjectileRadius;
+                            shot.life = enemyProjectileLife;
+                            shot.damage = enemyAttackDamage * typeDamageScale * enemyProjectileDamageScale;
+                            if (m_enemyProjectiles.size() < 128)
+                            {
+                                m_enemyProjectiles.push_back(shot);
+                            }
                         }
-                        if (tran.player.hp < 0.0f) tran.player.hp = 0.0f;
-                        if (tran.player.hp <= 0.0f)
+                        else if (applyPlayerDamage(enemyAttackDamage * typeDamageScale))
                         {
-                            tran.gameplayDebug.attackSwingId = m_attackSwingId;
-                            tran.gameplayDebug.swingHitCount = m_attackHitCountThisSwing;
-                            tran.gameplayDebug.attackActive = m_attackActive ? 1 : 0;
-                            tran.gameplayDebug.currentWave = m_currentWave;
-                            tran.gameplayDebug.maxWave = m_waveMax;
-                            tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
-                            tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
-                            SceneManager::ChangeResult(SceneManager::ResultType::Lose);
-                            SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
                             return;
                         }
                     }
@@ -1464,6 +1559,7 @@ void SceneGame::Update()
 
         if (m_enemies.empty())
         {
+            m_enemyProjectiles.clear();
             if (m_currentWave < m_waveMax)
             {
                 ++m_currentWave;
@@ -1526,38 +1622,6 @@ void SceneGame::Update()
         }
     }
 
-    if (m_pGoal && m_pPlayer)
-    {
-        const Collision::Box playerBox = MakeAabb({
-            tran.player.pos.x,
-            tran.player.pos.y + tran.player.size.y * 0.5f,
-            tran.player.pos.z
-        }, tran.player.size);
-
-        const Collision::Box goalBox = MakeAabb(m_pGoal->GetPos(), kGoalSize);
-
-        if (HitAabb(playerBox, goalBox))
-        {
-            if (m_pClearSe) PlaySound(m_pClearSe);
-            tran.gameplayDebug.attackSwingId = m_attackSwingId;
-            tran.gameplayDebug.swingHitCount = m_attackHitCountThisSwing;
-            tran.gameplayDebug.attackActive = m_attackActive ? 1 : 0;
-            tran.gameplayDebug.currentWave = m_currentWave;
-            tran.gameplayDebug.maxWave = m_waveMax;
-            tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
-            tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
-            tran.BeginUpgradeSelection();
-            SceneManager::ChangeResult(SceneManager::ResultType::Win);
-            SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
-            return;
-        }
-    }
-
-    if(m_pGoal)
-    {
-        m_pGoal->Update();
-    }
-
     tran.gameplayDebug.attackSwingId = m_attackSwingId;
     tran.gameplayDebug.swingHitCount = m_attackHitCountThisSwing;
     tran.gameplayDebug.attackActive = m_attackActive ? 1 : 0;
@@ -1602,6 +1666,19 @@ void SceneGame::Draw()
     if (m_attackActive)
     {
         DrawAttackMarker(m_pAttackMarker, m_attackCenter, m_attackSize);
+    }
+    if (m_pAttackMarker)
+    {
+        for (const auto& shot : m_enemyProjectiles)
+        {
+            if (shot.life <= 0.0f) continue;
+            const float size = shot.radius * 2.0f;
+            DrawAttackMarkerTint(
+                m_pAttackMarker,
+                shot.pos,
+                { size, size, size },
+                kEnemyProjectileColor);
+        }
     }
 
     struct DrawEntry
@@ -1782,6 +1859,15 @@ void SceneGame::Draw()
             }
         }
 
+        for (const auto& shot : m_enemyProjectiles)
+        {
+            if (shot.life <= 0.0f) continue;
+            Collision::Box shotBox{};
+            shotBox.center = shot.pos;
+            shotBox.size = { shot.radius * 2.0f, shot.radius * 2.0f, shot.radius * 2.0f };
+            AddAabbLines(shotBox, { 0.25f, 0.95f, 1.0f, 1.0f });
+        }
+
         if (m_attackActive)
         {
             Collision::Box attackBox{};
@@ -1817,11 +1903,6 @@ void SceneGame::Draw()
 
             DrawEnemyHpGaugeBillboard(headPos, enemyBox.size, rate);
         }
-    }
-
-    if(m_pGoal)
-    {
-        m_pGoal->Draw();
     }
 
     m_uiManager.Draw(UIObjectManager::Layer::Game);
