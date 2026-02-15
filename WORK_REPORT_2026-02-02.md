@@ -344,6 +344,85 @@ DX22_Project にて、敵・攻撃・当たり判定可視化・影・敵HP表�
 
 ---
 
+# 追記（2026-02-14 / ローグライク化）
+
+## 実施内容
+- 難易度がゲーム進行へ与える実効補正を追加。
+  - 難易度ごとに「基準敵数」「Waveごとの追加敵数」「敵攻撃ダメージ倍率」を補正する方式へ変更。
+  - `Gameplay` の設定値は基準値として残し、実行時に実効値を算出。
+- ステージクリア報酬によるプレイヤー強化を追加。
+  - 強化系統: 攻撃力 / 攻撃頻度 / 回避CT短縮。
+  - 強化状態は実行時デバッグ・インスペクター・専用タブで確認可能。
+- ダッシュを「回避」扱いへ整理。
+  - パラメータ表記を回避に変更（距離/CT/時間）。
+  - 回避中はプレイヤーと敵の押し合い解決を無効化し、敵をすり抜け可能に変更。
+  - 回避中は敵攻撃ヒット判定を無効化（被弾しない）。
+
+## 追加/更新ファイル
+- 更新
+  - DX22_Project\Player.h
+  - DX22_Project\Player.cpp
+  - DX22_Project\SceneGame.cpp
+  - DX22_Project\Main.cpp
+  - DX22_Project\Transfer.h
+  - DX22_Project\Transfer.cpp
+  - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-02-14 / 強化選択制）
+
+## 実施内容
+- 勝利時の強化付与を「自動付与」から「三択選択」へ変更。
+  - `ResultType::Win` 時に強化選択待ち状態へ遷移。
+  - `1/2/3` キーで候補を1つ選択して適用後、次プレイへ進行。
+- リロール機能を追加。
+  - `R` キーで候補を再抽選。
+  - リロールには上限を設け、残回数が0なら再抽選不可。
+  - 上限値は ImGui の `ゲーム調整` から変更可能。
+- 強化候補表示を追加。
+  - Winリザルト画面中央に候補3つと説明文、リロール残回数を表示。
+  - `強化状態` タブにも候補と残回数を表示。
+- 保存/読込に強化関連項目を追加。
+  - 強化レベル、最終取得強化、リロール上限を `gameplay_tuning.cfg` へ保存/復元。
+
+## 操作
+- 勝利時:
+  - `1` / `2` / `3`: 候補選択
+  - `R`: リロール（残回数がある場合のみ）
+
+## 追加/更新ファイル
+- 更新
+  - DX22_Project\SceneResult.cpp
+  - DX22_Project\SceneGame.cpp
+  - DX22_Project\Main.cpp
+  - DX22_Project\Transfer.h
+  - DX22_Project\Transfer.cpp
+  - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-02-14 / 現時点総括）
+
+## 今までにやったこと（最新版）
+- ゲームプレイ当たり判定を AABB で統一し、判定経路を整理。
+- Wave進行と敵の段階強化（速度/攻撃）を実装。
+- 敵タイプ（速度型/耐久型/遠距離型）を追加。
+- 難易度プリセット（Easy/Normal/Hard）を実装。
+- サウンド拡張（BGM/SE、音量調整、SE後始末）を実装。
+- サウンド構成を `Assets/Sound/BGM` と `Assets/Sound/SE` に分離。
+- 最終Wave到達時のボスBGM切替（`GameBGM2.mp3`）を実装。
+- エフェクト強化（攻撃軌跡、被弾、撃破）を実装。
+- 調整値の保存/読込（`Assets/gameplay_tuning.cfg`）を実装。
+- テスト確認表を固定化（`TEST_CHECKLIST_2026-02-14.md`）。
+- 回避仕様を強化（回避中の貫通・押し合い無効・被弾無効）。
+- ローグライク強化を導入し、勝利時に三択選択＋リロール制へ移行。
+
+
+---
+
 # 追記（2026-02-14 / サウンド拡張 追補2）
 
 ## 実施内容
@@ -550,4 +629,99 @@ DX22_Project にて、敵・攻撃・当たり判定可視化・影・敵HP表�
   - DX22_Project\SceneGame.h
   - DX22_Project\SceneGame.cpp
   - DX22_Project\Main.cpp
+  - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-02-15 / 作業再開9）
+
+## 実施内容
+- 敵タイプ差を強化し、遠距離型を「敵弾発射」方式へ変更。
+  - 予兆完了時、遠距離型は即時接触ダメージではなく敵弾を生成。
+  - 敵弾は移動・寿命・AABB被弾判定を持ち、プレイヤー接触時にダメージ。
+  - 回避中は既存仕様どおり被弾無効。
+- 敵弾の実行時調整を追加。
+  - `Gameplay` タブに `敵弾速度 / 敵弾寿命 / 敵弾半径 / 敵弾ダメ倍率` を追加。
+  - 遠距離型の挙動説明をデバッグ表示に追記。
+- 設定保存/読込を拡張。
+  - `gameplay_tuning.cfg` に敵弾4項目を保存・復元。
+- デバッグ可視化を追加。
+  - 敵弾をシーン上マーカーで表示。
+  - デバッグカメラ時に敵弾AABB線を表示。
+- ビルド確認。
+  - `Debug|x64` ビルド成功（エラー0）。
+
+## 追加/更新ファイル
+- 更新
+  - DX22_Project\SceneGame.h
+  - DX22_Project\SceneGame.cpp
+  - DX22_Project\Transfer.h
+  - DX22_Project\Transfer.cpp
+  - DX22_Project\Main.cpp
+  - TEST_CHECKLIST_2026-02-14.md
+  - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-02-15 / 差分確認）
+
+## 確認結果（レポート記載と現状コードの差分）
+- 大きな不整合はなし（主要項目は一致）。
+- 差分として確認された2点（勝利条件の二重化、`gameplay_tuning.cfg` の2配置差分）を次項で対応。
+
+## 差分対応（2026-02-15 / 作業再開10）
+1. 勝利条件の仕様を一本化。
+   - `SceneGame` の Goal接触時Win遷移を撤去し、勝利は「最終Wave全滅時のみ」に統一。
+2. `gameplay_tuning.cfg` の運用を一本化。
+   - `Transfer::LoadGameplayTuning` にフォールバック読込を追加。
+   - `Transfer::SaveGameplayTuning` を既定時の複数パス同期保存に変更。
+   - 同期対象: `Assets/gameplay_tuning.cfg` / `x64/Debug/Assets/gameplay_tuning.cfg` / `DX22_Project/Assets/gameplay_tuning.cfg`
+   - 初回整合として `DX22_Project/Assets/gameplay_tuning.cfg` を `x64/Debug/Assets/gameplay_tuning.cfg` へ同期し、差分ゼロを確認。
+3. テストケースを追加。
+   - `TEST_CHECKLIST_2026-02-14.md` に `T15/T16/T17`（勝利条件統一、強化三択、リロール）を追加。
+4. ビルド確認手順を再整備。
+   - ルートに `build_debug_x64.ps1` を追加（`msbuild` 直接検出 + `vswhere` フォールバック）。
+5. 反映確認を実施。
+   - `build_debug_x64.ps1` 実行で `Debug|x64` ビルド成功（警告0 / エラー0）。
+
+## 追加/更新ファイル
+- 更新
+  - DX22_Project\SceneGame.cpp
+  - DX22_Project\Transfer.cpp
+  - TEST_CHECKLIST_2026-02-14.md
+  - WORK_REPORT_2026-02-02.md
+- 新規
+  - build_debug_x64.ps1
+
+
+---
+
+# 追記（2026-02-15 / 整合性再確認）
+
+## 依頼内容
+- `WORK_REPORT_2026-02-02.md` と `TEST_CHECKLIST_2026-02-14.md` の記載内容と、現状コードの進行内容の整合性を再確認。
+
+## 差分（確認結果）
+1. テスト項目の文言差分（Goal）
+   - チェックシート `T01/T15` に Goal接触前提の文言が残っていた。
+   - 現状コードは Goal未使用で、勝利条件は「最終Wave全滅時のみ」。
+2. 設定ファイル運用の文言差分（`gameplay_tuning.cfg`）
+   - チェックシート `T09/T10` の備考が3系統表記だった。
+   - 現状コードの既定運用はフォールバック/同期ともに4系統（`../../DX22_Project/Assets` を含む）。
+
+## 差分対応（実施）
+- `TEST_CHECKLIST_2026-02-14.md` を更新。
+  - `T01/T15` を Goal未使用の現仕様に合わせて修正。
+  - `T09/T10` のパス記載を4系統に修正。
+- 主要実装の整合性は維持されていることを再確認。
+  - 勝利条件一本化（最終Wave全滅のみ）
+  - Win時三択 + リロール
+  - 遠距離型の敵弾 + AABB被弾判定
+  - `build_debug_x64.ps1` で `Debug|x64` ビルド成功
+
+## 追加/更新ファイル
+- 更新
+  - TEST_CHECKLIST_2026-02-14.md
   - WORK_REPORT_2026-02-02.md
