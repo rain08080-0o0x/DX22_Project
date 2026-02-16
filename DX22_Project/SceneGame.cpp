@@ -2386,10 +2386,3 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
         Sprite::Draw();
     }
 }
-
-
-
-
-
-
-
