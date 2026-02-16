@@ -21,12 +21,6 @@ namespace
         if (v > hi) return hi;
         return v;
     }
-
-    float CalcEvadeCooldownScale(int evadeCooldownLevel)
-    {
-        const float scale = 1.0f - 0.10f * static_cast<float>(evadeCooldownLevel);
-        return ClampFloat(scale, 0.30f, 1.0f);
-    }
 }
 
 
@@ -43,6 +37,7 @@ Player::Player(Camera*camera)
     , m_dashDuration(kDefaultDashDuration)
     , m_dashTimer(0.0f)
     , m_dashCooldownTimer(0.0f)
+    , m_effectiveDashCooldown(kDefaultDashCooldown)
     , m_dashDir(0.0f, 0.0f, 1.0f)
     , m_isDashing(false)
     , m_stageSize(kDefaultStageSize)
@@ -203,7 +198,7 @@ void Player::SyncToTransfer()
     tran.player.dashDuration = m_dashDuration;
     tran.player.stageSize = m_stageSize;
     tran.gameplayDebug.playerEvading = m_isDashing ? 1 : 0;
-    tran.gameplayDebug.playerEvadeCooldownScale = CalcEvadeCooldownScale(tran.roguelike.evadeCooldownLevel);
+    tran.gameplayDebug.playerEvadeCooldownScale = tran.GetEvadeCooldownScaleByLevel(tran.roguelike.evadeCooldownLevel);
 }
 
 void Player::ApplyMovement(float dt)
@@ -217,20 +212,27 @@ void Player::ApplyMovement(float dt)
     if (IsKeyPress('A')) dirX -= 1.0f;
     if (IsKeyPress('D')) dirX += 1.0f;
 
+    const float padX = GetPadLeftStickX();
+    const float padZ = GetPadLeftStickY();
+    if (fabsf(padX) > fabsf(dirX)) dirX = padX;
+    if (fabsf(padZ) > fabsf(dirZ)) dirZ = padZ;
+
     float len = sqrtf(dirX * dirX + dirZ * dirZ);
-    if (len > 0.0001f)
+    if (len > 1.0f)
     {
         dirX /= len;
         dirZ /= len;
     }
-    else
+    else if (len <= 0.0001f)
     {
         dirX = 0.0f;
         dirZ = 0.0f;
+        len = 0.0f;
     }
 
-    const float evadeCooldownScale = CalcEvadeCooldownScale(tran.roguelike.evadeCooldownLevel);
+    const float evadeCooldownScale = tran.GetEvadeCooldownScaleByLevel(tran.roguelike.evadeCooldownLevel);
     const float effectiveDashCooldown = m_dashCooldown * evadeCooldownScale;
+    m_effectiveDashCooldown = effectiveDashCooldown;
     tran.gameplayDebug.playerEvadeCooldownScale = evadeCooldownScale;
 
     if (m_dashCooldownTimer > 0.0f)
@@ -246,7 +248,11 @@ void Player::ApplyMovement(float dt)
             m_isDashing = true;
             m_dashTimer = m_dashDuration;
             m_dashCooldownTimer = effectiveDashCooldown;
-            m_dashDir = DirectX::XMFLOAT3(dirX, 0.0f, dirZ);
+            const float dashLen = sqrtf(dirX * dirX + dirZ * dirZ);
+            if (dashLen > 0.0001f)
+            {
+                m_dashDir = DirectX::XMFLOAT3(dirX / dashLen, 0.0f, dirZ / dashLen);
+            }
         }
     }
 

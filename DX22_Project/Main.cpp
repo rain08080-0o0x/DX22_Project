@@ -97,25 +97,25 @@ void Draw()
 	{
 		switch (upgradeType)
 		{
-		case 0: return u8"攻撃力+1";
-		case 1: return u8"攻撃頻度+1";
-		case 2: return u8"回避CT短縮+1";
-		case 3: return u8"攻撃力+2";
-		case 4: return u8"攻撃頻度+2";
-		case 5: return u8"回避CT短縮+2";
-		default: return u8"なし";
+		case 0: return u8"攻撃段階+1";
+		case 1: return u8"攻撃頻度段階+1";
+		case 2: return u8"回避CT段階+1";
+		case 3: return u8"攻撃段階+2";
+		case 4: return u8"攻撃頻度段階+2";
+		case 5: return u8"回避CT段階+2";
+		default: return u8"ここには何もないようだ";
 		}
 	};
 	auto upgradeDesc = [](int upgradeType) -> const char*
 	{
 		switch (upgradeType)
 		{
-		case 0: return u8"与ダメージを少し上げる";
-		case 1: return u8"攻撃クールタイムを少し短縮";
-		case 2: return u8"回避クールタイムを少し短縮";
-		case 3: return u8"与ダメージを大きく上げる";
-		case 4: return u8"攻撃クールタイムを大きく短縮";
-		case 5: return u8"回避クールタイムを大きく短縮";
+		case 0: return u8"段階テーブルに沿って攻撃性能を1段階強化";
+		case 1: return u8"段階テーブルに沿って攻撃CTを1段階短縮";
+		case 2: return u8"段階テーブルに沿って回避CTを1段階短縮";
+		case 3: return u8"段階テーブルに沿って攻撃性能を2段階強化";
+		case 4: return u8"段階テーブルに沿って攻撃CTを2段階短縮";
+		case 5: return u8"段階テーブルに沿って回避CTを2段階短縮";
 		default: return u8"";
 		}
 	};
@@ -256,13 +256,23 @@ void Draw()
 				DragInt(u8"Wave毎の敵追加数", &tran.gameplay.waveEnemyAddPerWave, 1.0f, 0, 16);
 				DragInt(u8"強化リロール上限", &tran.roguelike.rerollMaxPerStage, 1.0f, 0, 9);
 				ImGui::TextDisabled(u8"初期値: 敵数3 / 最大Wave3 / Wave追加1");
+				ImGui::SeparatorText(u8"開始カメラ演出");
+				ImGui::TextDisabled(u8"初期値: 演出時間1.20秒 / フォーカス距離2.80");
+				DragFloat(u8"開始演出時間", &tran.gameplay.cameraIntroDuration, 0.02f, 0.10f, 8.0f);
+				DragFloat(u8"フォーカス距離", &tran.gameplay.cameraIntroFocusDistance, 0.05f, 0.50f, 12.0f);
 
 				ImGui::SeparatorText(u8"プレイヤー攻撃");
-				ImGui::TextDisabled(u8"初期値: 準備0.04 / 有効0.12 / 後隙0.10 / CT0.24");
+				ImGui::TextDisabled(u8"初期値: 準備0.04 / 有効0.12 / 後隙0.10 / CT0.24 / Skill1CT4.0 / Skill2CT9.0");
 				DragFloat(u8"攻撃準備", &tran.gameplay.attackWindup, 0.005f, 0.0f, 1.0f);
 				DragFloat(u8"攻撃有効", &tran.gameplay.attackDuration, 0.005f, 0.01f, 1.0f);
 				DragFloat(u8"攻撃後隙", &tran.gameplay.attackRecovery, 0.005f, 0.0f, 1.0f);
 				DragFloat(u8"攻撃CT", &tran.gameplay.attackCooldown, 0.005f, 0.0f, 2.0f);
+				DragFloat(u8"スキル1 CT", &tran.gameplay.skill1Cooldown, 0.05f, 0.0f, 30.0f);
+				DragFloat(u8"スキル2 CT", &tran.gameplay.skill2Cooldown, 0.05f, 0.0f, 30.0f);
+				ImGui::TextDisabled(u8"初期値: 3体ヒット / 時間0.18 / 強さ0.20");
+				DragInt(u8"画面揺れ発火ヒット数", &tran.gameplay.screenShakeHitThreshold, 1.0f, 1, 16);
+				DragFloat(u8"画面揺れ時間", &tran.gameplay.screenShakeDuration, 0.01f, 0.0f, 1.0f);
+				DragFloat(u8"画面揺れ強さ", &tran.gameplay.screenShakeAmplitude, 0.01f, 0.0f, 1.0f);
 				DragFloat(u8"薙ぎ角度", &tran.gameplay.attackSweepDegrees, 1.0f, 10.0f, 240.0f);
 				DragFloat(u8"攻撃半径倍率", &tran.gameplay.attackSweepRadiusScale, 0.01f, 0.1f, 3.0f);
 				DragFloat(u8"攻撃幅倍率", &tran.gameplay.attackWidthScale, 0.01f, 0.1f, 3.0f);
@@ -276,8 +286,9 @@ void Draw()
 				DragFloat(u8"攻撃軌跡倍率", &tran.gameplay.attackTrailScale, 0.01f, 0.1f, 3.0f);
 
 				ImGui::SeparatorText(u8"被弾・撃破演出");
-				ImGui::TextDisabled(u8"初期値: 被弾0.20 / 被弾倍率1.65 / 撃破0.28 / 撃破倍率1.60");
+				ImGui::TextDisabled(u8"初期値: 被弾0.20 / 被弾無敵0.35 / 被弾倍率1.65 / 撃破0.28 / 撃破倍率1.60");
 				DragFloat(u8"被弾フラッシュ時間", &tran.gameplay.playerDamageFlash, 0.005f, 0.0f, 1.0f);
+				DragFloat(u8"被弾無敵時間", &tran.gameplay.playerDamageInvincible, 0.005f, 0.0f, 2.0f);
 				DragFloat(u8"被弾フラッシュ倍率", &tran.gameplay.playerDamageFlashScale, 0.01f, 0.1f, 4.0f);
 				DragFloat(u8"敵撃破フラッシュ時間", &tran.gameplay.enemyDefeatFlash, 0.005f, 0.0f, 1.0f);
 				DragFloat(u8"敵撃破フラッシュ倍率", &tran.gameplay.enemyDefeatFlashScale, 0.01f, 0.1f, 4.0f);
@@ -336,6 +347,10 @@ void Draw()
 				ImGui::Text(u8"実効攻撃力: %d", tran.gameplayDebug.playerAttackDamage);
 				ImGui::Text(u8"攻撃CT倍率: %.2f", tran.gameplayDebug.playerAttackCooldownScale);
 				ImGui::Text(u8"回避CT倍率: %.2f", tran.gameplayDebug.playerEvadeCooldownScale);
+				ImGui::Text(u8"攻撃CT進捗: %.2f", tran.gameplayDebug.cooldownRateAttack);
+				ImGui::Text(u8"回避CT進捗: %.2f", tran.gameplayDebug.cooldownRateEvade);
+				ImGui::Text(u8"スキル1CT進捗: %.2f", tran.gameplayDebug.cooldownRateSkill1);
+				ImGui::Text(u8"スキル2CT進捗: %.2f", tran.gameplayDebug.cooldownRateSkill2);
 				ImGui::Text(u8"回避中: %s", tran.gameplayDebug.playerEvading ? u8"はい" : u8"いいえ");
 				ImGui::Text(u8"強化選択待ち: %d / リロール残り: %d", tran.gameplayDebug.upgradeSelectionPending, tran.gameplayDebug.upgradeRerollRemain);
 				ImGui::TextDisabled(u8"ゲーム進行: 敵全滅で次Wave、最終Wave全滅で勝利");
@@ -378,6 +393,7 @@ void Draw()
 				ImGui::Text(u8"ステージクリア回数: %d", tran.gameplayDebug.stageClearCount);
 				ImGui::Text(u8"直近の強化: %s", lastUpgradeText);
 				ImGui::SeparatorText(u8"強化レベル");
+				ImGui::Text(u8"上限: Lv.%d", tran.GetUpgradeLevelMax());
 				ImGui::Text(u8"攻撃力 Lv.%d", tran.gameplayDebug.attackPowerLevel);
 				ImGui::Text(u8"攻撃頻度 Lv.%d", tran.gameplayDebug.attackSpeedLevel);
 				ImGui::Text(u8"回避CT Lv.%d", tran.gameplayDebug.evadeCooldownLevel);
@@ -667,7 +683,7 @@ void Draw()
 	{
 		ImGui::Begin(u8"インスペクタ（表）", &show_table_window);
 
-		ImGui::Text(u8"F1:表  F2:オーバーレイ  F3:デモ");
+		ImGui::Text(u8"F1:表  F2:オーバーレイ");
 		ImGui::Separator();
 
 		// 1) Key-Value 監視テーブル（縦スクロール）
@@ -866,23 +882,35 @@ void Draw()
 	{
 		ImGuiViewport* vp = ImGui::GetMainViewport();
 		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+		const bool hasAnyOffer =
+			(tran.roguelike.offers[0] >= 0) ||
+			(tran.roguelike.offers[1] >= 0) ||
+			(tran.roguelike.offers[2] >= 0);
 
-		const char* l0 = upgradeLabel(tran.roguelike.offers[0]);
-		const char* l1 = upgradeLabel(tran.roguelike.offers[1]);
-		const char* l2 = upgradeLabel(tran.roguelike.offers[2]);
-		const char* d0 = upgradeDesc(tran.roguelike.offers[0]);
-		const char* d1 = upgradeDesc(tran.roguelike.offers[1]);
-		const char* d2 = upgradeDesc(tran.roguelike.offers[2]);
-
-		char upgradeHud[1024];
-		sprintf_s(
-			upgradeHud,
-			u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
-			l0, d0,
-			l1, d1,
-			l2, d2,
-			tran.roguelike.rerollRemain,
-			tran.roguelike.rerollMaxPerStage);
+		char upgradeHud[1024]{};
+		if (!hasAnyOffer)
+		{
+			sprintf_s(
+				upgradeHud,
+				u8"ステージクリア報酬\n\nここには何もないようだ\n\n[1] [2] [3] で先へ進む");
+		}
+		else
+		{
+			const char* l0 = upgradeLabel(tran.roguelike.offers[0]);
+			const char* l1 = upgradeLabel(tran.roguelike.offers[1]);
+			const char* l2 = upgradeLabel(tran.roguelike.offers[2]);
+			const char* d0 = upgradeDesc(tran.roguelike.offers[0]);
+			const char* d1 = upgradeDesc(tran.roguelike.offers[1]);
+			const char* d2 = upgradeDesc(tran.roguelike.offers[2]);
+			sprintf_s(
+				upgradeHud,
+				u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
+				l0, d0,
+				l1, d1,
+				l2, d2,
+				tran.roguelike.rerollRemain,
+				tran.roguelike.rerollMaxPerStage);
+		}
 
 		const ImVec2 pad(14.0f, 12.0f);
 		const ImVec2 textSize = ImGui::CalcTextSize(upgradeHud);

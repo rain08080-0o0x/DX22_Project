@@ -70,6 +70,28 @@ namespace
 		return v;
 	}
 
+	const int kUpgradeTierMax = 10;
+
+	int ClampUpgradeTier(int level)
+	{
+		return ClampInt(level, 0, kUpgradeTierMax);
+	}
+
+	const int kAttackDamageByTier[kUpgradeTierMax + 1] =
+	{
+		1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 10
+	};
+
+	const float kAttackCooldownScaleByTier[kUpgradeTierMax + 1] =
+	{
+		1.00f, 0.96f, 0.92f, 0.88f, 0.84f, 0.80f, 0.76f, 0.72f, 0.68f, 0.64f, 0.60f
+	};
+
+	const float kEvadeCooldownScaleByTier[kUpgradeTierMax + 1] =
+	{
+		1.00f, 0.95f, 0.90f, 0.84f, 0.78f, 0.72f, 0.66f, 0.60f, 0.54f, 0.48f, 0.42f
+	};
+
 	int RandRangeInt(int minValue, int maxValue)
 	{
 		if (maxValue <= minValue) return minValue;
@@ -79,25 +101,65 @@ namespace
 
 	const int kUpgradeOfferCount = 3;
 	const int kUpgradeTypeCount = 6;
+	const int kUpgradeOfferNone = -1;
 
-	void GenerateUpgradeOffers(int offers[kUpgradeOfferCount])
+	bool IsUpgradeTypeAvailable(int upgradeType, int attackPowerLevel, int attackSpeedLevel, int evadeCooldownLevel)
 	{
-		int pool[kUpgradeTypeCount] =
+		switch (upgradeType)
 		{
-			0, 1, 2, 3, 4, 5
-		};
+		case 0:
+		case 3:
+			return attackPowerLevel < kUpgradeTierMax;
+		case 1:
+		case 4:
+			return attackSpeedLevel < kUpgradeTierMax;
+		case 2:
+		case 5:
+			return evadeCooldownLevel < kUpgradeTierMax;
+		default:
+			return false;
+		}
+	}
 
-		for (int i = 0; i < kUpgradeTypeCount; ++i)
+	void GenerateUpgradeOffers(int offers[kUpgradeOfferCount], int attackPowerLevel, int attackSpeedLevel, int evadeCooldownLevel)
+	{
+		int available[kUpgradeTypeCount]{};
+		int availableCount = 0;
+		for (int t = 0; t < kUpgradeTypeCount; ++t)
 		{
-			const int j = RandRangeInt(i, kUpgradeTypeCount - 1);
-			const int tmp = pool[i];
-			pool[i] = pool[j];
-			pool[j] = tmp;
+			if (IsUpgradeTypeAvailable(t, attackPowerLevel, attackSpeedLevel, evadeCooldownLevel))
+			{
+				available[availableCount++] = t;
+			}
+		}
+
+		if (availableCount == 0)
+		{
+			for (int i = 0; i < kUpgradeOfferCount; ++i)
+			{
+				offers[i] = kUpgradeOfferNone;
+			}
+			return;
+		}
+
+		for (int i = 0; i < availableCount; ++i)
+		{
+			const int j = RandRangeInt(i, availableCount - 1);
+			const int tmp = available[i];
+			available[i] = available[j];
+			available[j] = tmp;
 		}
 
 		for (int i = 0; i < kUpgradeOfferCount; ++i)
 		{
-			offers[i] = pool[i];
+			if (i < availableCount)
+			{
+				offers[i] = available[i];
+			}
+			else
+			{
+				offers[i] = available[RandRangeInt(0, availableCount - 1)];
+			}
 		}
 	}
 
@@ -106,22 +168,22 @@ namespace
 		switch (upgradeType)
 		{
 		case 0:
-			attackPowerLevel += 1;
+			attackPowerLevel = ClampUpgradeTier(attackPowerLevel + 1);
 			break;
 		case 1:
-			attackSpeedLevel += 1;
+			attackSpeedLevel = ClampUpgradeTier(attackSpeedLevel + 1);
 			break;
 		case 2:
-			evadeCooldownLevel += 1;
+			evadeCooldownLevel = ClampUpgradeTier(evadeCooldownLevel + 1);
 			break;
 		case 3:
-			attackPowerLevel += 2;
+			attackPowerLevel = ClampUpgradeTier(attackPowerLevel + 2);
 			break;
 		case 4:
-			attackSpeedLevel += 2;
+			attackSpeedLevel = ClampUpgradeTier(attackSpeedLevel + 2);
 			break;
 		case 5:
-			evadeCooldownLevel += 2;
+			evadeCooldownLevel = ClampUpgradeTier(evadeCooldownLevel + 2);
 			break;
 		default:
 			break;
@@ -151,7 +213,7 @@ void Transfer::BeginUpgradeSelection()
 {
 	roguelike.selectionPending = 1;
 	roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
-	GenerateUpgradeOffers(roguelike.offers);
+	GenerateUpgradeOffers(roguelike.offers, roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel);
 }
 
 bool Transfer::RerollUpgradeSelection()
@@ -159,7 +221,7 @@ bool Transfer::RerollUpgradeSelection()
 	if (roguelike.selectionPending == 0) return false;
 	if (roguelike.rerollRemain <= 0) return false;
 	--roguelike.rerollRemain;
-	GenerateUpgradeOffers(roguelike.offers);
+	GenerateUpgradeOffers(roguelike.offers, roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel);
 	return true;
 }
 
@@ -175,6 +237,31 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 	roguelike.selectionPending = 0;
 	roguelike.rerollRemain = 0;
 	return true;
+}
+
+int Transfer::ClampUpgradeLevel(int level) const
+{
+	return ClampUpgradeTier(level);
+}
+
+int Transfer::GetUpgradeLevelMax() const
+{
+	return RoguelikeUpgrade::kLevelMax;
+}
+
+int Transfer::GetPlayerAttackDamageByLevel(int level) const
+{
+	return kAttackDamageByTier[ClampUpgradeTier(level)];
+}
+
+float Transfer::GetAttackCooldownScaleByLevel(int level) const
+{
+	return kAttackCooldownScaleByTier[ClampUpgradeTier(level)];
+}
+
+float Transfer::GetEvadeCooldownScaleByLevel(int level) const
+{
+	return kEvadeCooldownScaleByTier[ClampUpgradeTier(level)];
 }
 
 
@@ -235,10 +322,17 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		if (key == "enemyCount") loaded.enemyCount = ToInt(value, loaded.enemyCount);
 		else if (key == "waveMax") loaded.waveMax = ToInt(value, loaded.waveMax);
 		else if (key == "waveEnemyAddPerWave") loaded.waveEnemyAddPerWave = ToInt(value, loaded.waveEnemyAddPerWave);
+		else if (key == "cameraIntroDuration") loaded.cameraIntroDuration = ToFloat(value, loaded.cameraIntroDuration);
+		else if (key == "cameraIntroFocusDistance") loaded.cameraIntroFocusDistance = ToFloat(value, loaded.cameraIntroFocusDistance);
 		else if (key == "attackWindup") loaded.attackWindup = ToFloat(value, loaded.attackWindup);
 		else if (key == "attackDuration") loaded.attackDuration = ToFloat(value, loaded.attackDuration);
 		else if (key == "attackRecovery") loaded.attackRecovery = ToFloat(value, loaded.attackRecovery);
 		else if (key == "attackCooldown") loaded.attackCooldown = ToFloat(value, loaded.attackCooldown);
+		else if (key == "skill1Cooldown") loaded.skill1Cooldown = ToFloat(value, loaded.skill1Cooldown);
+		else if (key == "skill2Cooldown") loaded.skill2Cooldown = ToFloat(value, loaded.skill2Cooldown);
+		else if (key == "screenShakeHitThreshold") loaded.screenShakeHitThreshold = ToInt(value, loaded.screenShakeHitThreshold);
+		else if (key == "screenShakeDuration") loaded.screenShakeDuration = ToFloat(value, loaded.screenShakeDuration);
+		else if (key == "screenShakeAmplitude") loaded.screenShakeAmplitude = ToFloat(value, loaded.screenShakeAmplitude);
 		else if (key == "attackSweepDegrees") loaded.attackSweepDegrees = ToFloat(value, loaded.attackSweepDegrees);
 		else if (key == "attackSweepRadiusScale") loaded.attackSweepRadiusScale = ToFloat(value, loaded.attackSweepRadiusScale);
 		else if (key == "attackWidthScale") loaded.attackWidthScale = ToFloat(value, loaded.attackWidthScale);
@@ -250,6 +344,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "attackTrailLife") loaded.attackTrailLife = ToFloat(value, loaded.attackTrailLife);
 		else if (key == "attackTrailScale") loaded.attackTrailScale = ToFloat(value, loaded.attackTrailScale);
 		else if (key == "playerDamageFlash") loaded.playerDamageFlash = ToFloat(value, loaded.playerDamageFlash);
+		else if (key == "playerDamageInvincible") loaded.playerDamageInvincible = ToFloat(value, loaded.playerDamageInvincible);
 		else if (key == "playerDamageFlashScale") loaded.playerDamageFlashScale = ToFloat(value, loaded.playerDamageFlashScale);
 		else if (key == "enemyDefeatFlash") loaded.enemyDefeatFlash = ToFloat(value, loaded.enemyDefeatFlash);
 		else if (key == "enemyDefeatFlashScale") loaded.enemyDefeatFlashScale = ToFloat(value, loaded.enemyDefeatFlashScale);
@@ -287,18 +382,24 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "upgradeRerollMax") loadedRogue.rerollMaxPerStage = ToInt(value, loadedRogue.rerollMaxPerStage);
 	}
 
+	loaded.screenShakeHitThreshold = ClampInt(loaded.screenShakeHitThreshold, 1, 16);
+	if (loaded.cameraIntroDuration < 0.10f) loaded.cameraIntroDuration = 0.10f;
+	if (loaded.cameraIntroFocusDistance < 0.50f) loaded.cameraIntroFocusDistance = 0.50f;
+	if (loaded.playerDamageInvincible < 0.0f) loaded.playerDamageInvincible = 0.0f;
+	if (loaded.screenShakeDuration < 0.0f) loaded.screenShakeDuration = 0.0f;
+	if (loaded.screenShakeAmplitude < 0.0f) loaded.screenShakeAmplitude = 0.0f;
 	gameplay = loaded;
 	loadedPreset = ClampInt(loadedPreset, 0, 2);
 	gameplayDebug.difficultyPreset = loadedPreset;
 	loadedRogue.stageClearCount = ClampInt(loadedRogue.stageClearCount, 0, 9999);
-	loadedRogue.attackPowerLevel = ClampInt(loadedRogue.attackPowerLevel, 0, 999);
-	loadedRogue.attackSpeedLevel = ClampInt(loadedRogue.attackSpeedLevel, 0, 999);
-	loadedRogue.evadeCooldownLevel = ClampInt(loadedRogue.evadeCooldownLevel, 0, 999);
+	loadedRogue.attackPowerLevel = ClampUpgradeTier(loadedRogue.attackPowerLevel);
+	loadedRogue.attackSpeedLevel = ClampUpgradeTier(loadedRogue.attackSpeedLevel);
+	loadedRogue.evadeCooldownLevel = ClampUpgradeTier(loadedRogue.evadeCooldownLevel);
 	loadedRogue.lastUpgradeType = ClampInt(loadedRogue.lastUpgradeType, -1, RoguelikeUpgrade::UpgradeTypeCount - 1);
 	loadedRogue.rerollMaxPerStage = ClampInt(loadedRogue.rerollMaxPerStage, 0, 9);
 	loadedRogue.rerollRemain = 0;
 	loadedRogue.selectionPending = 0;
-	GenerateUpgradeOffers(loadedRogue.offers);
+	GenerateUpgradeOffers(loadedRogue.offers, loadedRogue.attackPowerLevel, loadedRogue.attackSpeedLevel, loadedRogue.evadeCooldownLevel);
 	roguelike = loadedRogue;
 
 	if (IsDefaultPathArgument(path))
@@ -324,10 +425,17 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "enemyCount=" << gameplay.enemyCount << "\n";
 		ofs << "waveMax=" << gameplay.waveMax << "\n";
 		ofs << "waveEnemyAddPerWave=" << gameplay.waveEnemyAddPerWave << "\n";
+		ofs << "cameraIntroDuration=" << gameplay.cameraIntroDuration << "\n";
+		ofs << "cameraIntroFocusDistance=" << gameplay.cameraIntroFocusDistance << "\n";
 		ofs << "attackWindup=" << gameplay.attackWindup << "\n";
 		ofs << "attackDuration=" << gameplay.attackDuration << "\n";
 		ofs << "attackRecovery=" << gameplay.attackRecovery << "\n";
 		ofs << "attackCooldown=" << gameplay.attackCooldown << "\n";
+		ofs << "skill1Cooldown=" << gameplay.skill1Cooldown << "\n";
+		ofs << "skill2Cooldown=" << gameplay.skill2Cooldown << "\n";
+		ofs << "screenShakeHitThreshold=" << gameplay.screenShakeHitThreshold << "\n";
+		ofs << "screenShakeDuration=" << gameplay.screenShakeDuration << "\n";
+		ofs << "screenShakeAmplitude=" << gameplay.screenShakeAmplitude << "\n";
 		ofs << "attackSweepDegrees=" << gameplay.attackSweepDegrees << "\n";
 		ofs << "attackSweepRadiusScale=" << gameplay.attackSweepRadiusScale << "\n";
 		ofs << "attackWidthScale=" << gameplay.attackWidthScale << "\n";
@@ -339,6 +447,7 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "attackTrailLife=" << gameplay.attackTrailLife << "\n";
 		ofs << "attackTrailScale=" << gameplay.attackTrailScale << "\n";
 		ofs << "playerDamageFlash=" << gameplay.playerDamageFlash << "\n";
+		ofs << "playerDamageInvincible=" << gameplay.playerDamageInvincible << "\n";
 		ofs << "playerDamageFlashScale=" << gameplay.playerDamageFlashScale << "\n";
 		ofs << "enemyDefeatFlash=" << gameplay.enemyDefeatFlash << "\n";
 		ofs << "enemyDefeatFlashScale=" << gameplay.enemyDefeatFlashScale << "\n";

@@ -51,7 +51,17 @@ private:
         float damage = 0.0f;
     };
 
+    enum CooldownSlot
+    {
+        CooldownAttack = 0,
+        CooldownEvade,
+        CooldownSkill1,
+        CooldownSkill2,
+        CooldownSlotCount
+    };
+
     void UpdateHpGauge();
+    void UpdateCooldownGauges();
     void SpawnEnemyByIndex(int index, float stageSize);
     void EnsureEnemyCount(int targetCount, float stageSize);
     int CalcWaveEnemyCount(int baseCount, int waveIndex, int addPerWave) const;
@@ -81,22 +91,41 @@ private:
     Texture* m_pEnemyHpGauge;
     UIObject* m_pHpFrame;
     UIObject* m_pHpGauge;
+    UIObject* m_pCooldownFrame[CooldownSlotCount];
+    UIObject* m_pCooldownGauge[CooldownSlotCount];
     UIObjectManager m_uiManager;
     float m_stageSize;
     int m_requestedEnemyCount;
     int m_currentWave;
     int m_waveMax;
+    bool m_cameraIntroActive;
+    float m_cameraIntroTimer;
+    DirectX::XMFLOAT3 m_cameraIntroStartEye;
+    DirectX::XMFLOAT3 m_cameraIntroStartLook;
+    DirectX::XMFLOAT3 m_cameraIntroFocusEye;
+    DirectX::XMFLOAT3 m_cameraIntroFocusLook;
 
     bool m_attackActive;
     float m_attackTimer;
     float m_attackWindupTimer;
     float m_attackRecoveryTimer;
     float m_attackCooldownTimer;
+    float m_attackCooldownUiTimer;
+    float m_attackCooldownUiDuration;
+    float m_skill1CooldownTimer;
+    float m_skill2CooldownTimer;
+    float m_skill1CooldownDuration;
+    float m_skill2CooldownDuration;
     int m_attackSwingId;
     int m_attackHitCountThisSwing;
     float m_hitStopTimer;
     float m_attackTrailSpawnTimer;
     float m_playerDamageFlashTimer;
+    float m_playerDamageInvincibleTimer;
+    float m_screenShakeTimer;
+    float m_screenShakeDuration;
+    float m_screenShakeAmplitude;
+    float m_screenShakePhase;
     float m_enemyAttackSeGateTimer;
     unsigned int m_enemyPerfPhase;
     DirectX::XMFLOAT3 m_lastMoveDir;

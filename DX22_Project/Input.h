@@ -13,5 +13,8 @@ bool IsKeyPress(BYTE key);
 bool IsKeyTrigger(BYTE key);
 bool IsKeyRelease(BYTE key);
 bool IsKeyRepeat(BYTE key);
+bool IsPadConnected();
+float GetPadLeftStickX();
+float GetPadLeftStickY();
 
 #endif // __INPUT_H__

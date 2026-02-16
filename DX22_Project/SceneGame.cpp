@@ -21,12 +21,26 @@ namespace
     const float kHpFrameWidth = 260.0f;
     const float kHpFrameHeight = 32.0f;
     const float kHpGaugePadding = 4.0f;
+    const float kCooldownFrameWidth = 220.0f;
+    const float kCooldownFrameHeight = 24.0f;
+    const float kCooldownGaugePadding = 3.0f;
+    const float kCooldownRowSpacing = 8.0f;
+    const int kMultiHitShakeThresholdMin = 1;
+    const int kMultiHitShakeThresholdMax = 16;
+    const float kMultiHitShakeDurationDefault = 0.18f;
     const float kFixedDt = 1.0f / 60.0f;
     const int kEnemyCountMin = 0;
     const int kEnemyCountMax = 16;
     const int kWaveCountMin = 1;
     const int kWaveCountMax = 32;
     const float kMinDuration = 0.01f;
+    const float kCameraIntroDurationMin = 0.10f;
+    const float kCameraIntroDurationMax = 8.0f;
+    const float kCameraIntroFocusDistanceMin = 0.50f;
+    const float kCameraIntroFocusDistanceMax = 12.0f;
+    const float kCameraIntroExpStrength = 5.0f;
+    const float kCameraIntroEyeMoveRatio = 0.42f;
+    const float kCameraIntroEyeLift = 0.45f;
     const float kPi = 3.14159265f;
     const float kEnemyHpBillboardWidthScale = 2.0f;
     const float kEnemyHpBillboardHeightScale = 0.2f;
@@ -88,6 +102,38 @@ namespace
         return v;
     }
 
+    DirectX::XMFLOAT3 LerpFloat3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b, float t)
+    {
+        const float rate = Clamp01(t);
+        return {
+            a.x + (b.x - a.x) * rate,
+            a.y + (b.y - a.y) * rate,
+            a.z + (b.z - a.z) * rate
+        };
+    }
+
+    DirectX::XMFLOAT3 Normalize3(const DirectX::XMFLOAT3& v, const DirectX::XMFLOAT3& fallback)
+    {
+        const float lenSq = v.x * v.x + v.y * v.y + v.z * v.z;
+        if (lenSq <= 1.0e-6f)
+        {
+            return fallback;
+        }
+        const float invLen = 1.0f / std::sqrt(lenSq);
+        return { v.x * invLen, v.y * invLen, v.z * invLen };
+    }
+
+    float ExpEase01(float t)
+    {
+        const float clamped = Clamp01(t);
+        const float denom = 1.0f - expf(-kCameraIntroExpStrength);
+        if (denom <= 1.0e-6f)
+        {
+            return clamped;
+        }
+        return (1.0f - expf(-kCameraIntroExpStrength * clamped)) / denom;
+    }
+
     float ClampRange(float v, float lo, float hi)
     {
         if (v < lo) return lo;
@@ -130,23 +176,6 @@ namespace
         case 2: return 1.25f; // Hard
         default: return 1.0f; // Normal
         }
-    }
-
-    float CalcAttackCooldownScale(int attackSpeedLevel)
-    {
-        const float scale = 1.0f - 0.08f * static_cast<float>(attackSpeedLevel);
-        return ClampRange(scale, 0.35f, 1.0f);
-    }
-
-    float CalcEvadeCooldownScale(int evadeCooldownLevel)
-    {
-        const float scale = 1.0f - 0.10f * static_cast<float>(evadeCooldownLevel);
-        return ClampRange(scale, 0.30f, 1.0f);
-    }
-
-    int CalcPlayerAttackDamage(int attackPowerLevel)
-    {
-        return 1 + ClampInt(attackPowerLevel, 0, 999);
     }
 
     float DistSqXZ(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b)
@@ -394,20 +423,39 @@ SceneGame::SceneGame()
     , m_pEnemyHpGauge(nullptr)
     , m_pHpFrame(nullptr)
     , m_pHpGauge(nullptr)
+    , m_pCooldownFrame{ nullptr, nullptr, nullptr, nullptr }
+    , m_pCooldownGauge{ nullptr, nullptr, nullptr, nullptr }
     , m_stageSize(5.0f)
     , m_requestedEnemyCount(0)
     , m_currentWave(1)
     , m_waveMax(1)
+    , m_cameraIntroActive(true)
+    , m_cameraIntroTimer(0.0f)
+    , m_cameraIntroStartEye(0.0f, 0.0f, 0.0f)
+    , m_cameraIntroStartLook(0.0f, 0.0f, 0.0f)
+    , m_cameraIntroFocusEye(0.0f, 0.0f, 0.0f)
+    , m_cameraIntroFocusLook(0.0f, 0.0f, 0.0f)
     , m_attackActive(false)
     , m_attackTimer(0.0f)
     , m_attackWindupTimer(0.0f)
     , m_attackRecoveryTimer(0.0f)
     , m_attackCooldownTimer(0.0f)
+    , m_attackCooldownUiTimer(0.0f)
+    , m_attackCooldownUiDuration(0.0f)
+    , m_skill1CooldownTimer(0.0f)
+    , m_skill2CooldownTimer(0.0f)
+    , m_skill1CooldownDuration(0.0f)
+    , m_skill2CooldownDuration(0.0f)
     , m_attackSwingId(0)
     , m_attackHitCountThisSwing(0)
     , m_hitStopTimer(0.0f)
     , m_attackTrailSpawnTimer(0.0f)
     , m_playerDamageFlashTimer(0.0f)
+    , m_playerDamageInvincibleTimer(0.0f)
+    , m_screenShakeTimer(0.0f)
+    , m_screenShakeDuration(0.0f)
+    , m_screenShakeAmplitude(0.0f)
+    , m_screenShakePhase(0.0f)
     , m_enemyAttackSeGateTimer(0.0f)
     , m_enemyPerfPhase(0)
     , m_lastMoveDir(0.0f, 0.0f, 1.0f)
@@ -442,6 +490,51 @@ SceneGame::SceneGame()
             tran.player.stageSize = m_stageSize;
         }
     }
+    {
+        TRAN_INS;
+        const float introFocusDistance = ClampRange(
+            tran.gameplay.cameraIntroFocusDistance,
+            kCameraIntroFocusDistanceMin,
+            kCameraIntroFocusDistanceMax);
+        tran.gameplay.cameraIntroFocusDistance = introFocusDistance;
+        const DirectX::XMFLOAT3 playerFocus = {
+            tran.player.pos.x,
+            tran.player.pos.y + tran.player.size.y * 0.55f,
+            tran.player.pos.z
+        };
+        m_cameraIntroStartEye = tran.camera.eye;
+        m_cameraIntroStartLook = tran.camera.look;
+        m_cameraIntroFocusLook = playerFocus;
+
+        const DirectX::XMFLOAT3 toPlayer = {
+            playerFocus.x - m_cameraIntroStartEye.x,
+            playerFocus.y - m_cameraIntroStartEye.y,
+            playerFocus.z - m_cameraIntroStartEye.z
+        };
+        m_cameraIntroFocusEye = {
+            m_cameraIntroStartEye.x + toPlayer.x * kCameraIntroEyeMoveRatio,
+            m_cameraIntroStartEye.y + toPlayer.y * kCameraIntroEyeMoveRatio + kCameraIntroEyeLift,
+            m_cameraIntroStartEye.z + toPlayer.z * kCameraIntroEyeMoveRatio
+        };
+
+        const DirectX::XMFLOAT3 fallbackBackDir = Normalize3({
+            m_cameraIntroStartEye.x - m_cameraIntroStartLook.x,
+            m_cameraIntroStartEye.y - m_cameraIntroStartLook.y,
+            m_cameraIntroStartEye.z - m_cameraIntroStartLook.z
+        }, { 0.0f, 0.2f, -1.0f });
+        const DirectX::XMFLOAT3 focusBackDir = Normalize3({
+            m_cameraIntroFocusEye.x - m_cameraIntroFocusLook.x,
+            m_cameraIntroFocusEye.y - m_cameraIntroFocusLook.y,
+            m_cameraIntroFocusEye.z - m_cameraIntroFocusLook.z
+        }, fallbackBackDir);
+        m_cameraIntroFocusEye = {
+            m_cameraIntroFocusLook.x + focusBackDir.x * introFocusDistance,
+            m_cameraIntroFocusLook.y + focusBackDir.y * introFocusDistance + kCameraIntroEyeLift,
+            m_cameraIntroFocusLook.z + focusBackDir.z * introFocusDistance
+        };
+        m_cameraIntroActive = true;
+        m_cameraIntroTimer = 0.0f;
+    }
 
     m_enemies.clear();
     const int baseEnemyCount = static_cast<int>(ClampRange(
@@ -473,6 +566,9 @@ SceneGame::SceneGame()
     tran.gameplay.enemyCount = baseEnemyCount;
     tran.gameplay.waveMax = m_waveMax;
     tran.gameplay.waveEnemyAddPerWave = waveEnemyAddPerWave;
+    tran.roguelike.attackPowerLevel = tran.ClampUpgradeLevel(tran.roguelike.attackPowerLevel);
+    tran.roguelike.attackSpeedLevel = tran.ClampUpgradeLevel(tran.roguelike.attackSpeedLevel);
+    tran.roguelike.evadeCooldownLevel = tran.ClampUpgradeLevel(tran.roguelike.evadeCooldownLevel);
     tran.gameplayDebug.difficultyPreset = difficultyPreset;
     tran.gameplayDebug.effectiveEnemyBaseCount = effectiveBaseEnemyCount;
     tran.gameplayDebug.effectiveEnemyAddPerWave = effectiveWaveEnemyAdd;
@@ -537,7 +633,29 @@ SceneGame::SceneGame()
     m_uiManager.Add(m_pHpGauge, UIObjectManager::Layer::Game);
     m_uiManager.Add(m_pHpFrame, UIObjectManager::Layer::Game);
 
+    const DirectX::XMFLOAT4 cooldownColors[CooldownSlotCount] =
+    {
+        { 1.0f, 0.35f, 0.35f, 1.0f }, // Attack
+        { 0.35f, 0.95f, 0.55f, 1.0f }, // Evade
+        { 0.35f, 0.70f, 1.0f, 1.0f }, // Skill1
+        { 1.0f, 0.80f, 0.35f, 1.0f }  // Skill2
+    };
+    for (int i = 0; i < CooldownSlotCount; ++i)
+    {
+        m_pCooldownFrame[i] = new UIObject("UIFrame.png", 0.0f, 0.0f, kCooldownFrameWidth, kCooldownFrameHeight);
+        m_pCooldownGauge[i] = new UIObject("UIGauge.png", 0.0f, 0.0f,
+                                           kCooldownFrameWidth - kCooldownGaugePadding * 2.0f,
+                                           kCooldownFrameHeight - kCooldownGaugePadding * 2.0f);
+        if (m_pCooldownGauge[i])
+        {
+            m_pCooldownGauge[i]->SetColor(cooldownColors[i]);
+        }
+        m_uiManager.Add(m_pCooldownGauge[i], UIObjectManager::Layer::Game);
+        m_uiManager.Add(m_pCooldownFrame[i], UIObjectManager::Layer::Game);
+    }
+
     UpdateHpGauge();
+    UpdateCooldownGauges();
     tran.gameplayDebug.currentWave = m_currentWave;
     tran.gameplayDebug.maxWave = m_waveMax;
     tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
@@ -571,6 +689,19 @@ SceneGame::~SceneGame()
     {
         delete m_pHpFrame;
         m_pHpFrame = nullptr;
+    }
+    for (int i = 0; i < CooldownSlotCount; ++i)
+    {
+        if (m_pCooldownGauge[i])
+        {
+            delete m_pCooldownGauge[i];
+            m_pCooldownGauge[i] = nullptr;
+        }
+        if (m_pCooldownFrame[i])
+        {
+            delete m_pCooldownFrame[i];
+            m_pCooldownFrame[i] = nullptr;
+        }
     }
     for (auto& slot : m_enemies)
     {
@@ -787,9 +918,9 @@ void SceneGame::Update()
         waveEnemyAddPerWave + CalcDifficultyWaveAddBonus(difficultyPreset),
         0,
         kEnemyCountMax);
-    const int playerAttackDamage = CalcPlayerAttackDamage(tran.roguelike.attackPowerLevel);
-    const float playerAttackCooldownScale = CalcAttackCooldownScale(tran.roguelike.attackSpeedLevel);
-    const float playerEvadeCooldownScale = CalcEvadeCooldownScale(tran.roguelike.evadeCooldownLevel);
+    const int playerAttackDamage = tran.GetPlayerAttackDamageByLevel(tran.roguelike.attackPowerLevel);
+    const float playerAttackCooldownScale = tran.GetAttackCooldownScaleByLevel(tran.roguelike.attackSpeedLevel);
+    const float playerEvadeCooldownScale = tran.GetEvadeCooldownScaleByLevel(tran.roguelike.evadeCooldownLevel);
     const float difficultyEnemyAttackDamageScale = CalcDifficultyEnemyAttackDamageScale(difficultyPreset);
 
     if (m_currentWave < kWaveCountMin) m_currentWave = kWaveCountMin;
@@ -797,10 +928,25 @@ void SceneGame::Update()
 
     const int waveEnemyTarget = CalcWaveEnemyCount(effectiveBaseEnemyCount, m_currentWave, effectiveWaveEnemyAdd);
 
+    const float cameraIntroDuration = ClampRange(
+        tran.gameplay.cameraIntroDuration,
+        kCameraIntroDurationMin,
+        kCameraIntroDurationMax);
+    tran.gameplay.cameraIntroDuration = cameraIntroDuration;
     const float attackWindup = (tran.gameplay.attackWindup < 0.0f) ? 0.0f : tran.gameplay.attackWindup;
     const float attackDuration = (tran.gameplay.attackDuration < kMinDuration) ? kMinDuration : tran.gameplay.attackDuration;
     const float attackRecovery = (tran.gameplay.attackRecovery < 0.0f) ? 0.0f : tran.gameplay.attackRecovery;
     const float attackCooldown = ((tran.gameplay.attackCooldown < 0.0f) ? 0.0f : tran.gameplay.attackCooldown) * playerAttackCooldownScale;
+    const float skill1Cooldown = (tran.gameplay.skill1Cooldown < 0.0f) ? 0.0f : tran.gameplay.skill1Cooldown;
+    const float skill2Cooldown = (tran.gameplay.skill2Cooldown < 0.0f) ? 0.0f : tran.gameplay.skill2Cooldown;
+    int multiHitShakeThreshold = tran.gameplay.screenShakeHitThreshold;
+    if (multiHitShakeThreshold < kMultiHitShakeThresholdMin) multiHitShakeThreshold = kMultiHitShakeThresholdMin;
+    if (multiHitShakeThreshold > kMultiHitShakeThresholdMax) multiHitShakeThreshold = kMultiHitShakeThresholdMax;
+    tran.gameplay.screenShakeHitThreshold = multiHitShakeThreshold;
+    const float multiHitShakeDuration = (tran.gameplay.screenShakeDuration < 0.0f)
+        ? 0.0f : tran.gameplay.screenShakeDuration;
+    const float multiHitShakeAmplitude = (tran.gameplay.screenShakeAmplitude < 0.0f)
+        ? 0.0f : tran.gameplay.screenShakeAmplitude;
     const float attackSweepDegrees = tran.gameplay.attackSweepDegrees;
     const float attackSweepRadiusScale = (tran.gameplay.attackSweepRadiusScale < 0.1f) ? 0.1f : tran.gameplay.attackSweepRadiusScale;
     const float attackWidthScale = (tran.gameplay.attackWidthScale < 0.1f) ? 0.1f : tran.gameplay.attackWidthScale;
@@ -812,6 +958,7 @@ void SceneGame::Update()
     const float attackTrailLife = (tran.gameplay.attackTrailLife < 0.0f) ? 0.0f : tran.gameplay.attackTrailLife;
     const float attackTrailScale = (tran.gameplay.attackTrailScale < 0.1f) ? 0.1f : tran.gameplay.attackTrailScale;
     const float playerDamageFlash = (tran.gameplay.playerDamageFlash < 0.0f) ? 0.0f : tran.gameplay.playerDamageFlash;
+    const float playerDamageInvincible = (tran.gameplay.playerDamageInvincible < 0.0f) ? 0.0f : tran.gameplay.playerDamageInvincible;
     const float enemyDefeatFlash = (tran.gameplay.enemyDefeatFlash < 0.0f) ? 0.0f : tran.gameplay.enemyDefeatFlash;
     const float enemyDefeatFlashScale = (tran.gameplay.enemyDefeatFlashScale < 0.1f) ? 0.1f : tran.gameplay.enemyDefeatFlashScale;
 
@@ -850,6 +997,12 @@ void SceneGame::Update()
         playerPushShare /= pushShareSum;
         enemyPushShare /= pushShareSum;
     }
+
+    tran.roguelike.attackPowerLevel = tran.ClampUpgradeLevel(tran.roguelike.attackPowerLevel);
+    tran.roguelike.attackSpeedLevel = tran.ClampUpgradeLevel(tran.roguelike.attackSpeedLevel);
+    tran.roguelike.evadeCooldownLevel = tran.ClampUpgradeLevel(tran.roguelike.evadeCooldownLevel);
+    m_skill1CooldownDuration = skill1Cooldown;
+    m_skill2CooldownDuration = skill2Cooldown;
 
     tran.gameplayDebug.effectiveEnemyBaseCount = effectiveBaseEnemyCount;
     tran.gameplayDebug.effectiveEnemyAddPerWave = effectiveWaveEnemyAdd;
@@ -928,6 +1081,9 @@ void SceneGame::Update()
 
     if (m_pCamera) m_pCamera->Update();
 
+    const DirectX::XMFLOAT3 baseEye = tran.camera.eye;
+    const DirectX::XMFLOAT3 baseLook = tran.camera.look;
+
     if (m_cameraMode == kCameraModeDebug)
     {
         tran.cameraDebug = tran.camera;
@@ -935,6 +1091,97 @@ void SceneGame::Update()
     else
     {
         tran.cameraGame = tran.camera;
+    }
+
+    if (m_cameraIntroActive)
+    {
+        const float safeIntroDuration = (cameraIntroDuration > 0.0f) ? cameraIntroDuration : kFixedDt;
+        m_cameraIntroTimer += kFixedDt;
+        const float introT = Clamp01(m_cameraIntroTimer / safeIntroDuration);
+        const bool returnPhase = (introT >= 0.5f);
+        const float phaseT = returnPhase ? (introT - 0.5f) * 2.0f : introT * 2.0f;
+        const float easedT = ExpEase01(phaseT);
+
+        const DirectX::XMFLOAT3 introEye = returnPhase
+            ? LerpFloat3(m_cameraIntroFocusEye, m_cameraIntroStartEye, easedT)
+            : LerpFloat3(m_cameraIntroStartEye, m_cameraIntroFocusEye, easedT);
+        const DirectX::XMFLOAT3 introLook = returnPhase
+            ? LerpFloat3(m_cameraIntroFocusLook, m_cameraIntroStartLook, easedT)
+            : LerpFloat3(m_cameraIntroStartLook, m_cameraIntroFocusLook, easedT);
+
+        tran.camera.eye = introEye;
+        tran.camera.look = introLook;
+        if (m_cameraMode == kCameraModeDebug)
+        {
+            tran.cameraDebug = tran.camera;
+            ApplyCameraPose(m_pCameraDebug, introEye, introLook);
+        }
+        else
+        {
+            tran.cameraGame = tran.camera;
+            ApplyCameraPose(m_pCameraGame, introEye, introLook);
+        }
+
+        if (introT >= 1.0f)
+        {
+            m_cameraIntroActive = false;
+            m_cameraIntroTimer = 0.0f;
+            tran.camera.eye = m_cameraIntroStartEye;
+            tran.camera.look = m_cameraIntroStartLook;
+            if (m_cameraMode == kCameraModeDebug)
+            {
+                tran.cameraDebug = tran.camera;
+                ApplyCameraPose(m_pCameraDebug, m_cameraIntroStartEye, m_cameraIntroStartLook);
+            }
+            else
+            {
+                tran.cameraGame = tran.camera;
+                ApplyCameraPose(m_pCameraGame, m_cameraIntroStartEye, m_cameraIntroStartLook);
+            }
+        }
+
+        tran.gameplayDebug.attackSwingId = m_attackSwingId;
+        tran.gameplayDebug.swingHitCount = m_attackHitCountThisSwing;
+        tran.gameplayDebug.attackActive = m_attackActive ? 1 : 0;
+        tran.gameplayDebug.currentWave = m_currentWave;
+        tran.gameplayDebug.maxWave = m_waveMax;
+        tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
+        tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+        UpdateHpGauge();
+        UpdateCooldownGauges();
+        m_uiManager.Update(UIObjectManager::Layer::Game);
+        return;
+    }
+
+    if (m_screenShakeTimer > 0.0f)
+    {
+        m_screenShakeTimer -= kFixedDt;
+        if (m_screenShakeTimer < 0.0f) m_screenShakeTimer = 0.0f;
+    }
+
+    if (m_screenShakeTimer > 0.0f && m_cameraMode == kCameraModeGame && m_pCameraGame)
+    {
+        const float safeDuration = (m_screenShakeDuration > 0.0f) ? m_screenShakeDuration : kMultiHitShakeDurationDefault;
+        const float t = Clamp01(m_screenShakeTimer / safeDuration);
+        const float strength = m_screenShakeAmplitude * t;
+        m_screenShakePhase += kFixedDt * 60.0f;
+        const float shakeX = static_cast<float>(std::sin(m_screenShakePhase * 1.73f)) * strength;
+        const float shakeY = static_cast<float>(std::cos(m_screenShakePhase * 2.41f)) * strength * 0.45f;
+
+        DirectX::XMFLOAT3 shakenEye = baseEye;
+        DirectX::XMFLOAT3 shakenLook = baseLook;
+        shakenEye.x += shakeX;
+        shakenEye.y += shakeY;
+        shakenLook.x += shakeX;
+        shakenLook.y += shakeY;
+        tran.camera.eye = shakenEye;
+        tran.camera.look = shakenLook;
+        ApplyCameraPose(m_pCameraGame, shakenEye, shakenLook);
+    }
+    else
+    {
+        tran.camera.eye = baseEye;
+        tran.camera.look = baseLook;
     }
 
     if (m_attackTrailSpawnTimer > 0.0f)
@@ -946,6 +1193,11 @@ void SceneGame::Update()
     {
         m_playerDamageFlashTimer -= kFixedDt;
         if (m_playerDamageFlashTimer < 0.0f) m_playerDamageFlashTimer = 0.0f;
+    }
+    if (m_playerDamageInvincibleTimer > 0.0f)
+    {
+        m_playerDamageInvincibleTimer -= kFixedDt;
+        if (m_playerDamageInvincibleTimer < 0.0f) m_playerDamageInvincibleTimer = 0.0f;
     }
     for (auto& fx : m_markerEffects)
     {
@@ -972,8 +1224,43 @@ void SceneGame::Update()
         tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
         tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
         UpdateHpGauge();
+        UpdateCooldownGauges();
         m_uiManager.Update(UIObjectManager::Layer::Game);
         return;
+    }
+
+    if (m_attackCooldownUiTimer > 0.0f)
+    {
+        m_attackCooldownUiTimer -= kFixedDt;
+        if (m_attackCooldownUiTimer < 0.0f) m_attackCooldownUiTimer = 0.0f;
+    }
+    if (m_skill1CooldownTimer > 0.0f)
+    {
+        m_skill1CooldownTimer -= kFixedDt;
+        if (m_skill1CooldownTimer < 0.0f) m_skill1CooldownTimer = 0.0f;
+    }
+    if (m_skill2CooldownTimer > 0.0f)
+    {
+        m_skill2CooldownTimer -= kFixedDt;
+        if (m_skill2CooldownTimer < 0.0f) m_skill2CooldownTimer = 0.0f;
+    }
+    if (m_skill1CooldownDuration <= 0.0f)
+    {
+        m_skill1CooldownTimer = 0.0f;
+    }
+    if (m_skill2CooldownDuration <= 0.0f)
+    {
+        m_skill2CooldownTimer = 0.0f;
+    }
+    if (m_skill1CooldownDuration > 0.0f && IsKeyTrigger('Q') && m_skill1CooldownTimer <= 0.0f)
+    {
+        // Skill body is not implemented yet; reserve cooldown behavior only.
+        m_skill1CooldownTimer = m_skill1CooldownDuration;
+    }
+    if (m_skill2CooldownDuration > 0.0f && IsKeyTrigger('E') && m_skill2CooldownTimer <= 0.0f)
+    {
+        // Skill body is not implemented yet; reserve cooldown behavior only.
+        m_skill2CooldownTimer = m_skill2CooldownDuration;
     }
 
     if (m_pPlayer) m_pPlayer->Update();
@@ -992,12 +1279,16 @@ void SceneGame::Update()
     };
     const auto applyPlayerDamage = [&](float damage) -> bool
     {
-        if (damage <= 0.0f || isPlayerEvading)
+        if (damage <= 0.0f || isPlayerEvading || m_playerDamageInvincibleTimer > 0.0f)
         {
             return false;
         }
         if (m_pPlayerHitSe) PlaySound(m_pPlayerHitSe);
         tran.player.hp -= damage;
+        if (m_playerDamageInvincibleTimer < playerDamageInvincible)
+        {
+            m_playerDamageInvincibleTimer = playerDamageInvincible;
+        }
         if (m_playerDamageFlashTimer < playerDamageFlash)
         {
             m_playerDamageFlashTimer = playerDamageFlash;
@@ -1185,6 +1476,9 @@ void SceneGame::Update()
         m_attackCooldownTimer <= 0.0f)
     {
         m_attackWindupTimer = attackWindup;
+        m_attackCooldownUiDuration = attackWindup + attackDuration + attackRecovery + attackCooldown;
+        if (m_attackCooldownUiDuration < kMinDuration) m_attackCooldownUiDuration = kMinDuration;
+        m_attackCooldownUiTimer = m_attackCooldownUiDuration;
     }
 
     if (!m_attackActive && m_attackWindupTimer > 0.0f)
@@ -1493,6 +1787,21 @@ void SceneGame::Update()
                     slot.enemy->Damage(playerAttackDamage);
                     slot.lastHitSwingId = m_attackSwingId;
                     ++m_attackHitCountThisSwing;
+                    if (m_attackHitCountThisSwing == multiHitShakeThreshold &&
+                        multiHitShakeDuration > 0.0f &&
+                        multiHitShakeAmplitude > 0.0f)
+                    {
+                        m_screenShakeDuration = multiHitShakeDuration;
+                        if (m_screenShakeTimer < multiHitShakeDuration)
+                        {
+                            m_screenShakeTimer = multiHitShakeDuration;
+                        }
+                        if (m_screenShakeAmplitude < multiHitShakeAmplitude)
+                        {
+                            m_screenShakeAmplitude = multiHitShakeAmplitude;
+                        }
+                        m_screenShakePhase = 0.0f;
+                    }
                     slot.hitFlashTimer = attackHitFlash;
                     if (m_pAttackSe) PlaySound(m_pAttackSe);
 
@@ -1631,6 +1940,7 @@ void SceneGame::Update()
     tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
 
     UpdateHpGauge();
+    UpdateCooldownGauges();
     m_uiManager.Update(UIObjectManager::Layer::Game);
 }
 
@@ -1928,6 +2238,75 @@ void SceneGame::UpdateHpGauge()
     m_pHpGauge->SetSize(gaugeWidth * rate, gaugeHeight);
     m_pHpGauge->SetUVPosition(0.0f, 0.0f);
     m_pHpGauge->SetUVScale(rate, 1.0f);
+}
+
+void SceneGame::UpdateCooldownGauges()
+{
+    float attackRate = 1.0f;
+    if (m_attackCooldownUiDuration > 0.0f)
+    {
+        attackRate = Clamp01(1.0f - (m_attackCooldownUiTimer / m_attackCooldownUiDuration));
+    }
+
+    float evadeRate = 1.0f;
+    if (m_pPlayer)
+    {
+        const float evadeDuration = m_pPlayer->GetEvadeCooldownDuration();
+        const float evadeRemain = m_pPlayer->GetEvadeCooldownRemain();
+        if (evadeDuration > 0.0f)
+        {
+            evadeRate = Clamp01(1.0f - (evadeRemain / evadeDuration));
+        }
+    }
+
+    float skill1Rate = 1.0f;
+    if (m_skill1CooldownDuration > 0.0f)
+    {
+        skill1Rate = Clamp01(1.0f - (m_skill1CooldownTimer / m_skill1CooldownDuration));
+    }
+
+    float skill2Rate = 1.0f;
+    if (m_skill2CooldownDuration > 0.0f)
+    {
+        skill2Rate = Clamp01(1.0f - (m_skill2CooldownTimer / m_skill2CooldownDuration));
+    }
+
+    {
+        TRAN_INS;
+        tran.gameplayDebug.cooldownRateAttack = attackRate;
+        tran.gameplayDebug.cooldownRateEvade = evadeRate;
+        tran.gameplayDebug.cooldownRateSkill1 = skill1Rate;
+        tran.gameplayDebug.cooldownRateSkill2 = skill2Rate;
+    }
+
+    const float rates[CooldownSlotCount] = { attackRate, evadeRate, skill1Rate, skill2Rate };
+    const float totalHeight =
+        static_cast<float>(CooldownSlotCount) * kCooldownFrameHeight +
+        static_cast<float>(CooldownSlotCount - 1) * kCooldownRowSpacing;
+    const float frameX = static_cast<float>(SCREEN_WIDTH) - kUiMargin - kCooldownFrameWidth * 0.5f;
+    const float startY = static_cast<float>(SCREEN_HEIGHT) - kUiMargin - totalHeight + kCooldownFrameHeight * 0.5f;
+    const float gaugeWidth = kCooldownFrameWidth - kCooldownGaugePadding * 2.0f;
+    const float gaugeHeight = kCooldownFrameHeight - kCooldownGaugePadding * 2.0f;
+
+    for (int i = 0; i < CooldownSlotCount; ++i)
+    {
+        const float y = startY + static_cast<float>(i) * (kCooldownFrameHeight + kCooldownRowSpacing);
+        if (m_pCooldownFrame[i])
+        {
+            m_pCooldownFrame[i]->SetPosition(frameX, y);
+            m_pCooldownFrame[i]->SetSize(kCooldownFrameWidth, kCooldownFrameHeight);
+        }
+        if (m_pCooldownGauge[i])
+        {
+            const float rate = Clamp01(rates[i]);
+            const float gaugeLeft = frameX - kCooldownFrameWidth * 0.5f + kCooldownGaugePadding;
+            const float gaugeX = gaugeLeft + gaugeWidth * rate * 0.5f;
+            m_pCooldownGauge[i]->SetPosition(gaugeX, y);
+            m_pCooldownGauge[i]->SetSize(gaugeWidth * rate, gaugeHeight);
+            m_pCooldownGauge[i]->SetUVPosition(0.0f, 0.0f);
+            m_pCooldownGauge[i]->SetUVScale(rate, 1.0f);
+        }
+    }
 }
 
 void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,

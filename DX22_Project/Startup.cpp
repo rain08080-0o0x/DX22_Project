@@ -16,6 +16,57 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
 //--- プロトタイプ宣言
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
+namespace
+{
+	bool g_isFullscreen = false;
+	WINDOWPLACEMENT g_windowPlacement = { sizeof(WINDOWPLACEMENT) };
+	DWORD g_windowStyle = 0;
+	DWORD g_windowExStyle = 0;
+
+	void SetWindowFullscreen(HWND hWnd, bool fullscreen)
+	{
+		if (!hWnd || (g_isFullscreen == fullscreen))
+			return;
+
+		if (fullscreen)
+		{
+			g_windowStyle = static_cast<DWORD>(GetWindowLongPtr(hWnd, GWL_STYLE));
+			g_windowExStyle = static_cast<DWORD>(GetWindowLongPtr(hWnd, GWL_EXSTYLE));
+			g_windowPlacement.length = sizeof(WINDOWPLACEMENT);
+			GetWindowPlacement(hWnd, &g_windowPlacement);
+
+			HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+			MONITORINFO monitorInfo = {};
+			monitorInfo.cbSize = sizeof(MONITORINFO);
+			GetMonitorInfo(monitor, &monitorInfo);
+
+			SetWindowLongPtr(hWnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+			SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_APPWINDOW);
+			SetWindowPos(
+				hWnd,
+				HWND_TOP,
+				monitorInfo.rcMonitor.left,
+				monitorInfo.rcMonitor.top,
+				monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
+				monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
+				SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+		}
+		else
+		{
+			SetWindowLongPtr(hWnd, GWL_STYLE, g_windowStyle);
+			SetWindowLongPtr(hWnd, GWL_EXSTYLE, g_windowExStyle);
+			SetWindowPlacement(hWnd, &g_windowPlacement);
+			SetWindowPos(
+				hWnd,
+				nullptr,
+				0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+		}
+
+		g_isFullscreen = fullscreen;
+	}
+}
+
 
 // エントリポイント
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -64,8 +115,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
 
+	RECT clientRect = {};
+	GetClientRect(hWnd, &clientRect);
+	UINT clientWidth = static_cast<UINT>(clientRect.right - clientRect.left);
+	UINT clientHeight = static_cast<UINT>(clientRect.bottom - clientRect.top);
+	if (clientWidth == 0) clientWidth = SCREEN_WIDTH;
+	if (clientHeight == 0) clientHeight = SCREEN_HEIGHT;
+
 	// 初期化処理
-	if (FAILED(Init(hWnd, SCREEN_WIDTH, SCREEN_HEIGHT)))
+	if (FAILED(Init(hWnd, clientWidth, clientHeight)))
 	{
 		Uninit();
 		UnregisterClass(wcex.lpszClassName, hInstance);
@@ -117,6 +175,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 // ウィンドウプロシージャ
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	const bool isRepeatKey = (lParam & 0x40000000) != 0;
+	const bool isF11 = (message == WM_KEYDOWN) && (wParam == VK_F11);
+	if (!isRepeatKey && isF11)
+	{
+		SetWindowFullscreen(hWnd, !g_isFullscreen);
+		return 0;
+	}
+
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
 		return true;
 	switch (message)

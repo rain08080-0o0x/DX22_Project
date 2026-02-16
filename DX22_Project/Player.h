@@ -19,6 +19,8 @@ public:
 
     void SetCamera(Camera*set);
     bool IsEvading() const { return m_isDashing; }
+    float GetEvadeCooldownRemain() const { return m_dashCooldownTimer; }
+    float GetEvadeCooldownDuration() const { return m_effectiveDashCooldown; }
 
 private:
     void SyncFromTransfer();
@@ -42,6 +44,7 @@ private:
     float m_dashDuration;
     float m_dashTimer;
     float m_dashCooldownTimer;
+    float m_effectiveDashCooldown;
     DirectX::XMFLOAT3 m_dashDir;
     bool m_isDashing;
 

@@ -123,11 +123,18 @@ private:
 		int enemyCount = 3;
 		int waveMax = 3;
 		int waveEnemyAddPerWave = 1;
+		float cameraIntroDuration = 1.20f;
+		float cameraIntroFocusDistance = 2.80f;
 
 		float attackWindup = 0.04f;
 		float attackDuration = 0.12f;
 		float attackRecovery = 0.10f;
 		float attackCooldown = 0.24f;
+		float skill1Cooldown = 4.0f;
+		float skill2Cooldown = 9.0f;
+		int screenShakeHitThreshold = 3;
+		float screenShakeDuration = 0.18f;
+		float screenShakeAmplitude = 0.20f;
 		float attackSweepDegrees = 120.0f;
 		float attackSweepRadiusScale = 1.25f;
 		float attackWidthScale = 1.2f;
@@ -139,6 +146,7 @@ private:
 		float attackTrailLife = 0.16f;
 		float attackTrailScale = 0.75f;
 		float playerDamageFlash = 0.20f;
+		float playerDamageInvincible = 0.35f;
 		float playerDamageFlashScale = 1.65f;
 		float enemyDefeatFlash = 0.28f;
 		float enemyDefeatFlashScale = 1.60f;
@@ -186,6 +194,10 @@ private:
 		int playerAttackDamage = 1;
 		float playerAttackCooldownScale = 1.0f;
 		float playerEvadeCooldownScale = 1.0f;
+		float cooldownRateAttack = 1.0f;
+		float cooldownRateEvade = 1.0f;
+		float cooldownRateSkill1 = 1.0f;
+		float cooldownRateSkill2 = 1.0f;
 		int playerEvading = 0;
 		int stageClearCount = 0;
 		int attackPowerLevel = 0;
@@ -200,6 +212,7 @@ private:
 	};
 	struct RoguelikeUpgrade
 	{
+		static const int kLevelMax = 10;
 		static const int kOfferCount = 3;
 		enum UpgradeType
 		{
@@ -239,6 +252,11 @@ public:
 	void BeginUpgradeSelection();
 	bool RerollUpgradeSelection();
 	bool ApplyUpgradeSelection(int offerIndex);
+	int ClampUpgradeLevel(int level) const;
+	int GetUpgradeLevelMax() const;
+	int GetPlayerAttackDamageByLevel(int level) const;
+	float GetAttackCooldownScaleByLevel(int level) const;
+	float GetEvadeCooldownScaleByLevel(int level) const;
 	bool LoadGameplayTuning(const char* path = nullptr);
 	bool SaveGameplayTuning(const char* path = nullptr) const;
 	const char* GetGameplayTuningPath() const;
