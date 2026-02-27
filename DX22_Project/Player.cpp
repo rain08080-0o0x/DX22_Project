@@ -3,10 +3,12 @@
 #include "Transfer.h"
 #include <cmath>
 #include "Defines.h"
+#include "DirectX.h"
 
 namespace
 {
     const char* kPlayerTexture = "Assets/Texture/Chracter/genbaneko.png";
+    const char* kDirectionTexture = "Assets/Texture/Chracter/triangle.png";
     const float kDefaultStageSize = 5.0f;
     const float kDefaultMoveSpeed = 2.4f;
     const float kDefaultMaxHp = 100.0f;
@@ -26,8 +28,10 @@ namespace
 
 Player::Player(Camera*camera)
     : m_pTexture(nullptr)
+    , m_pDirectionTexture(nullptr)
     , m_size(0.5f, 1.0f, 0.5f)
     , m_velocity(0.0f, 0.0f, 0.0f)
+    , m_facingDir(0.0f, 0.0f, 1.0f)
     , m_color(1.0f, 1.0f, 1.0f, 1.0f)
     , m_hp(kDefaultMaxHp)
     , m_maxHp(kDefaultMaxHp)
@@ -53,6 +57,11 @@ Player::Player(Camera*camera)
     {
         MessageBox(NULL, "Texture load failed.\nPlayer.cpp", "Error", MB_OK);
     }
+    m_pDirectionTexture = new Texture();
+    if (FAILED(m_pDirectionTexture->Create(kDirectionTexture)))
+    {
+        MessageBox(NULL, "Texture load failed.\ntriangle.png", "Error", MB_OK);
+    }
 
     m_pTrailEffectTexture = new Texture();
     if (FAILED(m_pTrailEffectTexture->Create("Assets/Texture/Chracter/genbaneko.png")))
@@ -74,6 +83,11 @@ Player::~Player()
     {
         delete m_pTexture;
         m_pTexture = nullptr;
+    }
+    if (m_pDirectionTexture)
+    {
+        delete m_pDirectionTexture;
+        m_pDirectionTexture = nullptr;
     }
     if (m_pTrailEffectTexture)
     {
@@ -152,7 +166,6 @@ void Player::Draw()
     Sprite::Draw();
 
 
-
     if (m_pTrail)
     {
         m_pTrail->SetView(m_pCamera->GetViewMatrix());
@@ -161,6 +174,67 @@ void Player::Draw()
         //m_pTrail->SetTexture(m_pTrailEffectTexture);
         m_pTrail->Draw();
     }
+}
+
+void Player::DrawDirectionMarker()
+{
+    if (!m_pDirectionTexture) return;
+
+    TRAN_INS;
+    const float dirLenSq = m_facingDir.x * m_facingDir.x + m_facingDir.z * m_facingDir.z;
+    if (dirLenSq <= 1.0e-6f) return;
+
+    const float dirLen = sqrtf(dirLenSq);
+    const DirectX::XMFLOAT3 dir = { m_facingDir.x / dirLen, 0.0f, m_facingDir.z / dirLen };
+    const float yaw = atan2f(dir.x, dir.z) + DirectX::XM_PI;
+    const float forwardOffset = m_size.z * 0.9f;
+    const DirectX::XMFLOAT3 markerPos = {
+        m_pos.x + dir.x * forwardOffset,
+        0.002f,
+        m_pos.z + dir.z * forwardOffset
+    };
+    const float markerSizeX = m_size.x * 0.70f;
+    const float markerSizeZ = m_size.z * 0.70f;
+    const float markerRadius = ((markerSizeX > markerSizeZ) ? markerSizeX : markerSizeZ) * 0.5f;
+    const float playerRadius = ((m_size.x > m_size.z) ? m_size.x : m_size.z) * 0.5f;
+    const float overlapMargin = playerRadius * 0.30f;
+    const float playerDx = markerPos.x - m_pos.x;
+    const float playerDz = markerPos.z - m_pos.z;
+    const float playerRange = playerRadius + markerRadius + overlapMargin;
+    bool overlapsPlayer = (playerDx * playerDx + playerDz * playerDz) <= (playerRange * playerRange);
+    bool overlapsEnemy = false;
+    if (tran.enemy.exists != 0)
+    {
+        const float enemyRadius = playerRadius;
+        const float enemyDx = markerPos.x - tran.enemy.pos.x;
+        const float enemyDz = markerPos.z - tran.enemy.pos.z;
+        const float enemyRange = enemyRadius + markerRadius;
+        overlapsEnemy = (enemyDx * enemyDx + enemyDz * enemyDz) <= (enemyRange * enemyRange);
+    }
+    float normalAlpha = tran.gameplay.directionMarkerAlpha;
+    float overlapAlpha = tran.gameplay.directionMarkerOverlapAlpha;
+    if (normalAlpha < 0.0f) normalAlpha = 0.0f;
+    if (normalAlpha > 1.0f) normalAlpha = 1.0f;
+    if (overlapAlpha < 0.0f) overlapAlpha = 0.0f;
+    if (overlapAlpha > 1.0f) overlapAlpha = 1.0f;
+    const float markerAlpha = (overlapsPlayer || overlapsEnemy) ? overlapAlpha : normalAlpha;
+
+    const DirectX::XMMATRIX R =
+        DirectX::XMMatrixRotationX(DirectX::XM_PIDIV2) *
+        DirectX::XMMatrixRotationY(yaw);
+    const DirectX::XMMATRIX Tr = DirectX::XMMatrixTranslation(markerPos.x, markerPos.y, markerPos.z);
+    DirectX::XMFLOAT4X4 worldDir;
+    DirectX::XMStoreFloat4x4(&worldDir, DirectX::XMMatrixTranspose(R * Tr));
+    Sprite::SetWorld(worldDir);
+    Sprite::SetSize({ markerSizeX, markerSizeZ });
+    Sprite::SetOffset({ 0.0f, 0.0f });
+    Sprite::SetUVPos({ 0.0f, 0.0f });
+    Sprite::SetUVScale({ 1.0f, 1.0f });
+    Sprite::SetColor({ 1.0f, 1.0f, 1.0f, markerAlpha });
+    Sprite::SetTexture(m_pDirectionTexture);
+    SetCullingMode(D3D11_CULL_NONE);
+    Sprite::Draw();
+    SetCullingMode(D3D11_CULL_BACK);
 }
 
 void Player::SetCamera(Camera* set)
@@ -222,12 +296,17 @@ void Player::ApplyMovement(float dt)
     {
         dirX /= len;
         dirZ /= len;
+        len = 1.0f;
     }
     else if (len <= 0.0001f)
     {
         dirX = 0.0f;
         dirZ = 0.0f;
         len = 0.0f;
+    }
+    if (len > 0.0001f)
+    {
+        m_facingDir = { dirX, 0.0f, dirZ };
     }
 
     const float evadeCooldownScale = tran.GetEvadeCooldownScaleByLevel(tran.roguelike.evadeCooldownLevel);
@@ -252,6 +331,7 @@ void Player::ApplyMovement(float dt)
             if (dashLen > 0.0001f)
             {
                 m_dashDir = DirectX::XMFLOAT3(dirX / dashLen, 0.0f, dirZ / dashLen);
+                m_facingDir = m_dashDir;
             }
         }
     }
@@ -266,6 +346,7 @@ void Player::ApplyMovement(float dt)
             m_velocity.x = m_dashDir.x * speed;
             m_velocity.y = 0.0f;
             m_velocity.z = m_dashDir.z * speed;
+            m_facingDir = m_dashDir;
             m_pos.x += m_velocity.x * dt;
             m_pos.z += m_velocity.z * dt;
         }

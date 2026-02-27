@@ -16,6 +16,7 @@ public:
 
     void Update() override;
     void Draw() override;
+    void DrawDirectionMarker();
 
     void SetCamera(Camera*set);
     bool IsEvading() const { return m_isDashing; }
@@ -32,8 +33,10 @@ private:
 private:
     Camera* m_pCamera;
     Texture* m_pTexture;
+    Texture* m_pDirectionTexture;
     DirectX::XMFLOAT3 m_size;
     DirectX::XMFLOAT3 m_velocity;
+    DirectX::XMFLOAT3 m_facingDir;
     DirectX::XMFLOAT4 m_color;
 
     float m_hp;

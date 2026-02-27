@@ -2,9 +2,11 @@
 #define __SCENE_GAME_H__
 
 #include "Scene.h"
+#include "Boss.h"
 #include "Camera.h"
 #include "Player.h"
 #include "UIObjectManager.h"
+#include <functional>
 #include <vector>
 
 class UIObject;
@@ -50,7 +52,15 @@ private:
         float life = 0.0f;
         float damage = 0.0f;
     };
-
+    struct DrawEntry
+    {
+        float distSq = 0.0f;
+        bool isPlayer = false;
+        bool isBoss = false;
+        DirectX::XMFLOAT3 pos = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 size = { 0.0f, 0.0f, 0.0f };
+        Enemy* enemy = nullptr;
+    };
     enum CooldownSlot
     {
         CooldownAttack = 0,
@@ -68,6 +78,18 @@ private:
     void DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
                                    const DirectX::XMFLOAT3& enemySize,
                                    float rate);
+    void InitializeBossForScene();
+    void LoadBossResources();
+    void ReleaseBossResources();
+    bool UpdateBossDebugSetup(float stageSize);
+    bool UpdateBossBattle(float stageSize,
+                          int playerAttackDamage,
+                          const std::function<bool(float)>& applyPlayerDamage);
+    void DrawBossTelegraphMarker() const;
+    void AddBossDrawEntry(std::vector<DrawEntry>& drawEntries,
+                          const DirectX::XMFLOAT3& cam) const;
+    void DrawBossEntry(const DrawEntry& entry) const;
+    void DrawBossHpUi() const;
 
     Camera* m_pCamera;
     CameraDebug* m_pCameraGame;
@@ -77,8 +99,10 @@ private:
     std::vector<EnemySlot> m_enemies;
     std::vector<MarkerEffect> m_markerEffects;
     std::vector<EnemyProjectile> m_enemyProjectiles;
+    BossController m_boss;
     Texture* m_pShadow;
     Texture* m_pAttackMarker;
+    Texture* m_pBossAttackRangeMarker;
     XAUDIO2_BUFFER* m_pAttackSe;
     XAUDIO2_BUFFER* m_pPlayerHitSe;
     XAUDIO2_BUFFER* m_pEnemyAttackSe;
@@ -135,6 +159,7 @@ private:
     int m_pauseMenuSelection;
     bool m_isPauseOptionOpen;
     int m_pauseOptionSelection;
+    bool m_isBossBattleDebug;
 };
 
 #endif // __SCENE_GAME_H__

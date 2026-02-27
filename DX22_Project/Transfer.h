@@ -153,6 +153,18 @@ private:
 		float volumeMaster = 1.0f;
 		float volumeBgm = 0.7f;
 		float volumeSe = 1.0f;
+		float directionMarkerAlpha = 0.92f;
+		float directionMarkerOverlapAlpha = 0.45f;
+		float bossHpBarWidthRate = 0.42f;
+		float bossHpBarHeightRate = 0.045f;
+		float bossSizeAreaScale = 6.0f;
+		int bossMaxHp = 180;
+		float bossAttackTelegraph = 1.0f;
+		float bossAttackJumpOutTime = 0.5f;
+		float bossAttackDashDuration = 0.35f;
+		float bossAttackCooldown = 1.15f;
+		float bossAttackLanePlayerScale = 3.0f;
+		float bossAttackDamage = 20.0f;
 
 		float enemyAttackWindup = 0.55f;
 		float enemyAttackCooldown = 1.00f;
@@ -209,6 +221,14 @@ private:
 		int upgradeOffer0 = -1;
 		int upgradeOffer1 = -1;
 		int upgradeOffer2 = -1;
+		float runElapsedSec = 0.0f;
+		float runRecordedSec = 0.0f;
+		int runTimerRunning = 0;
+		int requestBossBattle = 0;
+		int bossBattleActive = 0;
+		float bossHp = 0.0f;
+		float bossMaxHp = 0.0f;
+		int showBossResultTimer = 0;
 		int pauseMenuOpen = 0;
 		int pauseMenuSelection = 0; // 0: Continue, 1: Option, 2: Title
 		int pauseMenuRequest = 0;   // 0: None, 1: Continue, 2: Title, 3: Option

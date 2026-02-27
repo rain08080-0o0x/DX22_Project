@@ -13,6 +13,11 @@ namespace
 	{
 		return IsKeyTrigger(VK_RETURN) || IsKeyTrigger('F') || IsKeyTrigger(VK_SPACE);
 	}
+
+	bool IsBossStartTriggered()
+	{
+		return IsKeyTrigger('B');
+	}
 }
 
 SceneResult::SceneResult()
@@ -66,6 +71,7 @@ SceneResult::~SceneResult()
 void SceneResult::Update()
 {
 	TRAN_INS;
+	tran.gameplayDebug.runTimerRunning = 0;
 	if (m_pResultBgmVoice)
 	{
 		float masterVolume = tran.gameplay.volumeMaster;
@@ -85,6 +91,23 @@ void SceneResult::Update()
 	}
 	if (m_current == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0)
 	{
+		if (IsBossStartTriggered())
+		{
+			tran.roguelike.selectionPending = 0;
+			tran.roguelike.rerollRemain = 0;
+			tran.gameplayDebug.upgradeSelectionPending = 0;
+			tran.gameplayDebug.upgradeRerollRemain = 0;
+			tran.gameplayDebug.upgradeOffer0 = -1;
+			tran.gameplayDebug.upgradeOffer1 = -1;
+			tran.gameplayDebug.upgradeOffer2 = -1;
+			tran.gameplayDebug.requestBossBattle = 1;
+			tran.gameplayDebug.bossBattleActive = 0;
+			tran.gameplayDebug.showBossResultTimer = 0;
+			SceneManager::ChangeResult(SceneManager::ResultType::None);
+			SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+			return;
+		}
+
 		const bool hasAnyOffer =
 			(tran.roguelike.offers[0] >= 0) ||
 			(tran.roguelike.offers[1] >= 0) ||
@@ -151,11 +174,21 @@ void SceneResult::Update()
 		if (restartSelected)
 		{
 			tran.ResetRoguelikeUpgrade();
+			tran.gameplayDebug.requestBossBattle = 0;
+			tran.gameplayDebug.bossBattleActive = 0;
+			tran.gameplayDebug.showBossResultTimer = 0;
+			tran.gameplayDebug.runElapsedSec = 0.0f;
+			tran.gameplayDebug.runRecordedSec = 0.0f;
+			tran.gameplayDebug.runTimerRunning = 0;
 			SceneManager::ChangeResult(SceneManager::ResultType::None);
 			SceneManager::ChangeScene(SceneManager::SCENE_GAME);
 		}
 		else
 		{
+			tran.gameplayDebug.requestBossBattle = 0;
+			tran.gameplayDebug.bossBattleActive = 0;
+			tran.gameplayDebug.showBossResultTimer = 0;
+			tran.gameplayDebug.runTimerRunning = 0;
 			SceneManager::ChangeResult(SceneManager::ResultType::None);
 			SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
 		}

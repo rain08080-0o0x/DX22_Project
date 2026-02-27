@@ -119,6 +119,25 @@ void Draw()
 		default: return u8"";
 		}
 	};
+	auto formatRunTime = [](float sec, char* out, size_t outSize)
+	{
+		float safeSec = sec;
+		if (safeSec < 0.0f) safeSec = 0.0f;
+		const int totalMin = static_cast<int>(safeSec / 60.0f);
+		const float remain = safeSec - static_cast<float>(totalMin) * 60.0f;
+		int totalSec = static_cast<int>(remain);
+		int centi = static_cast<int>((remain - static_cast<float>(totalSec)) * 100.0f + 0.5f);
+		if (centi >= 100)
+		{
+			centi = 0;
+			++totalSec;
+		}
+		if (totalSec >= 60)
+		{
+			totalSec -= 60;
+		}
+		sprintf_s(out, outSize, "%02d:%02d.%02d", totalMin, totalSec, centi);
+	};
 
 	// Docking用のルート（上下左右の吸着・分割/再結合）
 	if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable)
@@ -185,6 +204,36 @@ void Draw()
 				DragFloat(u8"回避CT", &tran.player.dashCooldown, 0.01f, 0.0f, 5.0f);
 				DragFloat(u8"回避時間", &tran.player.dashDuration, 0.01f, 0.01f, 1.0f);
 				DragFloat(u8"ステージサイズ", &tran.player.stageSize, 0.1f, 1.0f, 20.0f);
+
+				ImGui::SeparatorText(u8"プレイヤー攻撃");
+				ImGui::TextDisabled(u8"初期値: 準備0.04 / 有効0.12 / 後隙0.10 / CT0.24 / Skill1CT4.0 / Skill2CT9.0");
+				DragFloat(u8"攻撃準備", &tran.gameplay.attackWindup, 0.005f, 0.0f, 1.0f);
+				DragFloat(u8"攻撃有効", &tran.gameplay.attackDuration, 0.005f, 0.01f, 1.0f);
+				DragFloat(u8"攻撃後隙", &tran.gameplay.attackRecovery, 0.005f, 0.0f, 1.0f);
+				DragFloat(u8"攻撃CT", &tran.gameplay.attackCooldown, 0.005f, 0.0f, 2.0f);
+				DragFloat(u8"スキル1 CT", &tran.gameplay.skill1Cooldown, 0.05f, 0.0f, 30.0f);
+				DragFloat(u8"スキル2 CT", &tran.gameplay.skill2Cooldown, 0.05f, 0.0f, 30.0f);
+				ImGui::TextDisabled(u8"初期値: 3体ヒット / 時間0.18 / 強さ0.20");
+				DragInt(u8"画面揺れ発火ヒット数", &tran.gameplay.screenShakeHitThreshold, 1.0f, 1, 16);
+				DragFloat(u8"画面揺れ時間", &tran.gameplay.screenShakeDuration, 0.01f, 0.0f, 1.0f);
+				DragFloat(u8"画面揺れ強さ", &tran.gameplay.screenShakeAmplitude, 0.01f, 0.0f, 1.0f);
+				DragFloat(u8"薙ぎ角度", &tran.gameplay.attackSweepDegrees, 1.0f, 10.0f, 240.0f);
+				DragFloat(u8"攻撃半径倍率", &tran.gameplay.attackSweepRadiusScale, 0.01f, 0.1f, 3.0f);
+				DragFloat(u8"攻撃幅倍率", &tran.gameplay.attackWidthScale, 0.01f, 0.1f, 3.0f);
+				DragFloat(u8"攻撃奥行倍率", &tran.gameplay.attackDepthScale, 0.01f, 0.1f, 3.0f);
+				DragFloat(u8"ヒットストップ", &tran.gameplay.attackHitStop, 0.001f, 0.0f, 0.20f);
+				DragFloat(u8"ノックバック", &tran.gameplay.attackKnockback, 0.01f, 0.0f, 3.0f);
+				DragFloat(u8"ヒット発光", &tran.gameplay.attackHitFlash, 0.005f, 0.0f, 0.50f);
+				ImGui::TextDisabled(u8"初期値: 軌跡間隔0.02 / 軌跡残存0.16 / 軌跡倍率0.75");
+				DragFloat(u8"攻撃軌跡間隔", &tran.gameplay.attackTrailInterval, 0.002f, 0.0f, 0.20f);
+				DragFloat(u8"攻撃軌跡残存", &tran.gameplay.attackTrailLife, 0.005f, 0.0f, 0.50f);
+				DragFloat(u8"攻撃軌跡倍率", &tran.gameplay.attackTrailScale, 0.01f, 0.1f, 3.0f);
+
+				ImGui::SeparatorText(u8"進行方向マーカー");
+				ImGui::TextDisabled(u8"初期値: 通常0.92 / 被り時0.45");
+				DragFloat(u8"マーカー透明度(通常)", &tran.gameplay.directionMarkerAlpha, 0.01f, 0.0f, 1.0f);
+				DragFloat(u8"マーカー透明度(被り時)", &tran.gameplay.directionMarkerOverlapAlpha, 0.01f, 0.0f, 1.0f);
+
 				ColorEdit4(u8"色", reinterpret_cast<float*>(&tran.player.color));
 				EndTabItem();
 			}
@@ -261,30 +310,6 @@ void Draw()
 				DragFloat(u8"開始演出時間", &tran.gameplay.cameraIntroDuration, 0.02f, 0.10f, 8.0f);
 				DragFloat(u8"フォーカス距離", &tran.gameplay.cameraIntroFocusDistance, 0.05f, 0.50f, 12.0f);
 
-				ImGui::SeparatorText(u8"プレイヤー攻撃");
-				ImGui::TextDisabled(u8"初期値: 準備0.04 / 有効0.12 / 後隙0.10 / CT0.24 / Skill1CT4.0 / Skill2CT9.0");
-				DragFloat(u8"攻撃準備", &tran.gameplay.attackWindup, 0.005f, 0.0f, 1.0f);
-				DragFloat(u8"攻撃有効", &tran.gameplay.attackDuration, 0.005f, 0.01f, 1.0f);
-				DragFloat(u8"攻撃後隙", &tran.gameplay.attackRecovery, 0.005f, 0.0f, 1.0f);
-				DragFloat(u8"攻撃CT", &tran.gameplay.attackCooldown, 0.005f, 0.0f, 2.0f);
-				DragFloat(u8"スキル1 CT", &tran.gameplay.skill1Cooldown, 0.05f, 0.0f, 30.0f);
-				DragFloat(u8"スキル2 CT", &tran.gameplay.skill2Cooldown, 0.05f, 0.0f, 30.0f);
-				ImGui::TextDisabled(u8"初期値: 3体ヒット / 時間0.18 / 強さ0.20");
-				DragInt(u8"画面揺れ発火ヒット数", &tran.gameplay.screenShakeHitThreshold, 1.0f, 1, 16);
-				DragFloat(u8"画面揺れ時間", &tran.gameplay.screenShakeDuration, 0.01f, 0.0f, 1.0f);
-				DragFloat(u8"画面揺れ強さ", &tran.gameplay.screenShakeAmplitude, 0.01f, 0.0f, 1.0f);
-				DragFloat(u8"薙ぎ角度", &tran.gameplay.attackSweepDegrees, 1.0f, 10.0f, 240.0f);
-				DragFloat(u8"攻撃半径倍率", &tran.gameplay.attackSweepRadiusScale, 0.01f, 0.1f, 3.0f);
-				DragFloat(u8"攻撃幅倍率", &tran.gameplay.attackWidthScale, 0.01f, 0.1f, 3.0f);
-				DragFloat(u8"攻撃奥行倍率", &tran.gameplay.attackDepthScale, 0.01f, 0.1f, 3.0f);
-				DragFloat(u8"ヒットストップ", &tran.gameplay.attackHitStop, 0.001f, 0.0f, 0.20f);
-				DragFloat(u8"ノックバック", &tran.gameplay.attackKnockback, 0.01f, 0.0f, 3.0f);
-				DragFloat(u8"ヒット発光", &tran.gameplay.attackHitFlash, 0.005f, 0.0f, 0.50f);
-				ImGui::TextDisabled(u8"初期値: 軌跡間隔0.02 / 軌跡残存0.16 / 軌跡倍率0.75");
-				DragFloat(u8"攻撃軌跡間隔", &tran.gameplay.attackTrailInterval, 0.002f, 0.0f, 0.20f);
-				DragFloat(u8"攻撃軌跡残存", &tran.gameplay.attackTrailLife, 0.005f, 0.0f, 0.50f);
-				DragFloat(u8"攻撃軌跡倍率", &tran.gameplay.attackTrailScale, 0.01f, 0.1f, 3.0f);
-
 				ImGui::SeparatorText(u8"被弾・撃破演出");
 				ImGui::TextDisabled(u8"初期値: 被弾0.20 / 被弾無敵0.35 / 被弾倍率1.65 / 撃破0.28 / 撃破倍率1.60");
 				DragFloat(u8"被弾フラッシュ時間", &tran.gameplay.playerDamageFlash, 0.005f, 0.0f, 1.0f);
@@ -298,6 +323,21 @@ void Draw()
 				DragFloat(u8"Master音量", &tran.gameplay.volumeMaster, 0.01f, 0.0f, 2.0f);
 				DragFloat(u8"BGM音量", &tran.gameplay.volumeBgm, 0.01f, 0.0f, 2.0f);
 				DragFloat(u8"SE音量", &tran.gameplay.volumeSe, 0.01f, 0.0f, 2.0f);
+
+				ImGui::SeparatorText(u8"ボス戦");
+				ImGui::TextDisabled(u8"HPバーは画面上部UI表示。初期値: 横0.42 / 縦0.045");
+				DragFloat(u8"ボスHPバー横幅(画面比)", &tran.gameplay.bossHpBarWidthRate, 0.005f, 0.20f, 0.90f);
+				DragFloat(u8"ボスHPバー縦幅(画面比)", &tran.gameplay.bossHpBarHeightRate, 0.002f, 0.01f, 0.20f);
+				ImGui::TextDisabled(u8"初期値: 面積倍率6.0 (4.0〜12.0)");
+				DragFloat(u8"ボス面積倍率", &tran.gameplay.bossSizeAreaScale, 0.05f, 4.0f, 12.0f);
+				DragInt(u8"ボス最大HP", &tran.gameplay.bossMaxHp, 1.0f, 1, 9999);
+				ImGui::TextDisabled(u8"初期値: 予兆1.00 / ジャンプ0.50 / 突進0.35 / CT1.15 / 幅3.0 / ダメ20");
+				DragFloat(u8"ボス予兆時間", &tran.gameplay.bossAttackTelegraph, 0.01f, 0.10f, 4.0f);
+				DragFloat(u8"画面外ジャンプ開始", &tran.gameplay.bossAttackJumpOutTime, 0.01f, 0.0f, 4.0f);
+				DragFloat(u8"ボス突進時間", &tran.gameplay.bossAttackDashDuration, 0.005f, 0.05f, 2.0f);
+				DragFloat(u8"ボス攻撃CT", &tran.gameplay.bossAttackCooldown, 0.01f, 0.0f, 6.0f);
+				DragFloat(u8"予兆幅(プレイヤー比)", &tran.gameplay.bossAttackLanePlayerScale, 0.05f, 0.5f, 8.0f);
+				DragFloat(u8"ボス攻撃ダメージ", &tran.gameplay.bossAttackDamage, 0.1f, 0.0f, 200.0f);
 
 				ImGui::SeparatorText(u8"敵攻撃");
 				ImGui::TextDisabled(u8"初期値: 予兆0.55 / CT1.00 / 射程最小0.80 / 射程倍率1.35 / ダメージ1.0");
@@ -353,6 +393,8 @@ void Draw()
 				ImGui::Text(u8"スキル2CT進捗: %.2f", tran.gameplayDebug.cooldownRateSkill2);
 				ImGui::Text(u8"回避中: %s", tran.gameplayDebug.playerEvading ? u8"はい" : u8"いいえ");
 				ImGui::Text(u8"強化選択待ち: %d / リロール残り: %d", tran.gameplayDebug.upgradeSelectionPending, tran.gameplayDebug.upgradeRerollRemain);
+				ImGui::Text(u8"タイマー: %.2f sec (記録 %.2f sec / 稼働 %d)", tran.gameplayDebug.runElapsedSec, tran.gameplayDebug.runRecordedSec, tran.gameplayDebug.runTimerRunning);
+				ImGui::Text(u8"ボスデバッグ戦: %s", tran.gameplayDebug.bossBattleActive ? u8"ON" : u8"OFF");
 				ImGui::TextDisabled(u8"ゲーム進行: 敵全滅で次Wave、最終Wave全滅で勝利");
 				ImGui::TextDisabled(u8"敵タイプ差: 遠距離型は予兆後に敵弾を発射");
 				ImGui::TextDisabled(u8"敵AABB色: 赤=被弾 / 橙=予兆 / 黄=攻撃可能");
@@ -397,6 +439,61 @@ void Draw()
 				ImGui::Text(u8"攻撃力 Lv.%d", tran.gameplayDebug.attackPowerLevel);
 				ImGui::Text(u8"攻撃頻度 Lv.%d", tran.gameplayDebug.attackSpeedLevel);
 				ImGui::Text(u8"回避CT Lv.%d", tran.gameplayDebug.evadeCooldownLevel);
+				ImGui::SeparatorText(u8"強化レベル編集");
+				ImGui::TextDisabled(u8"ゲーム中でも直接Lvを増減できます");
+				const int maxUpgradeLevel = tran.GetUpgradeLevelMax();
+				int attackPowerLevelEdit = tran.roguelike.attackPowerLevel;
+				int attackSpeedLevelEdit = tran.roguelike.attackSpeedLevel;
+				int evadeCooldownLevelEdit = tran.roguelike.evadeCooldownLevel;
+				bool upgradeLevelEdited = false;
+				upgradeLevelEdited |= ImGui::DragInt(u8"攻撃力Lv##edit", &attackPowerLevelEdit, 1.0f, 0, maxUpgradeLevel);
+				upgradeLevelEdited |= ImGui::DragInt(u8"攻撃頻度Lv##edit", &attackSpeedLevelEdit, 1.0f, 0, maxUpgradeLevel);
+				upgradeLevelEdited |= ImGui::DragInt(u8"回避CTLv##edit", &evadeCooldownLevelEdit, 1.0f, 0, maxUpgradeLevel);
+				if (Button(u8"攻撃力+1##upgrade"))
+				{
+					++attackPowerLevelEdit;
+					upgradeLevelEdited = true;
+				}
+				SameLine();
+				if (Button(u8"攻撃力-1##upgrade"))
+				{
+					--attackPowerLevelEdit;
+					upgradeLevelEdited = true;
+				}
+				if (Button(u8"攻撃頻度+1##upgrade"))
+				{
+					++attackSpeedLevelEdit;
+					upgradeLevelEdited = true;
+				}
+				SameLine();
+				if (Button(u8"攻撃頻度-1##upgrade"))
+				{
+					--attackSpeedLevelEdit;
+					upgradeLevelEdited = true;
+				}
+				if (Button(u8"回避CT+1##upgrade"))
+				{
+					++evadeCooldownLevelEdit;
+					upgradeLevelEdited = true;
+				}
+				SameLine();
+				if (Button(u8"回避CT-1##upgrade"))
+				{
+					--evadeCooldownLevelEdit;
+					upgradeLevelEdited = true;
+				}
+				if (upgradeLevelEdited)
+				{
+					tran.roguelike.attackPowerLevel = tran.ClampUpgradeLevel(attackPowerLevelEdit);
+					tran.roguelike.attackSpeedLevel = tran.ClampUpgradeLevel(attackSpeedLevelEdit);
+					tran.roguelike.evadeCooldownLevel = tran.ClampUpgradeLevel(evadeCooldownLevelEdit);
+					tran.gameplayDebug.attackPowerLevel = tran.roguelike.attackPowerLevel;
+					tran.gameplayDebug.attackSpeedLevel = tran.roguelike.attackSpeedLevel;
+					tran.gameplayDebug.evadeCooldownLevel = tran.roguelike.evadeCooldownLevel;
+					tran.gameplayDebug.playerAttackDamage = tran.GetPlayerAttackDamageByLevel(tran.roguelike.attackPowerLevel);
+					tran.gameplayDebug.playerAttackCooldownScale = tran.GetAttackCooldownScaleByLevel(tran.roguelike.attackSpeedLevel);
+					tran.gameplayDebug.playerEvadeCooldownScale = tran.GetEvadeCooldownScaleByLevel(tran.roguelike.evadeCooldownLevel);
+				}
 				ImGui::SeparatorText(u8"現在の実効値");
 				ImGui::Text(u8"攻撃ダメージ: %d", tran.gameplayDebug.playerAttackDamage);
 				ImGui::Text(u8"攻撃CT倍率: %.2f", tran.gameplayDebug.playerAttackCooldownScale);
@@ -800,6 +897,12 @@ void Draw()
 			row_i1(u8"強化:回避CTLv", tran.gameplayDebug.evadeCooldownLevel);
 			row_i1(u8"強化選択待ち", tran.gameplayDebug.upgradeSelectionPending);
 			row_i1(u8"強化リロール残り", tran.gameplayDebug.upgradeRerollRemain);
+			row_f1(u8"タイマー経過秒", tran.gameplayDebug.runElapsedSec);
+			row_f1(u8"タイマー記録秒", tran.gameplayDebug.runRecordedSec);
+			row_i1(u8"タイマー稼働中", tran.gameplayDebug.runTimerRunning);
+			row_i1(u8"ボスデバッグ戦中", tran.gameplayDebug.bossBattleActive);
+			row_f1(u8"ボスHP", tran.gameplayDebug.bossHp);
+			row_f1(u8"ボス最大HP", tran.gameplayDebug.bossMaxHp);
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"強化候補1");
 			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer0, upgradeLabel(tran.gameplayDebug.upgradeOffer0));
@@ -860,18 +963,22 @@ void Draw()
 		default: difficultyText = u8"Normal"; break;
 		}
 
-		char gameplayHud[256];
+		char timeText[32]{};
+		formatRunTime(tran.gameplayDebug.runElapsedSec, timeText, sizeof(timeText));
+		char gameplayHud[384];
 		sprintf_s(
 			gameplayHud,
-			u8"難易度: %s\n現在Wave: %d / %d\n残り敵数: %d / %d\n強化: 攻撃Lv%d / 攻撃頻度Lv%d / 回避Lv%d\nクリア条件: 最終Waveで敵を全滅",
+			u8"難易度: %s\nタイム: %s\n現在Wave: %d / %d\n残り敵数: %d / %d\n強化: 攻撃Lv%d / 攻撃頻度Lv%d / 回避Lv%d\nクリア条件: 最終Waveで敵を全滅%s",
 			difficultyText,
+			timeText,
 			tran.gameplayDebug.currentWave,
 			tran.gameplayDebug.maxWave,
 			tran.gameplayDebug.enemiesAlive,
 			tran.gameplayDebug.enemiesTarget,
 			tran.gameplayDebug.attackPowerLevel,
 			tran.gameplayDebug.attackSpeedLevel,
-			tran.gameplayDebug.evadeCooldownLevel);
+			tran.gameplayDebug.evadeCooldownLevel,
+			tran.gameplayDebug.bossBattleActive ? u8"\nボスデバッグ戦: Enterでリザルトへ" : u8"");
 
 		const ImVec2 pad(10.0f, 8.0f);
 		const ImVec2 textSize = ImGui::CalcTextSize(gameplayHud);
@@ -881,6 +988,43 @@ void Draw()
 		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 6.0f);
 		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 6.0f);
 		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), gameplayHud);
+
+		if (tran.gameplayDebug.bossBattleActive != 0 && tran.gameplayDebug.bossMaxHp > 0.0f)
+		{
+			float widthRate = tran.gameplay.bossHpBarWidthRate;
+			if (widthRate < 0.20f) widthRate = 0.20f;
+			if (widthRate > 0.90f) widthRate = 0.90f;
+			float heightRate = tran.gameplay.bossHpBarHeightRate;
+			if (heightRate < 0.01f) heightRate = 0.01f;
+			if (heightRate > 0.20f) heightRate = 0.20f;
+
+			float hpRate = tran.gameplayDebug.bossHp / tran.gameplayDebug.bossMaxHp;
+			if (hpRate < 0.0f) hpRate = 0.0f;
+			if (hpRate > 1.0f) hpRate = 1.0f;
+
+			const float barW = vp->Size.x * widthRate;
+			const float barH = vp->Size.y * heightRate;
+			const float x = vp->Pos.x + (vp->Size.x - barW) * 0.5f;
+			const float y = vp->Pos.y + 12.0f;
+			const float padding = 4.0f;
+			const float radius = 6.0f;
+
+			const ImVec2 frameMin(x, y);
+			const ImVec2 frameMax(x + barW, y + barH);
+			dl->AddRectFilled(frameMin, frameMax, IM_COL32(20, 20, 20, 220), radius);
+			dl->AddRect(frameMin, frameMax, IM_COL32(230, 230, 230, 210), radius, 0, 2.0f);
+
+			const float innerW = (barW - padding * 2.0f) * hpRate;
+			if (innerW > 0.0f)
+			{
+				dl->AddRectFilled(
+					ImVec2(x + padding, y + padding),
+					ImVec2(x + padding + innerW, y + barH - padding),
+					IM_COL32(180, 30, 30, 220),
+					radius * 0.6f);
+			}
+			dl->AddText(ImVec2(x + 8.0f, y - 18.0f), IM_COL32(255, 255, 255, 230), "BOSS");
+		}
 	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_GAME &&
 		tran.gameplayDebug.pauseMenuOpen != 0)
@@ -1013,7 +1157,7 @@ void Draw()
 		{
 			sprintf_s(
 				upgradeHud,
-				u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ");
+				u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ\n[B] ボス戦へ（デバッグ）");
 		}
 		else
 		{
@@ -1025,7 +1169,7 @@ void Draw()
 			const char* d2 = upgradeDesc(tran.roguelike.offers[2]);
 			sprintf_s(
 				upgradeHud,
-				u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
+				u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d\n[B] ボス戦へ（デバッグ）",
 				l0, d0,
 				l1, d1,
 				l2, d2,
@@ -1063,6 +1207,43 @@ void Draw()
 		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 8.0f);
 		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 8.0f);
 		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), resultGuide);
+	}
+	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
+		tran.gameplayDebug.showBossResultTimer != 0)
+	{
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+		char timeText[32]{};
+		formatRunTime(tran.gameplayDebug.runRecordedSec, timeText, sizeof(timeText));
+		const char* timerLabel = u8"記録タイム";
+		const char* timerState = u8"TIMER STOP";
+		ImFont* font = ImGui::GetFont();
+		const float labelSize = ImGui::GetFontSize() * 1.15f;
+		const float timeSize = ImGui::GetFontSize() * 3.10f;
+		const float stateSize = ImGui::GetFontSize() * 1.00f;
+		const ImVec2 labelTextSize = font->CalcTextSizeA(labelSize, 10000.0f, 0.0f, timerLabel);
+		const ImVec2 timeTextSize = font->CalcTextSizeA(timeSize, 10000.0f, 0.0f, timeText);
+		const ImVec2 stateTextSize = font->CalcTextSizeA(stateSize, 10000.0f, 0.0f, timerState);
+		const float contentWidth = (labelTextSize.x > timeTextSize.x)
+			? ((labelTextSize.x > stateTextSize.x) ? labelTextSize.x : stateTextSize.x)
+			: ((timeTextSize.x > stateTextSize.x) ? timeTextSize.x : stateTextSize.x);
+		const float gap = 10.0f;
+		const float padX = 28.0f;
+		const float padY = 18.0f;
+		const float contentHeight = labelTextSize.y + gap + timeTextSize.y + gap + stateTextSize.y;
+		const float boxWidth = contentWidth + padX * 2.0f;
+		const float boxHeight = contentHeight + padY * 2.0f;
+		const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - boxWidth) * 0.5f, vp->Pos.y + 52.0f);
+		const ImVec2 boxMax(boxMin.x + boxWidth, boxMin.y + boxHeight);
+
+		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 190), 10.0f);
+		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 180), 10.0f);
+		float y = boxMin.y + padY;
+		dl->AddText(font, labelSize, ImVec2(boxMin.x + (boxWidth - labelTextSize.x) * 0.5f, y), IM_COL32(230, 230, 230, 255), timerLabel);
+		y += labelTextSize.y + gap;
+		dl->AddText(font, timeSize, ImVec2(boxMin.x + (boxWidth - timeTextSize.x) * 0.5f, y), IM_COL32(255, 240, 120, 255), timeText);
+		y += timeTextSize.y + gap;
+		dl->AddText(font, stateSize, ImVec2(boxMin.x + (boxWidth - stateTextSize.x) * 0.5f, y), IM_COL32(210, 210, 210, 255), timerState);
 	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
 		tran.gameplayDebug.titleOptionOpen == 0)

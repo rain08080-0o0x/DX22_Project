@@ -13,8 +13,10 @@
 #include "Collision.h"
 #include "Texture.h"
 #include "Sound.h"
+#include "imgui.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace
 {
@@ -440,8 +442,10 @@ SceneGame::SceneGame()
     , m_enemies()
     , m_markerEffects()
     , m_enemyProjectiles()
+    , m_boss()
     , m_pShadow(nullptr)
     , m_pAttackMarker(nullptr)
+    , m_pBossAttackRangeMarker(nullptr)
     , m_pAttackSe(nullptr)
     , m_pPlayerHitSe(nullptr)
     , m_pEnemyAttackSe(nullptr)
@@ -496,6 +500,7 @@ SceneGame::SceneGame()
     , m_pauseMenuSelection(kPauseMenuContinue)
     , m_isPauseOptionOpen(false)
     , m_pauseOptionSelection(kPauseOptionMaster)
+    , m_isBossBattleDebug(false)
 {
     m_pCameraGame = new CameraDebug();
     m_pCameraDebug = new CameraDebug();
@@ -525,6 +530,11 @@ SceneGame::SceneGame()
     tran.gameplayDebug.titleOptionOpen = 0;
     tran.gameplayDebug.titleOptionSelection = 0;
     tran.gameplayDebug.titleOptionRequestClose = 0;
+    m_isBossBattleDebug = (tran.gameplayDebug.requestBossBattle != 0);
+    tran.gameplayDebug.requestBossBattle = 0;
+    tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
+    tran.gameplayDebug.showBossResultTimer = 0;
+    tran.gameplayDebug.runTimerRunning = 1;
 
     m_pPlayer = new Player(m_pCamera);
     {
@@ -606,6 +616,11 @@ SceneGame::SceneGame()
     m_currentWave = 1;
     m_waveMax = waveMax;
     m_requestedEnemyCount = CalcWaveEnemyCount(effectiveBaseEnemyCount, m_currentWave, effectiveWaveEnemyAdd);
+    if (m_isBossBattleDebug)
+    {
+        m_currentWave = m_waveMax;
+        m_requestedEnemyCount = 0;
+    }
 
     tran.gameplay.enemyCount = baseEnemyCount;
     tran.gameplay.waveMax = m_waveMax;
@@ -627,6 +642,7 @@ SceneGame::SceneGame()
     tran.gameplayDebug.upgradeOffer1 = tran.roguelike.offers[1];
     tran.gameplayDebug.upgradeOffer2 = tran.roguelike.offers[2];
     EnsureEnemyCount(m_requestedEnemyCount, tran.player.stageSize);
+    InitializeBossForScene();
 
     m_pShadow = new Texture();
     if (FAILED(m_pShadow->Create("Assets/Texture/Shadow.png")))
@@ -639,6 +655,13 @@ SceneGame::SceneGame()
     {
         MessageBox(NULL, "Texture load failed.\nStar.png", "Error", MB_OK);
     }
+    m_pBossAttackRangeMarker = new Texture();
+    if (FAILED(m_pBossAttackRangeMarker->Create("Assets/Texture/Game/AttackRange.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nGame/AttackRange.png", "Error", MB_OK);
+    }
+
+    LoadBossResources();
 
     m_pAttackSe = LoadSound("Assets/Sound/SE/attack.mp3", false);
     m_pPlayerHitSe = LoadSound("Assets/Sound/SE/player_hit.mp3", false);
@@ -766,6 +789,12 @@ SceneGame::~SceneGame()
         delete m_pAttackMarker;
         m_pAttackMarker = nullptr;
     }
+    if (m_pBossAttackRangeMarker)
+    {
+        delete m_pBossAttackRangeMarker;
+        m_pBossAttackRangeMarker = nullptr;
+    }
+    ReleaseBossResources();
     if (m_pEnemyHpGauge)
     {
         delete m_pEnemyHpGauge;
@@ -1056,6 +1085,11 @@ void SceneGame::Update()
                     tran.gameplayDebug.pauseOptionOpen = 0;
                     tran.gameplayDebug.pauseOptionSelection = kPauseOptionMaster;
                     tran.gameplayDebug.pauseOptionRequestClose = 0;
+                    tran.gameplayDebug.runTimerRunning = 0;
+                    tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+                    tran.gameplayDebug.requestBossBattle = 0;
+                    tran.gameplayDebug.bossBattleActive = 0;
+                    tran.gameplayDebug.showBossResultTimer = 0;
                     tran.ResetRoguelikeUpgrade();
                     SceneManager::ChangeResult(SceneManager::ResultType::None);
                     SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
@@ -1084,6 +1118,7 @@ void SceneGame::Update()
     tran.gameplayDebug.pauseOptionOpen = 0;
     tran.gameplayDebug.pauseOptionSelection = kPauseOptionMaster;
     tran.gameplayDebug.pauseOptionRequestClose = 0;
+    tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
     int baseEnemyCount = tran.gameplay.enemyCount;
     if (baseEnemyCount < kEnemyCountMin) baseEnemyCount = kEnemyCountMin;
     if (baseEnemyCount > kEnemyCountMax) baseEnemyCount = kEnemyCountMax;
@@ -1233,10 +1268,15 @@ void SceneGame::Update()
         stageSize = tran.player.stageSize;
     }
 
-    if (waveEnemyTarget != m_requestedEnemyCount)
+    if (!m_isBossBattleDebug && waveEnemyTarget != m_requestedEnemyCount)
     {
         m_requestedEnemyCount = waveEnemyTarget;
         EnsureEnemyCount(m_requestedEnemyCount, stageSize);
+    }
+    else if (m_isBossBattleDebug && m_requestedEnemyCount != 0)
+    {
+        m_requestedEnemyCount = 0;
+        EnsureEnemyCount(0, stageSize);
     }
 
     const int nextMode = NormalizeCameraMode(tran.cameraMode);
@@ -1334,6 +1374,20 @@ void SceneGame::Update()
         UpdateHpGauge();
         UpdateCooldownGauges();
         m_uiManager.Update(UIObjectManager::Layer::Game);
+        return;
+    }
+
+    if (tran.gameplayDebug.runTimerRunning != 0)
+    {
+        tran.gameplayDebug.runElapsedSec += kFixedDt;
+        if (tran.gameplayDebug.runElapsedSec < 0.0f)
+        {
+            tran.gameplayDebug.runElapsedSec = 0.0f;
+        }
+    }
+
+    if (UpdateBossDebugSetup(stageSize))
+    {
         return;
     }
 
@@ -1458,6 +1512,10 @@ void SceneGame::Update()
         tran.gameplayDebug.maxWave = m_waveMax;
         tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
         tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+        tran.gameplayDebug.runTimerRunning = 0;
+        tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+        tran.gameplayDebug.bossBattleActive = 0;
+        tran.gameplayDebug.showBossResultTimer = 0;
         SceneManager::ChangeResult(SceneManager::ResultType::Lose);
         SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
     };
@@ -1543,6 +1601,11 @@ void SceneGame::Update()
             std::remove_if(m_enemyProjectiles.begin(), m_enemyProjectiles.end(),
                            [](const EnemyProjectile& shot) { return shot.life <= 0.0f; }),
             m_enemyProjectiles.end());
+    }
+
+    if (UpdateBossBattle(stageSize, playerAttackDamage, applyPlayerDamage))
+    {
+        return;
     }
 
     const int enemyTotal = static_cast<int>(m_enemies.size());
@@ -2050,7 +2113,7 @@ void SceneGame::Update()
             std::remove_if(m_enemies.begin(), m_enemies.end(), [](const EnemySlot& slot) { return slot.enemy == nullptr; }),
             m_enemies.end());
 
-        if (m_enemies.empty())
+        if (!m_isBossBattleDebug && m_enemies.empty())
         {
             m_enemyProjectiles.clear();
             if (m_currentWave < m_waveMax)
@@ -2069,6 +2132,10 @@ void SceneGame::Update()
                 tran.gameplayDebug.maxWave = m_waveMax;
                 tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
                 tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+                tran.gameplayDebug.runTimerRunning = 0;
+                tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+                tran.gameplayDebug.bossBattleActive = 0;
+                tran.gameplayDebug.showBossResultTimer = 0;
                 tran.BeginUpgradeSelection();
                 SceneManager::ChangeResult(SceneManager::ResultType::Win);
                 SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
@@ -2122,6 +2189,7 @@ void SceneGame::Update()
     tran.gameplayDebug.maxWave = m_waveMax;
     tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
     tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+    tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
 
     UpdateHpGauge();
     UpdateCooldownGauges();
@@ -2174,15 +2242,7 @@ void SceneGame::Draw()
                 kEnemyProjectileColor);
         }
     }
-
-    struct DrawEntry
-    {
-        float distSq;
-        bool isPlayer;
-        DirectX::XMFLOAT3 pos;
-        DirectX::XMFLOAT3 size;
-        Enemy* enemy;
-    };
+    DrawBossTelegraphMarker();
 
     static std::vector<DrawEntry> drawEntries;
     drawEntries.clear();
@@ -2204,8 +2264,9 @@ void SceneGame::Draw()
         const float dx = playerPos.x - cam.x;
         const float dy = playerPos.y - cam.y;
         const float dz = playerPos.z - cam.z;
-        drawEntries.push_back({ dx * dx + dy * dy + dz * dz, true, playerPos, tran.player.size, nullptr });
+        drawEntries.push_back({ dx * dx + dy * dy + dz * dz, true, false, playerPos, tran.player.size, nullptr });
     }
+    AddBossDrawEntry(drawEntries, cam);
 
     for (auto& slot : m_enemies)
     {
@@ -2216,7 +2277,7 @@ void SceneGame::Draw()
         const float dx = enemyPos.x - cam.x;
         const float dy = enemyPos.y - cam.y;
         const float dz = enemyPos.z - cam.z;
-        drawEntries.push_back({ dx * dx + dy * dy + dz * dz, false, enemyPos, enemySize, slot.enemy });
+        drawEntries.push_back({ dx * dx + dy * dy + dz * dz, false, false, enemyPos, enemySize, slot.enemy });
     }
 
     std::sort(drawEntries.begin(), drawEntries.end(), [](const DrawEntry& a, const DrawEntry& b)
@@ -2231,10 +2292,18 @@ void SceneGame::Draw()
         {
             if (m_pPlayer) m_pPlayer->Draw();
         }
+        else if (entry.isBoss)
+        {
+            DrawBossEntry(entry);
+        }
         else if (entry.enemy)
         {
             entry.enemy->Draw();
         }
+    }
+    if (m_pPlayer)
+    {
+        m_pPlayer->DrawDirectionMarker();
     }
 
     if (m_pAttackMarker)
@@ -2400,6 +2469,7 @@ void SceneGame::Draw()
     }
 
     m_uiManager.Draw(UIObjectManager::Layer::Game);
+    DrawBossHpUi();
 }
 
 void SceneGame::UpdateHpGauge()

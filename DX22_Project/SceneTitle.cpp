@@ -190,6 +190,12 @@ void SceneTitle::Update()
         {
             TRAN_INS;
             tran.ResetRoguelikeUpgrade();
+            tran.gameplayDebug.requestBossBattle = 0;
+            tran.gameplayDebug.bossBattleActive = 0;
+            tran.gameplayDebug.showBossResultTimer = 0;
+            tran.gameplayDebug.runElapsedSec = 0.0f;
+            tran.gameplayDebug.runRecordedSec = 0.0f;
+            tran.gameplayDebug.runTimerRunning = 0;
             SceneManager::ChangeScene(SceneManager::SCENE_GAME);
             return;
         }
