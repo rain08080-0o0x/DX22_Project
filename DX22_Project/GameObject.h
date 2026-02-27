@@ -11,9 +11,12 @@ protected:
 public:
 	//--- Šî–{ˆ— 
 	GameObject();
-	virtual ~GameObject() = 0;
-	virtual void Update() = 0;
-	virtual void Draw() = 0;
+	virtual ~GameObject() {}
+
+	virtual void Init() {}
+	virtual void Uninit() {}
+	virtual void Update() {}
+	virtual void Draw() {}
 
 	//--- À•W‘€ì 
 	DirectX::XMFLOAT3 GetPos();

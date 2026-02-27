@@ -1,16 +1,51 @@
 
 #pragma once
-;
+
+#include <array>
+#include <list>
+#include <vector>
+#include "GameObject.h"
+
 class Scene
 {
+protected:
+	std::array<std::list<GameObject*>, 5> m_GameObject;
 public:
 	void RootUpdate();
 	void RootDraw();
 
 	Scene();
 	virtual ~Scene();
-	virtual void Update() = 0;
-	virtual void Draw() = 0;
+	virtual void Init(){}
+	virtual void Uninit(){}
+	virtual void Update(){}
+	virtual void Draw() {}
+
+	void InitBase()
+	{
+		Init();
+	}
+
+	void UninitBase()
+	{
+		for (auto& objectList : m_GameObject)
+		{
+			for (GameObject* object : objectList)
+			{
+				object->Uninit();
+				delete object;
+			}
+			objectList.clear();
+		}
+
+		Uninit();
+
+	}
+
+	void UpdateBase()
+	{
+
+	}
 
 
 //protected:
