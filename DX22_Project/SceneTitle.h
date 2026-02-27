@@ -15,5 +15,9 @@ public:
 private:
     UIObject* m_pLogo;
     UIObject* m_pStart;
+    UIObject* m_pOption;
     UIObject* m_pHint;
+    int m_menuSelection;
+    bool m_isOptionOpen;
+    int m_optionSelection;
 };

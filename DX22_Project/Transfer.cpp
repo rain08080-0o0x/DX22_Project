@@ -231,6 +231,7 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 	if (offerIndex < 0 || offerIndex >= RoguelikeUpgrade::kOfferCount) return false;
 
 	const int selectedType = roguelike.offers[offerIndex];
+	if (selectedType < 0 || selectedType >= RoguelikeUpgrade::UpgradeTypeCount) return false;
 	ApplyUpgradeType(roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel, selectedType);
 	++roguelike.stageClearCount;
 	roguelike.lastUpgradeType = selectedType;

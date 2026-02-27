@@ -5,15 +5,15 @@
 #include "Scene3DEditor.h"
 
 Scene* SceneManager::m_pScene = nullptr;
-SceneManager::SceneType SceneManager::m_current = SceneManager::SCENE_GAME;
-SceneManager::SceneType SceneManager::m_next = SceneManager::SCENE_GAME;
+SceneManager::SceneType SceneManager::m_current = SceneManager::SCENE_TITLE;
+SceneManager::SceneType SceneManager::m_next = SceneManager::SCENE_TITLE;
 SceneManager::ResultType SceneManager::m_result = SceneManager::None;
 bool SceneManager::m_isChanging = false;
 
 void SceneManager::Init()
 {
-    m_current = SCENE_GAME;
-    m_next = SCENE_GAME;
+    m_current = SCENE_TITLE;
+    m_next = SCENE_TITLE;
     m_isChanging = false;
     m_result = None;
     CreateScene(m_current);

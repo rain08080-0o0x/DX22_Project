@@ -414,6 +414,21 @@ void Draw()
 				}
 				EndTabItem();
 			}
+			if (BeginTabItem(u8"UI"))
+			{
+				ImGui::SeparatorText(u8"ポーズメニューUI");
+				ImGui::TextDisabled(u8"Escで開くゲーム内メニューの表示倍率");
+				DragFloat(u8"UI全体サイズ", &tran.gameplayDebug.pauseMenuUiScale, 0.01f, 0.5f, 2.5f);
+				DragFloat(u8"メニュー文字サイズ", &tran.gameplayDebug.pauseMenuFontScale, 0.01f, 0.5f, 2.5f);
+				DragFloat(u8"ボタンサイズ", &tran.gameplayDebug.pauseMenuButtonScale, 0.01f, 0.5f, 2.5f);
+				if (Button(u8"UI設定を初期値に戻す"))
+				{
+					tran.gameplayDebug.pauseMenuUiScale = 1.0f;
+					tran.gameplayDebug.pauseMenuFontScale = 1.0f;
+					tran.gameplayDebug.pauseMenuButtonScale = 1.0f;
+				}
+				EndTabItem();
+			}
 			if (BeginTabItem(u8"モデル編集"))
 			{
 				ImGui::SeparatorText(u8"腕");
@@ -634,15 +649,6 @@ void Draw()
 				Text(sceneTxt.c_str());
 				if (Button(u8"適用"))
 					SceneManager::ChangeScene(changeScene);
-
-				EndTabItem();
-			}
-			if (BeginTabItem(u8"UI"))
-			{
-				tran.diceui.role.pos;
-				DragFloat2(u8"ロール 位置", reinterpret_cast<float*>(&tran.diceui.role.pos));
-				DragFloat2(u8"ロール サイズ", reinterpret_cast<float*>(&tran.diceui.role.size));
-				ColorEdit4(u8"ロール 色", reinterpret_cast<float*>(&tran.diceui.role.color));
 
 				EndTabItem();
 			}
@@ -876,6 +882,121 @@ void Draw()
 		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 6.0f);
 		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), gameplayHud);
 	}
+	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_GAME &&
+		tran.gameplayDebug.pauseMenuOpen != 0)
+	{
+		const float uiScale = (tran.gameplayDebug.pauseMenuUiScale < 0.5f) ? 0.5f
+			: (tran.gameplayDebug.pauseMenuUiScale > 2.5f ? 2.5f : tran.gameplayDebug.pauseMenuUiScale);
+		const float fontScale = (tran.gameplayDebug.pauseMenuFontScale < 0.5f) ? 0.5f
+			: (tran.gameplayDebug.pauseMenuFontScale > 2.5f ? 2.5f : tran.gameplayDebug.pauseMenuFontScale);
+		const float buttonScale = (tran.gameplayDebug.pauseMenuButtonScale < 0.5f) ? 0.5f
+			: (tran.gameplayDebug.pauseMenuButtonScale > 2.5f ? 2.5f : tran.gameplayDebug.pauseMenuButtonScale);
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		const bool pauseOptionOpen = (tran.gameplayDebug.pauseOptionOpen != 0);
+		const ImVec2 windowSize = pauseOptionOpen
+			? ImVec2(560.0f * uiScale, 440.0f * uiScale)
+			: ImVec2(500.0f * uiScale, 390.0f * uiScale);
+		const ImVec2 windowPos(vp->Pos.x + (vp->Size.x - windowSize.x) * 0.5f,
+							   vp->Pos.y + (vp->Size.y - windowSize.y) * 0.5f);
+		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
+		ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * uiScale, 16.0f * uiScale));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * uiScale, 12.0f * uiScale));
+		ImGui::Begin("##pause_menu_overlay", nullptr,
+					 ImGuiWindowFlags_NoTitleBar |
+					 ImGuiWindowFlags_NoCollapse |
+					 ImGuiWindowFlags_NoResize |
+					 ImGuiWindowFlags_NoMove |
+					 ImGuiWindowFlags_NoDocking);
+		ImGui::SetWindowFontScale(fontScale);
+		if (pauseOptionOpen)
+		{
+			const int selected = tran.gameplayDebug.pauseOptionSelection;
+			const bool isFullscreen = IsAppFullscreen();
+			ImGui::TextUnformatted(u8"ポーズ - Option");
+			const float closeButtonWidth = 88.0f * uiScale;
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - closeButtonWidth);
+			if (ImGui::Button("Close##pause_option_close", ImVec2(closeButtonWidth, 0.0f)))
+			{
+				tran.gameplayDebug.pauseOptionRequestClose = 1;
+			}
+			ImGui::Separator();
+			const char* selectedLabel = u8"Master";
+			switch (selected)
+			{
+			case 1: selectedLabel = u8"BGM"; break;
+			case 2: selectedLabel = u8"SE"; break;
+			case 3: selectedLabel = u8"表示"; break;
+			case 4: selectedLabel = u8"戻る"; break;
+			default: break;
+			}
+			ImGui::Text(u8"選択中: %s", selectedLabel);
+
+			float master = tran.gameplay.volumeMaster;
+			if (ImGui::SliderFloat(u8"Master", &master, 0.0f, 2.0f, "%.2f"))
+			{
+				tran.gameplay.volumeMaster = master;
+			}
+			float bgm = tran.gameplay.volumeBgm;
+			if (ImGui::SliderFloat(u8"BGM", &bgm, 0.0f, 2.0f, "%.2f"))
+			{
+				tran.gameplay.volumeBgm = bgm;
+			}
+			float se = tran.gameplay.volumeSe;
+			if (ImGui::SliderFloat(u8"SE", &se, 0.0f, 2.0f, "%.2f"))
+			{
+				tran.gameplay.volumeSe = se;
+			}
+
+			bool fullscreenChecked = isFullscreen;
+			bool windowChecked = !isFullscreen;
+			if (ImGui::Checkbox(u8"Fullscreen", &fullscreenChecked))
+			{
+				SetAppFullscreen(fullscreenChecked);
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox(u8"Window", &windowChecked))
+			{
+				SetAppFullscreen(!windowChecked);
+			}
+			ImGui::Separator();
+			ImGui::TextUnformatted(u8"移動: W/S  or  ↑/↓");
+			ImGui::TextUnformatted(u8"変更: A/D  or  ←/→");
+			ImGui::TextUnformatted(u8"決定: Enter / F / Space");
+			ImGui::TextUnformatted(u8"戻る: Esc");
+		}
+		else
+		{
+			const int selected = tran.gameplayDebug.pauseMenuSelection;
+			ImGui::TextUnformatted(u8"ポーズ");
+			ImGui::Separator();
+			ImGui::TextUnformatted(u8"選択: A/D W/S ←→↑↓");
+			ImGui::TextUnformatted(u8"決定: Enter / F / Space");
+			const ImVec2 buttonSize(280.0f * uiScale * buttonScale, 62.0f * uiScale * buttonScale);
+			const auto drawMenuButton = [&](int index, const char* label, int request)
+			{
+				if (selected == index)
+				{
+					ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 120, 210, 230));
+				}
+				if (ImGui::Button(label, buttonSize))
+				{
+					tran.gameplayDebug.pauseMenuRequest = request;
+				}
+				if (selected == index)
+				{
+					ImGui::PopStyleColor();
+				}
+			};
+			drawMenuButton(0, u8"続行", 1);
+			drawMenuButton(1, u8"Option", 3);
+			drawMenuButton(2, u8"Titleに戻る", 2);
+		}
+		ImGui::SetWindowFontScale(1.0f);
+		ImGui::End();
+		ImGui::PopStyleVar(2);
+	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
 		SceneManager::GetResultType() == SceneManager::ResultType::Win &&
 		tran.roguelike.selectionPending != 0)
@@ -892,7 +1013,7 @@ void Draw()
 		{
 			sprintf_s(
 				upgradeHud,
-				u8"ステージクリア報酬\n\nここには何もないようだ\n\n[1] [2] [3] で先へ進む");
+				u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ");
 		}
 		else
 		{
@@ -921,6 +1042,130 @@ void Draw()
 		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 210), 8.0f);
 		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 160), 8.0f);
 		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), upgradeHud);
+	}
+	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
+		!(SceneManager::GetResultType() == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0))
+	{
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+		const char* resultGuide =
+			u8"リザルト選択\n"
+			u8"左: Restart (ゲームへ) / 右: Title (タイトルへ)\n"
+			u8"移動: A D / W S / ← → / ↑ ↓\n"
+			u8"決定: Enter / F / Space";
+
+		const ImVec2 pad(10.0f, 8.0f);
+		const ImVec2 textSize = ImGui::CalcTextSize(resultGuide);
+		const ImVec2 boxMin(vp->Pos.x + vp->Size.x - textSize.x - pad.x * 2.0f - 16.0f,
+							vp->Pos.y + vp->Size.y - textSize.y - pad.y * 2.0f - 16.0f);
+		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+
+		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 8.0f);
+		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 8.0f);
+		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), resultGuide);
+	}
+	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
+		tran.gameplayDebug.titleOptionOpen == 0)
+	{
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+		const char* titleGuide =
+			u8"タイトル選択\n"
+			u8"Start / Option / Exit\n"
+			u8"移動: W S A D / ↑ ↓ ← →\n"
+			u8"決定: Enter / F / Space\n"
+			u8"Esc: 終了";
+
+		const ImVec2 pad(10.0f, 8.0f);
+		const ImVec2 textSize = ImGui::CalcTextSize(titleGuide);
+		const ImVec2 boxMin(vp->Pos.x + vp->Size.x - textSize.x - pad.x * 2.0f - 16.0f,
+							vp->Pos.y + vp->Size.y - textSize.y - pad.y * 2.0f - 16.0f);
+		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+
+		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 8.0f);
+		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 8.0f);
+		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), titleGuide);
+	}
+	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
+		tran.gameplayDebug.titleOptionOpen != 0)
+	{
+		const float uiScale = (tran.gameplayDebug.pauseMenuUiScale < 0.5f) ? 0.5f
+			: (tran.gameplayDebug.pauseMenuUiScale > 2.5f ? 2.5f : tran.gameplayDebug.pauseMenuUiScale);
+		const float fontScale = (tran.gameplayDebug.pauseMenuFontScale < 0.5f) ? 0.5f
+			: (tran.gameplayDebug.pauseMenuFontScale > 2.5f ? 2.5f : tran.gameplayDebug.pauseMenuFontScale);
+		const int selected = tran.gameplayDebug.titleOptionSelection;
+		const bool isFullscreen = IsAppFullscreen();
+
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		const ImVec2 windowSize(560.0f * uiScale, 440.0f * uiScale);
+		const ImVec2 windowPos(vp->Pos.x + (vp->Size.x - windowSize.x) * 0.5f,
+							   vp->Pos.y + (vp->Size.y - windowSize.y) * 0.5f);
+		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
+		ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * uiScale, 16.0f * uiScale));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * uiScale, 12.0f * uiScale));
+		ImGui::Begin("##title_option_overlay", nullptr,
+					 ImGuiWindowFlags_NoTitleBar |
+					 ImGuiWindowFlags_NoCollapse |
+					 ImGuiWindowFlags_NoResize |
+					 ImGuiWindowFlags_NoMove |
+					 ImGuiWindowFlags_NoDocking);
+		ImGui::SetWindowFontScale(fontScale);
+		ImGui::TextUnformatted(u8"Title - Option");
+		const float closeButtonWidth = 88.0f * uiScale;
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - closeButtonWidth);
+		if (ImGui::Button("Close##title_option_close", ImVec2(closeButtonWidth, 0.0f)))
+		{
+			tran.gameplayDebug.titleOptionRequestClose = 1;
+		}
+		ImGui::Separator();
+		const char* selectedLabel = u8"Master";
+		switch (selected)
+		{
+		case 1: selectedLabel = u8"BGM"; break;
+		case 2: selectedLabel = u8"SE"; break;
+		case 3: selectedLabel = u8"表示"; break;
+		case 4: selectedLabel = u8"戻る"; break;
+		default: break;
+		}
+		ImGui::Text(u8"選択中: %s", selectedLabel);
+
+		float master = tran.gameplay.volumeMaster;
+		if (ImGui::SliderFloat(u8"Master", &master, 0.0f, 2.0f, "%.2f"))
+		{
+			tran.gameplay.volumeMaster = master;
+		}
+		float bgm = tran.gameplay.volumeBgm;
+		if (ImGui::SliderFloat(u8"BGM", &bgm, 0.0f, 2.0f, "%.2f"))
+		{
+			tran.gameplay.volumeBgm = bgm;
+		}
+		float se = tran.gameplay.volumeSe;
+		if (ImGui::SliderFloat(u8"SE", &se, 0.0f, 2.0f, "%.2f"))
+		{
+			tran.gameplay.volumeSe = se;
+		}
+
+		bool fullscreenChecked = isFullscreen;
+		bool windowChecked = !isFullscreen;
+		if (ImGui::Checkbox(u8"Fullscreen", &fullscreenChecked))
+		{
+			SetAppFullscreen(fullscreenChecked);
+		}
+		ImGui::SameLine();
+		if (ImGui::Checkbox(u8"Window", &windowChecked))
+		{
+			SetAppFullscreen(!windowChecked);
+		}
+		ImGui::Separator();
+		ImGui::TextUnformatted(u8"移動: W/S  or  ↑/↓");
+		ImGui::TextUnformatted(u8"変更: A/D  or  ←/→");
+		ImGui::TextUnformatted(u8"決定: Enter / F / Space");
+		ImGui::TextUnformatted(u8"戻る: Esc");
+		ImGui::SetWindowFontScale(1.0f);
+		ImGui::End();
+		ImGui::PopStyleVar(2);
 	}
 
 	// DrawList overlay（画面上に線や矩形などを描く）

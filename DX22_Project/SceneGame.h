@@ -131,6 +131,10 @@ private:
     DirectX::XMFLOAT3 m_lastMoveDir;
     DirectX::XMFLOAT3 m_attackCenter;
     DirectX::XMFLOAT3 m_attackSize;
+    bool m_isPaused;
+    int m_pauseMenuSelection;
+    bool m_isPauseOptionOpen;
+    int m_pauseOptionSelection;
 };
 
 #endif // __SCENE_GAME_H__

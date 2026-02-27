@@ -209,6 +209,18 @@ private:
 		int upgradeOffer0 = -1;
 		int upgradeOffer1 = -1;
 		int upgradeOffer2 = -1;
+		int pauseMenuOpen = 0;
+		int pauseMenuSelection = 0; // 0: Continue, 1: Option, 2: Title
+		int pauseMenuRequest = 0;   // 0: None, 1: Continue, 2: Title, 3: Option
+		int pauseOptionOpen = 0;
+		int pauseOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:Back
+		int pauseOptionRequestClose = 0;
+		int titleOptionOpen = 0;
+		int titleOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:Back
+		int titleOptionRequestClose = 0;
+		float pauseMenuUiScale = 1.0f;
+		float pauseMenuFontScale = 1.0f;
+		float pauseMenuButtonScale = 1.0f;
 	};
 	struct RoguelikeUpgrade
 	{

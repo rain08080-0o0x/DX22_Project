@@ -19,6 +19,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 namespace
 {
 	bool g_isFullscreen = false;
+	HWND g_mainWindow = nullptr;
 	WINDOWPLACEMENT g_windowPlacement = { sizeof(WINDOWPLACEMENT) };
 	DWORD g_windowStyle = 0;
 	DWORD g_windowExStyle = 0;
@@ -67,6 +68,21 @@ namespace
 	}
 }
 
+void SetAppFullscreen(bool fullscreen)
+{
+	SetWindowFullscreen(g_mainWindow, fullscreen);
+}
+
+void ToggleAppFullscreen()
+{
+	SetWindowFullscreen(g_mainWindow, !g_isFullscreen);
+}
+
+bool IsAppFullscreen()
+{
+	return g_isFullscreen;
+}
+
 
 // エントリポイント
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -110,6 +126,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		HWND_DESKTOP,
 		NULL, hInstance, NULL
 	);
+	g_mainWindow = hWnd;
 
 	// ウィンドウの表示
 	ShowWindow(hWnd, nCmdShow);

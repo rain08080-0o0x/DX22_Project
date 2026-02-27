@@ -808,3 +808,71 @@ DX22_Project にて、敵・攻撃・当たり判定可視化・影・敵HP表�
   - DX22_Project\Transfer.h
   - DX22_Project\Transfer.cpp
   - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-02-27 / タイトル・リザルト・ポーズUI改修）
+
+## 実施内容
+- タイトル導線を再構成。
+  - 起動直後にタイトルへ入り、`Start / Option / Exit` を選択できる構成に変更。
+  - `Option.png` を `Start` と `Exit` の間に配置。
+  - タイトル選択は `WASD/十字キー` で移動、`Enter / F / Space` で決定に統一。
+  - 選択中の項目は拡大表示して視認性を向上。
+  - タイトルで `Esc` を押すとアプリ終了。
+- リザルト導線を改修。
+  - リザルトで `Restart`（ゲームへ）/`Title`（タイトルへ）を選択可能に変更。
+  - 操作はタイトル同様に `WASD/十字キー` + `Enter / F / Space` へ統一。
+  - 選択中テクスチャを拡大表示。
+  - 操作ガイドUIを右下に表示。
+- 強化状態の遷移ルールを整理。
+  - 強化候補が無い場合は「なにもない」を表示後にリザルトへ遷移。
+  - `Title -> Game` / `Result -> Game` / `Pause -> Title` へ進む際に強化状態をリセット。
+- ポーズメニューを追加。
+  - ゲーム中 `Esc` でポーズメニュー表示、ポーズ中はゲーム更新を停止。
+  - `続行 / Option / Titleに戻る` を選択できるUIを追加。
+  - ポーズ中Optionの操作も `WASD/十字キー` + `Enter / F / Space` に対応。
+- Option機能を Title / Pause の両方に追加。
+  - `Master / BGM / SE` をスライダーで調整可能化。
+  - `Fullscreen / Window` を相互排他チェックボックスで切替可能化。
+  - OptionWindow右上に `Close` ボタンを追加し、クリックで閉じる仕様に変更。
+- 音量反映の不具合を修正。
+  - ポーズ中Optionで変更した音量が即時反映されるよう、`SceneGame::Update()` 先頭でBGM音量適用処理を実行するよう変更。
+
+## 動作確認
+- `build_debug_x64.ps1` 実行。
+- `Debug|x64` ビルド成功（警告0 / エラー0）。
+
+## 追加/更新ファイル
+- 更新
+  - DX22_Project\Main.cpp
+  - DX22_Project\Main.h
+  - DX22_Project\Startup.cpp
+  - DX22_Project\SceneTitle.h
+  - DX22_Project\SceneTitle.cpp
+  - DX22_Project\SceneResult.h
+  - DX22_Project\SceneResult.cpp
+  - DX22_Project\SceneGame.h
+  - DX22_Project\SceneGame.cpp
+  - DX22_Project\SceneManager.cpp
+  - DX22_Project\Transfer.h
+  - DX22_Project\Transfer.cpp
+  - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-02-27 / UI改修テスト反映）
+
+## 実施内容
+- 2026-02-27実装分（タイトル/リザルト/ポーズ/Option）の手動確認結果を固定チェックシートへ反映。
+  - 追加: `T18`〜`T25`
+  - 反映先: `TEST_CHECKLIST_2026-02-14.md`
+- ビルド確認記録を更新。
+  - `2026-02-27 Debug|x64` 成功（警告0 / エラー0）
+
+## 追加/更新ファイル
+- 更新
+  - TEST_CHECKLIST_2026-02-14.md
+  - WORK_REPORT_2026-02-02.md

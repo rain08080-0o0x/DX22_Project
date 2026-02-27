@@ -7,6 +7,7 @@
 #include "Input.h"
 #include "Defines.h"
 #include "Transfer.h"
+#include "Main.h"
 #include "SceneManager.h"
 #include "UIObject.h"
 #include "Collision.h"
@@ -67,10 +68,40 @@ namespace
 
     const int kCameraModeGame = 0;
     const int kCameraModeDebug = 1;
+    const int kPauseMenuContinue = 0;
+    const int kPauseMenuOption = 1;
+    const int kPauseMenuToTitle = 2;
+    const int kPauseOptionMaster = 0;
+    const int kPauseOptionBgm = 1;
+    const int kPauseOptionSe = 2;
+    const int kPauseOptionDisplay = 3;
+    const int kPauseOptionBack = 4;
+    const int kPauseOptionCount = 5;
+    const float kOptionVolumeStep = 0.05f;
 
     int NormalizeCameraMode(int mode)
     {
         return (mode == kCameraModeDebug) ? kCameraModeDebug : kCameraModeGame;
+    }
+
+    int WrapIndex(int value, int count)
+    {
+        if (count <= 0) return 0;
+        int wrapped = value % count;
+        if (wrapped < 0) wrapped += count;
+        return wrapped;
+    }
+
+    bool IsPauseConfirmTriggered()
+    {
+        return IsKeyTrigger(VK_RETURN) || IsKeyTrigger('F') || IsKeyTrigger(VK_SPACE);
+    }
+
+    float ClampVolume(float value)
+    {
+        if (value < 0.0f) return 0.0f;
+        if (value > 2.0f) return 2.0f;
+        return value;
     }
 
     DirectX::XMFLOAT3 CalcEnemySpawnPos(int index, float stageSize)
@@ -461,6 +492,10 @@ SceneGame::SceneGame()
     , m_lastMoveDir(0.0f, 0.0f, 1.0f)
     , m_attackCenter(0.0f, 0.0f, 0.0f)
     , m_attackSize(0.0f, 0.0f, 0.0f)
+    , m_isPaused(false)
+    , m_pauseMenuSelection(kPauseMenuContinue)
+    , m_isPauseOptionOpen(false)
+    , m_pauseOptionSelection(kPauseOptionMaster)
 {
     m_pCameraGame = new CameraDebug();
     m_pCameraDebug = new CameraDebug();
@@ -481,6 +516,15 @@ SceneGame::SceneGame()
         : static_cast<Camera*>(m_pCameraGame);
     tran.camera = (m_cameraMode == kCameraModeDebug) ? tran.cameraDebug : tran.cameraGame;
     SceneManager::ChangeResult(SceneManager::ResultType::None);
+    tran.gameplayDebug.pauseMenuOpen = 0;
+    tran.gameplayDebug.pauseMenuSelection = kPauseMenuContinue;
+    tran.gameplayDebug.pauseMenuRequest = 0;
+    tran.gameplayDebug.pauseOptionOpen = 0;
+    tran.gameplayDebug.pauseOptionSelection = kPauseOptionMaster;
+    tran.gameplayDebug.pauseOptionRequestClose = 0;
+    tran.gameplayDebug.titleOptionOpen = 0;
+    tran.gameplayDebug.titleOptionSelection = 0;
+    tran.gameplayDebug.titleOptionRequestClose = 0;
 
     m_pPlayer = new Player(m_pCamera);
     {
@@ -893,6 +937,153 @@ int SceneGame::CalcWaveEnemyCount(int baseCount, int waveIndex, int addPerWave) 
 void SceneGame::Update()
 {
     TRAN_INS;
+    tran.gameplayDebug.pauseMenuUiScale = ClampRange(tran.gameplayDebug.pauseMenuUiScale, 0.5f, 2.5f);
+    tran.gameplayDebug.pauseMenuFontScale = ClampRange(tran.gameplayDebug.pauseMenuFontScale, 0.5f, 2.5f);
+    tran.gameplayDebug.pauseMenuButtonScale = ClampRange(tran.gameplayDebug.pauseMenuButtonScale, 0.5f, 2.5f);
+    if (m_pGameBgmVoice)
+    {
+        const float masterVolume = ClampRange(tran.gameplay.volumeMaster, 0.0f, 2.0f);
+        const float bgmVolume = ClampRange(tran.gameplay.volumeBgm, 0.0f, 2.0f);
+        m_pGameBgmVoice->SetVolume(masterVolume * bgmVolume);
+    }
+    if (tran.gameplayDebug.pauseOptionRequestClose != 0)
+    {
+        tran.gameplayDebug.pauseOptionRequestClose = 0;
+        m_isPauseOptionOpen = false;
+    }
+
+    if (IsKeyTrigger(VK_ESCAPE))
+    {
+        if (!m_isPaused)
+        {
+            m_isPaused = true;
+            m_isPauseOptionOpen = false;
+            m_pauseMenuSelection = kPauseMenuContinue;
+        }
+        else if (m_isPauseOptionOpen)
+        {
+            m_isPauseOptionOpen = false;
+        }
+        else
+        {
+            m_isPaused = false;
+        }
+        tran.gameplayDebug.pauseMenuRequest = 0;
+    }
+
+    if (m_isPaused)
+    {
+        if (m_isPauseOptionOpen)
+        {
+            if (IsKeyTrigger(VK_UP) || IsKeyTrigger('W'))
+            {
+                m_pauseOptionSelection = WrapIndex(m_pauseOptionSelection - 1, kPauseOptionCount);
+            }
+            if (IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S'))
+            {
+                m_pauseOptionSelection = WrapIndex(m_pauseOptionSelection + 1, kPauseOptionCount);
+            }
+
+            const bool decrease = IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A');
+            const bool increase = IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D');
+            if (decrease || increase)
+            {
+                const float delta = decrease ? -kOptionVolumeStep : kOptionVolumeStep;
+                switch (m_pauseOptionSelection)
+                {
+                case kPauseOptionMaster:
+                    tran.gameplay.volumeMaster = ClampVolume(tran.gameplay.volumeMaster + delta);
+                    break;
+                case kPauseOptionBgm:
+                    tran.gameplay.volumeBgm = ClampVolume(tran.gameplay.volumeBgm + delta);
+                    break;
+                case kPauseOptionSe:
+                    tran.gameplay.volumeSe = ClampVolume(tran.gameplay.volumeSe + delta);
+                    break;
+                case kPauseOptionDisplay:
+                    SetAppFullscreen(increase);
+                    break;
+                default:
+                    break;
+                }
+            }
+
+            if (IsPauseConfirmTriggered())
+            {
+                if (m_pauseOptionSelection == kPauseOptionDisplay)
+                {
+                    ToggleAppFullscreen();
+                }
+                else if (m_pauseOptionSelection == kPauseOptionBack)
+                {
+                    m_isPauseOptionOpen = false;
+                }
+            }
+        }
+        else
+        {
+            if (IsKeyTrigger(VK_UP) || IsKeyTrigger('W') || IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A'))
+            {
+                m_pauseMenuSelection = WrapIndex(m_pauseMenuSelection - 1, 3);
+            }
+            if (IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S') || IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D'))
+            {
+                m_pauseMenuSelection = WrapIndex(m_pauseMenuSelection + 1, 3);
+            }
+
+            int actionRequest = tran.gameplayDebug.pauseMenuRequest;
+            if (actionRequest < 0 || actionRequest > 3) actionRequest = 0;
+            const bool confirmByKey = IsPauseConfirmTriggered();
+            if (confirmByKey || actionRequest != 0)
+            {
+                const int action = (actionRequest != 0)
+                    ? actionRequest
+                    : ((m_pauseMenuSelection == kPauseMenuContinue) ? 1
+                        : (m_pauseMenuSelection == kPauseMenuOption ? 3 : 2));
+                tran.gameplayDebug.pauseMenuRequest = 0;
+
+                if (action == 1)
+                {
+                    m_isPaused = false;
+                    m_isPauseOptionOpen = false;
+                }
+                else if (action == 2)
+                {
+                    m_isPaused = false;
+                    m_isPauseOptionOpen = false;
+                    tran.gameplayDebug.pauseMenuOpen = 0;
+                    tran.gameplayDebug.pauseMenuSelection = kPauseMenuContinue;
+                    tran.gameplayDebug.pauseOptionOpen = 0;
+                    tran.gameplayDebug.pauseOptionSelection = kPauseOptionMaster;
+                    tran.gameplayDebug.pauseOptionRequestClose = 0;
+                    tran.ResetRoguelikeUpgrade();
+                    SceneManager::ChangeResult(SceneManager::ResultType::None);
+                    SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
+                    return;
+                }
+                else if (action == 3)
+                {
+                    m_isPauseOptionOpen = true;
+                    m_pauseOptionSelection = kPauseOptionMaster;
+                    tran.gameplayDebug.pauseOptionRequestClose = 0;
+                }
+            }
+        }
+    }
+
+    tran.gameplayDebug.pauseMenuOpen = m_isPaused ? 1 : 0;
+    tran.gameplayDebug.pauseMenuSelection = m_pauseMenuSelection;
+    tran.gameplayDebug.pauseOptionOpen = m_isPauseOptionOpen ? 1 : 0;
+    tran.gameplayDebug.pauseOptionSelection = m_pauseOptionSelection;
+    if (m_isPaused)
+    {
+        return;
+    }
+
+    tran.gameplayDebug.pauseMenuRequest = 0;
+    tran.gameplayDebug.pauseOptionOpen = 0;
+    tran.gameplayDebug.pauseOptionSelection = kPauseOptionMaster;
+    tran.gameplayDebug.pauseOptionRequestClose = 0;
     int baseEnemyCount = tran.gameplay.enemyCount;
     if (baseEnemyCount < kEnemyCountMin) baseEnemyCount = kEnemyCountMin;
     if (baseEnemyCount > kEnemyCountMax) baseEnemyCount = kEnemyCountMax;
@@ -1020,13 +1211,6 @@ void SceneGame::Update()
     tran.gameplayDebug.upgradeOffer0 = tran.roguelike.offers[0];
     tran.gameplayDebug.upgradeOffer1 = tran.roguelike.offers[1];
     tran.gameplayDebug.upgradeOffer2 = tran.roguelike.offers[2];
-
-    if (m_pGameBgmVoice)
-    {
-        const float masterVolume = ClampRange(tran.gameplay.volumeMaster, 0.0f, 2.0f);
-        const float bgmVolume = ClampRange(tran.gameplay.volumeBgm, 0.0f, 2.0f);
-        m_pGameBgmVoice->SetVolume(masterVolume * bgmVolume);
-    }
 
     if (!m_isBossBgmActive && m_currentWave >= m_waveMax && m_pBossBgm)
     {
