@@ -237,6 +237,90 @@ void Draw()
 				ColorEdit4(u8"色", reinterpret_cast<float*>(&tran.player.color));
 				EndTabItem();
 			}
+			if (BeginTabItem(u8"敵・ボス"))
+			{
+				ImGui::TextDisabled(u8"※ 難易度プリセット適用時に敵の一部設定は上書きされる");
+
+				ImGui::SeparatorText(u8"敵の基本");
+				ImGui::TextDisabled(u8"初期値: 敵数3 / 予兆0.55 / CT1.00 / 射程最小0.80 / 射程倍率1.35 / ダメージ1.0");
+				DragInt(u8"敵数(基準)", &tran.gameplay.enemyCount, 1.0f, 0, 16);
+				DragFloat(u8"敵予兆時間", &tran.gameplay.enemyAttackWindup, 0.01f, 0.0f, 3.0f);
+				DragFloat(u8"敵攻撃CT", &tran.gameplay.enemyAttackCooldown, 0.01f, 0.0f, 3.0f);
+				DragFloat(u8"敵射程最小", &tran.gameplay.enemyAttackRangeMin, 0.01f, 0.1f, 5.0f);
+				DragFloat(u8"敵射程倍率", &tran.gameplay.enemyAttackRangeScale, 0.01f, 0.1f, 5.0f);
+				DragFloat(u8"敵ダメージ", &tran.gameplay.enemyAttackDamage, 0.1f, 0.0f, 20.0f);
+				DragFloat(u8"敵移動速度", &tran.gameplay.enemyMoveSpeed, 0.01f, 0.1f, 8.0f);
+				DragFloat(u8"Wave毎 速度加算", &tran.gameplay.waveEnemyMoveSpeedAdd, 0.01f, 0.0f, 2.0f);
+				DragFloat(u8"Wave毎 ダメ倍率加算", &tran.gameplay.waveEnemyAttackDamageScalePerWave, 0.01f, 0.0f, 3.0f);
+
+				ImGui::SeparatorText(u8"遠距離型の敵弾");
+				ImGui::TextDisabled(u8"初期値: 速度6.50 / 寿命1.40 / 半径0.22 / ダメ倍率0.85");
+				DragFloat(u8"敵弾速度", &tran.gameplay.enemyProjectileSpeed, 0.05f, 0.1f, 20.0f);
+				DragFloat(u8"敵弾寿命", &tran.gameplay.enemyProjectileLife, 0.01f, 0.05f, 5.0f);
+				DragFloat(u8"敵弾半径", &tran.gameplay.enemyProjectileRadius, 0.01f, 0.05f, 2.0f);
+				DragFloat(u8"敵弾ダメ倍率", &tran.gameplay.enemyProjectileDamageScale, 0.01f, 0.0f, 3.0f);
+
+				ImGui::SeparatorText(u8"敵の分離行動");
+				ImGui::TextDisabled(u8"初期値: 半径1.10 / 重み0.80 / 最大オフセット0.80");
+				DragFloat(u8"分離半径", &tran.gameplay.enemySeparationRadius, 0.01f, 0.0f, 5.0f);
+				DragFloat(u8"分離重み", &tran.gameplay.enemySeparationWeight, 0.01f, 0.0f, 3.0f);
+				DragFloat(u8"分離最大オフセット", &tran.gameplay.enemySeparationMaxOffset, 0.01f, 0.0f, 3.0f);
+
+				ImGui::SeparatorText(u8"敵スポーン");
+				ImGui::TextDisabled(u8"初期値: リング0.35 / ぶれ0.10 / 対プレイヤー最小1.50 / 対敵最小0.90");
+				DragFloat(u8"リング倍率", &tran.gameplay.enemySpawnRingScale, 0.01f, 0.1f, 0.9f);
+				DragFloat(u8"ジッタ倍率", &tran.gameplay.enemySpawnJitterScale, 0.01f, 0.0f, 0.5f);
+				DragFloat(u8"プレイヤー最小距離", &tran.gameplay.enemySpawnMinPlayerDist, 0.05f, 0.0f, 8.0f);
+				DragFloat(u8"敵同士最小距離", &tran.gameplay.enemySpawnMinEnemyDist, 0.05f, 0.0f, 4.0f);
+
+				ImGui::SeparatorText(u8"ボス共通");
+				ImGui::TextDisabled(u8"共通予兆倍率は各攻撃の予兆時間に乗算、予兆幅は細突進の幅かつ全攻撃の範囲倍率");
+				DragFloat(u8"ボスHPバー横幅(画面比)", &tran.gameplay.bossHpBarWidthRate, 0.005f, 0.20f, 0.90f);
+				DragFloat(u8"ボスHPバー縦幅(画面比)", &tran.gameplay.bossHpBarHeightRate, 0.002f, 0.01f, 0.20f);
+				DragFloat(u8"ボス面積倍率", &tran.gameplay.bossSizeAreaScale, 0.05f, 4.0f, 12.0f);
+				DragInt(u8"ボス最大HP", &tran.gameplay.bossMaxHp, 1.0f, 1, 9999);
+				DragFloat(u8"共通予兆倍率", &tran.gameplay.bossAttackTelegraph, 0.01f, 0.10f, 4.0f);
+				DragFloat(u8"画面外ジャンプ開始", &tran.gameplay.bossAttackJumpOutTime, 0.01f, 0.0f, 4.0f);
+				DragFloat(u8"ボス突進時間", &tran.gameplay.bossAttackDashDuration, 0.005f, 0.05f, 2.0f);
+				DragFloat(u8"ボス攻撃CT", &tran.gameplay.bossAttackCooldown, 0.01f, 0.0f, 6.0f);
+				DragFloat(u8"予兆幅(プレイヤー比)", &tran.gameplay.bossAttackLanePlayerScale, 0.05f, 0.5f, 8.0f);
+				DragFloat(u8"ボス攻撃ダメージ", &tran.gameplay.bossAttackDamage, 0.1f, 0.0f, 200.0f);
+
+				ImGui::SeparatorText(u8"ボス: 突進");
+				ImGui::TextDisabled(u8"初期値: 細予兆1.0 / 広予兆2.0 / 広幅0.50");
+				DragFloat(u8"細突進 予兆秒", &tran.gameplay.bossDashNarrowTelegraph, 0.01f, 0.10f, 8.0f);
+				DragFloat(u8"広突進 予兆秒", &tran.gameplay.bossDashWideTelegraph, 0.01f, 0.10f, 8.0f);
+				DragFloat(u8"広突進 幅(ステージ比)", &tran.gameplay.bossDashWideWidthRate, 0.01f, 0.10f, 1.00f);
+
+				ImGui::SeparatorText(u8"ボス: 落下・召喚");
+				ImGui::TextDisabled(u8"初期値: ランダム5発 / 半径1.6 / 召喚5〜10 / 追尾5回 / 半径3.0");
+				DragInt(u8"ランダム落下 回数", &tran.gameplay.bossRandomRainCount, 1.0f, 1, 16);
+				DragFloat(u8"ランダム落下 予兆秒", &tran.gameplay.bossRandomRainTelegraph, 0.01f, 0.10f, 8.0f);
+				DragFloat(u8"ランダム落下 半径倍率", &tran.gameplay.bossRandomRainRadiusScale, 0.05f, 0.25f, 8.0f);
+				DragInt(u8"従者召喚 最小数", &tran.gameplay.bossSummonMin, 1.0f, 1, 32);
+				DragInt(u8"従者召喚 最大数", &tran.gameplay.bossSummonMax, 1.0f, 1, 32);
+				DragFloat(u8"従者召喚 予兆秒", &tran.gameplay.bossSummonTelegraph, 0.01f, 0.10f, 8.0f);
+				DragInt(u8"追尾落下 回数", &tran.gameplay.bossTrackingDropCount, 1.0f, 1, 16);
+				DragFloat(u8"追尾落下 予兆秒", &tran.gameplay.bossTrackingDropTelegraph, 0.01f, 0.10f, 8.0f);
+				DragFloat(u8"追尾落下 半径倍率", &tran.gameplay.bossTrackingDropRadiusScale, 0.05f, 0.5f, 8.0f);
+
+				ImGui::SeparatorText(u8"ボス: 必殺技");
+				ImGui::TextDisabled(u8"初期値: 交差予兆1.0 / 交差幅1.0 / 踏みつけ5回 / 踏みつけ予兆3.0 / 全体予兆7.0 / 安置2.0");
+				DragFloat(u8"交差攻撃 予兆秒", &tran.gameplay.bossUltimateCrossTelegraph, 0.01f, 0.10f, 8.0f);
+				DragFloat(u8"交差攻撃 幅倍率", &tran.gameplay.bossUltimateCrossLaneScale, 0.05f, 0.25f, 8.0f);
+				DragInt(u8"踏みつけ 回数", &tran.gameplay.bossUltimateStompCount, 1.0f, 1, 16);
+				DragFloat(u8"踏みつけ 予兆秒", &tran.gameplay.bossUltimateStompTelegraph, 0.01f, 0.10f, 12.0f);
+				DragFloat(u8"踏みつけ 半径倍率", &tran.gameplay.bossUltimateStompRadiusScale, 0.05f, 0.5f, 8.0f);
+				DragFloat(u8"全体攻撃 予兆秒", &tran.gameplay.bossUltimateFieldTelegraph, 0.01f, 0.10f, 12.0f);
+				DragFloat(u8"安置 半径倍率", &tran.gameplay.bossUltimateFieldSafeScale, 0.05f, 0.5f, 8.0f);
+
+				if (tran.gameplay.bossSummonMax < tran.gameplay.bossSummonMin)
+				{
+					tran.gameplay.bossSummonMax = tran.gameplay.bossSummonMin;
+				}
+
+				EndTabItem();
+			}
 			if (BeginTabItem(u8"ゲーム調整"))
 			{
 				const char* difficultyText = u8"Normal";
@@ -300,11 +384,10 @@ void Draw()
 				SameLine();
 				if (Button(u8"Hard")) applyDifficultyPreset(2);
 
-				DragInt(u8"敵数(基準)", &tran.gameplay.enemyCount, 1.0f, 0, 16);
 				DragInt(u8"最大Wave", &tran.gameplay.waveMax, 1.0f, 1, 32);
 				DragInt(u8"Wave毎の敵追加数", &tran.gameplay.waveEnemyAddPerWave, 1.0f, 0, 16);
 				DragInt(u8"強化リロール上限", &tran.roguelike.rerollMaxPerStage, 1.0f, 0, 9);
-				ImGui::TextDisabled(u8"初期値: 敵数3 / 最大Wave3 / Wave追加1");
+				ImGui::TextDisabled(u8"初期値: 最大Wave3 / Wave追加1");
 				ImGui::SeparatorText(u8"開始カメラ演出");
 				ImGui::TextDisabled(u8"初期値: 演出時間1.20秒 / フォーカス距離2.80");
 				DragFloat(u8"開始演出時間", &tran.gameplay.cameraIntroDuration, 0.02f, 0.10f, 8.0f);
@@ -323,51 +406,6 @@ void Draw()
 				DragFloat(u8"Master音量", &tran.gameplay.volumeMaster, 0.01f, 0.0f, 2.0f);
 				DragFloat(u8"BGM音量", &tran.gameplay.volumeBgm, 0.01f, 0.0f, 2.0f);
 				DragFloat(u8"SE音量", &tran.gameplay.volumeSe, 0.01f, 0.0f, 2.0f);
-
-				ImGui::SeparatorText(u8"ボス戦");
-				ImGui::TextDisabled(u8"HPバーは画面上部UI表示。初期値: 横0.42 / 縦0.045");
-				DragFloat(u8"ボスHPバー横幅(画面比)", &tran.gameplay.bossHpBarWidthRate, 0.005f, 0.20f, 0.90f);
-				DragFloat(u8"ボスHPバー縦幅(画面比)", &tran.gameplay.bossHpBarHeightRate, 0.002f, 0.01f, 0.20f);
-				ImGui::TextDisabled(u8"初期値: 面積倍率6.0 (4.0〜12.0)");
-				DragFloat(u8"ボス面積倍率", &tran.gameplay.bossSizeAreaScale, 0.05f, 4.0f, 12.0f);
-				DragInt(u8"ボス最大HP", &tran.gameplay.bossMaxHp, 1.0f, 1, 9999);
-				ImGui::TextDisabled(u8"初期値: 予兆1.00 / ジャンプ0.50 / 突進0.35 / CT1.15 / 幅3.0 / ダメ20");
-				DragFloat(u8"ボス予兆時間", &tran.gameplay.bossAttackTelegraph, 0.01f, 0.10f, 4.0f);
-				DragFloat(u8"画面外ジャンプ開始", &tran.gameplay.bossAttackJumpOutTime, 0.01f, 0.0f, 4.0f);
-				DragFloat(u8"ボス突進時間", &tran.gameplay.bossAttackDashDuration, 0.005f, 0.05f, 2.0f);
-				DragFloat(u8"ボス攻撃CT", &tran.gameplay.bossAttackCooldown, 0.01f, 0.0f, 6.0f);
-				DragFloat(u8"予兆幅(プレイヤー比)", &tran.gameplay.bossAttackLanePlayerScale, 0.05f, 0.5f, 8.0f);
-				DragFloat(u8"ボス攻撃ダメージ", &tran.gameplay.bossAttackDamage, 0.1f, 0.0f, 200.0f);
-
-				ImGui::SeparatorText(u8"敵攻撃");
-				ImGui::TextDisabled(u8"初期値: 予兆0.55 / CT1.00 / 射程最小0.80 / 射程倍率1.35 / ダメージ1.0");
-				DragFloat(u8"敵予兆時間", &tran.gameplay.enemyAttackWindup, 0.01f, 0.0f, 3.0f);
-				DragFloat(u8"敵攻撃CT", &tran.gameplay.enemyAttackCooldown, 0.01f, 0.0f, 3.0f);
-				DragFloat(u8"敵射程最小", &tran.gameplay.enemyAttackRangeMin, 0.01f, 0.1f, 5.0f);
-				DragFloat(u8"敵射程倍率", &tran.gameplay.enemyAttackRangeScale, 0.01f, 0.1f, 5.0f);
-				DragFloat(u8"敵ダメージ", &tran.gameplay.enemyAttackDamage, 0.1f, 0.0f, 20.0f);
-				DragFloat(u8"敵移動速度", &tran.gameplay.enemyMoveSpeed, 0.01f, 0.1f, 8.0f);
-				DragFloat(u8"Wave毎 速度加算", &tran.gameplay.waveEnemyMoveSpeedAdd, 0.01f, 0.0f, 2.0f);
-				DragFloat(u8"Wave毎 ダメ倍率加算", &tran.gameplay.waveEnemyAttackDamageScalePerWave, 0.01f, 0.0f, 3.0f);
-				ImGui::SeparatorText(u8"遠距離型の敵弾");
-				ImGui::TextDisabled(u8"初期値: 速度6.50 / 寿命1.40 / 半径0.22 / ダメ倍率0.85");
-				DragFloat(u8"敵弾速度", &tran.gameplay.enemyProjectileSpeed, 0.05f, 0.1f, 20.0f);
-				DragFloat(u8"敵弾寿命", &tran.gameplay.enemyProjectileLife, 0.01f, 0.05f, 5.0f);
-				DragFloat(u8"敵弾半径", &tran.gameplay.enemyProjectileRadius, 0.01f, 0.05f, 2.0f);
-				DragFloat(u8"敵弾ダメ倍率", &tran.gameplay.enemyProjectileDamageScale, 0.01f, 0.0f, 3.0f);
-
-				ImGui::SeparatorText(u8"敵の分離行動");
-				ImGui::TextDisabled(u8"初期値: 半径1.10 / 重み0.80 / 最大オフセット0.80");
-				DragFloat(u8"分離半径", &tran.gameplay.enemySeparationRadius, 0.01f, 0.0f, 5.0f);
-				DragFloat(u8"分離重み", &tran.gameplay.enemySeparationWeight, 0.01f, 0.0f, 3.0f);
-				DragFloat(u8"分離最大オフセット", &tran.gameplay.enemySeparationMaxOffset, 0.01f, 0.0f, 3.0f);
-
-				ImGui::SeparatorText(u8"敵スポーン");
-				ImGui::TextDisabled(u8"初期値: リング0.35 / ぶれ0.10 / 対プレイヤー最小1.50 / 対敵最小0.90");
-				DragFloat(u8"リング倍率", &tran.gameplay.enemySpawnRingScale, 0.01f, 0.1f, 0.9f);
-				DragFloat(u8"ジッタ倍率", &tran.gameplay.enemySpawnJitterScale, 0.01f, 0.0f, 0.5f);
-				DragFloat(u8"プレイヤー最小距離", &tran.gameplay.enemySpawnMinPlayerDist, 0.05f, 0.0f, 8.0f);
-				DragFloat(u8"敵同士最小距離", &tran.gameplay.enemySpawnMinEnemyDist, 0.05f, 0.0f, 4.0f);
 
 				ImGui::SeparatorText(u8"押し合い");
 				ImGui::TextDisabled(u8"初期値: 余白0.01 / プレイヤー0.55 / 敵0.45");
@@ -1458,6 +1496,106 @@ void Draw()
 #endif
 
 	SceneManager::Draw();
+#ifndef _DEBUG
+	{
+		TRAN_INS;
+		if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
+			SceneManager::GetResultType() == SceneManager::ResultType::Win &&
+			tran.roguelike.selectionPending != 0)
+		{
+			auto releaseUpgradeLabel = [](int upgradeType) -> const char*
+			{
+				switch (upgradeType)
+				{
+				case 0: return u8"攻撃段階+1";
+				case 1: return u8"攻撃頻度段階+1";
+				case 2: return u8"回避CT段階+1";
+				case 3: return u8"攻撃段階+2";
+				case 4: return u8"攻撃頻度段階+2";
+				case 5: return u8"回避CT段階+2";
+				default: return u8"ここには何もないようだ";
+				}
+			};
+			auto releaseUpgradeDesc = [](int upgradeType) -> const char*
+			{
+				switch (upgradeType)
+				{
+				case 0: return u8"段階テーブルに沿って攻撃性能を1段階強化";
+				case 1: return u8"段階テーブルに沿って攻撃CTを1段階短縮";
+				case 2: return u8"段階テーブルに沿って回避CTを1段階短縮";
+				case 3: return u8"段階テーブルに沿って攻撃性能を2段階強化";
+				case 4: return u8"段階テーブルに沿って攻撃CTを2段階短縮";
+				case 5: return u8"段階テーブルに沿って回避CTを2段階短縮";
+				default: return u8"";
+				}
+			};
+
+			ImGuiViewport* vp = ImGui::GetMainViewport();
+			ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+			const bool hasAnyOffer =
+				(tran.roguelike.offers[0] >= 0) ||
+				(tran.roguelike.offers[1] >= 0) ||
+				(tran.roguelike.offers[2] >= 0);
+
+			char upgradeHud[1024]{};
+			if (!hasAnyOffer)
+			{
+				sprintf_s(
+					upgradeHud,
+					u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ");
+			}
+			else
+			{
+				const char* l0 = releaseUpgradeLabel(tran.roguelike.offers[0]);
+				const char* l1 = releaseUpgradeLabel(tran.roguelike.offers[1]);
+				const char* l2 = releaseUpgradeLabel(tran.roguelike.offers[2]);
+				const char* d0 = releaseUpgradeDesc(tran.roguelike.offers[0]);
+				const char* d1 = releaseUpgradeDesc(tran.roguelike.offers[1]);
+				const char* d2 = releaseUpgradeDesc(tran.roguelike.offers[2]);
+				sprintf_s(
+					upgradeHud,
+					u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
+					l0, d0,
+					l1, d1,
+					l2, d2,
+					tran.roguelike.rerollRemain,
+					tran.roguelike.rerollMaxPerStage);
+			}
+
+			const ImVec2 pad(14.0f, 12.0f);
+			const ImVec2 textSize = ImGui::CalcTextSize(upgradeHud);
+			const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - textSize.x) * 0.5f - pad.x,
+								vp->Pos.y + (vp->Size.y - textSize.y) * 0.5f - pad.y);
+			const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+
+			dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 210), 8.0f);
+			dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 160), 8.0f);
+			dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), upgradeHud);
+		}
+		if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
+			tran.gameplayDebug.titleOptionOpen == 0)
+		{
+			ImGuiViewport* vp = ImGui::GetMainViewport();
+			ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+			const char* titleGuide =
+				u8"タイトル選択\n"
+				u8"Start / Option / Exit\n"
+				u8"移動: W S A D / ↑ ↓ ← →\n"
+				u8"決定: Enter / F / Space\n"
+				u8"Esc: 終了";
+
+			const ImVec2 pad(10.0f, 8.0f);
+			const ImVec2 textSize = ImGui::CalcTextSize(titleGuide);
+			const ImVec2 boxMin(vp->Pos.x + vp->Size.x - textSize.x - pad.x * 2.0f - 16.0f,
+								vp->Pos.y + vp->Size.y - textSize.y - pad.y * 2.0f - 16.0f);
+			const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+
+			dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 8.0f);
+			dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 8.0f);
+			dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), titleGuide);
+		}
+	}
+#endif
 	EndDrawDirectX();
 }
 

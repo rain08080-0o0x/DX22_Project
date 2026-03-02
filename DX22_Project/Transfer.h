@@ -165,6 +165,25 @@ private:
 		float bossAttackCooldown = 1.15f;
 		float bossAttackLanePlayerScale = 3.0f;
 		float bossAttackDamage = 20.0f;
+		float bossDashNarrowTelegraph = 1.0f;
+		float bossDashWideTelegraph = 2.0f;
+		float bossDashWideWidthRate = 0.50f;
+		int bossRandomRainCount = 5;
+		float bossRandomRainTelegraph = 1.0f;
+		float bossRandomRainRadiusScale = 1.6f;
+		int bossSummonMin = 5;
+		int bossSummonMax = 10;
+		float bossSummonTelegraph = 1.0f;
+		int bossTrackingDropCount = 5;
+		float bossTrackingDropTelegraph = 1.0f;
+		float bossTrackingDropRadiusScale = 3.0f;
+		float bossUltimateCrossTelegraph = 1.0f;
+		float bossUltimateCrossLaneScale = 1.0f;
+		int bossUltimateStompCount = 5;
+		float bossUltimateStompTelegraph = 3.0f;
+		float bossUltimateStompRadiusScale = 3.0f;
+		float bossUltimateFieldTelegraph = 7.0f;
+		float bossUltimateFieldSafeScale = 2.0f;
 
 		float enemyAttackWindup = 0.55f;
 		float enemyAttackCooldown = 1.00f;

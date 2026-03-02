@@ -31,6 +31,8 @@ namespace
     const int kMultiHitShakeThresholdMin = 1;
     const int kMultiHitShakeThresholdMax = 16;
     const float kMultiHitShakeDurationDefault = 0.18f;
+    const float kBossStompImpactFxDuration = 0.18f;
+    const float kBossStompImpactShadowScale = 1.75f;
     const float kFixedDt = 1.0f / 60.0f;
     const int kEnemyCountMin = 0;
     const int kEnemyCountMax = 16;
@@ -380,7 +382,10 @@ namespace
         Geometory::AddLine(v[3], v[7], color);
     }
 
-    void DrawShadow(Texture* texture, const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& size)
+    void DrawShadow(Texture* texture,
+                    const DirectX::XMFLOAT3& pos,
+                    const DirectX::XMFLOAT3& size,
+                    float scaleMultiplier = 1.0f)
     {
         if (!texture) return;
 
@@ -393,7 +398,8 @@ namespace
         DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranspose(R * T));
 
         Sprite::SetWorld(world);
-        Sprite::SetSize({ size.x * kShadowScale, size.z * kShadowScale });
+        const float finalScale = kShadowScale * ((scaleMultiplier > 0.01f) ? scaleMultiplier : 0.01f);
+        Sprite::SetSize({ size.x * finalScale, size.z * finalScale });
         Sprite::SetOffset({ 0.0f, 0.0f });
         Sprite::SetUVPos({ 0.0f, 0.0f });
         Sprite::SetUVScale({ 1.0f, 1.0f });
@@ -487,6 +493,7 @@ SceneGame::SceneGame()
     , m_attackTrailSpawnTimer(0.0f)
     , m_playerDamageFlashTimer(0.0f)
     , m_playerDamageInvincibleTimer(0.0f)
+    , m_bossStompImpactTimer(0.0f)
     , m_screenShakeTimer(0.0f)
     , m_screenShakeDuration(0.0f)
     , m_screenShakeAmplitude(0.0f)
@@ -1427,6 +1434,11 @@ void SceneGame::Update()
         m_attackTrailSpawnTimer -= kFixedDt;
         if (m_attackTrailSpawnTimer < 0.0f) m_attackTrailSpawnTimer = 0.0f;
     }
+    if (m_bossStompImpactTimer > 0.0f)
+    {
+        m_bossStompImpactTimer -= kFixedDt;
+        if (m_bossStompImpactTimer < 0.0f) m_bossStompImpactTimer = 0.0f;
+    }
     if (m_playerDamageFlashTimer > 0.0f)
     {
         m_playerDamageFlashTimer -= kFixedDt;
@@ -2287,7 +2299,13 @@ void SceneGame::Draw()
 
     for (const auto& entry : drawEntries)
     {
-        DrawShadow(m_pShadow, entry.pos, entry.size);
+        float shadowScale = 1.0f;
+        if (entry.isBoss && m_bossStompImpactTimer > 0.0f)
+        {
+            const float impactRate = Clamp01(m_bossStompImpactTimer / kBossStompImpactFxDuration);
+            shadowScale = 1.0f + (kBossStompImpactShadowScale - 1.0f) * impactRate;
+        }
+        DrawShadow(m_pShadow, entry.pos, entry.size, shadowScale);
         if (entry.isPlayer)
         {
             if (m_pPlayer) m_pPlayer->Draw();
@@ -2301,6 +2319,7 @@ void SceneGame::Draw()
             entry.enemy->Draw();
         }
     }
+    DrawBossFallingObjects();
     if (m_pPlayer)
     {
         m_pPlayer->DrawDirectionMarker();

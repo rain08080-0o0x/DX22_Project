@@ -86,6 +86,7 @@ private:
                           int playerAttackDamage,
                           const std::function<bool(float)>& applyPlayerDamage);
     void DrawBossTelegraphMarker() const;
+    void DrawBossFallingObjects() const;
     void AddBossDrawEntry(std::vector<DrawEntry>& drawEntries,
                           const DirectX::XMFLOAT3& cam) const;
     void DrawBossEntry(const DrawEntry& entry) const;
@@ -146,6 +147,7 @@ private:
     float m_attackTrailSpawnTimer;
     float m_playerDamageFlashTimer;
     float m_playerDamageInvincibleTimer;
+    float m_bossStompImpactTimer;
     float m_screenShakeTimer;
     float m_screenShakeDuration;
     float m_screenShakeAmplitude;
