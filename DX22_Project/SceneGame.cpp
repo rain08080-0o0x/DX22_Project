@@ -452,10 +452,12 @@ SceneGame::SceneGame()
     , m_pShadow(nullptr)
     , m_pAttackMarker(nullptr)
     , m_pBossAttackRangeMarker(nullptr)
+    , m_pGroundTexture(nullptr)
     , m_pAttackSe(nullptr)
     , m_pPlayerHitSe(nullptr)
     , m_pEnemyAttackSe(nullptr)
     , m_pClearSe(nullptr)
+    , m_pDropSe(nullptr)
     , m_pGameBgm(nullptr)
     , m_pBossBgm(nullptr)
     , m_pGameBgmVoice(nullptr)
@@ -537,6 +539,8 @@ SceneGame::SceneGame()
     tran.gameplayDebug.titleOptionOpen = 0;
     tran.gameplayDebug.titleOptionSelection = 0;
     tran.gameplayDebug.titleOptionRequestClose = 0;
+    tran.gameplayDebug.titleDifficultyOpen = 0;
+    tran.gameplayDebug.titleDifficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
     m_isBossBattleDebug = (tran.gameplayDebug.requestBossBattle != 0);
     tran.gameplayDebug.requestBossBattle = 0;
     tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
@@ -667,6 +671,13 @@ SceneGame::SceneGame()
     {
         MessageBox(NULL, "Texture load failed.\nGame/AttackRange.png", "Error", MB_OK);
     }
+    m_pGroundTexture = new Texture();
+    if (FAILED(m_pGroundTexture->Create("Assets/Texture/Game/jimen.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nGame/jimen.png", "Error", MB_OK);
+        delete m_pGroundTexture;
+        m_pGroundTexture = nullptr;
+    }
 
     LoadBossResources();
 
@@ -674,6 +685,7 @@ SceneGame::SceneGame()
     m_pPlayerHitSe = LoadSound("Assets/Sound/SE/player_hit.mp3", false);
     m_pEnemyAttackSe = LoadSound("Assets/Sound/SE/enemy_attack.mp3", false);
     m_pClearSe = LoadSound("Assets/Sound/SE/clear.mp3", false);
+    m_pDropSe = LoadSound("Assets/Sound/SE/drop.mp3", false);
     m_pGameBgm = LoadSound("Assets/Sound/BGM/GameBGM.mp3", true);
     m_pBossBgm = LoadSound("Assets/Sound/BGM/GameBGM2.mp3", true);
     if (m_pGameBgm)
@@ -745,6 +757,7 @@ SceneGame::~SceneGame()
         m_pGameBgmVoice = nullptr;
     }
     m_pClearSe = nullptr;
+    m_pDropSe = nullptr;
     m_pEnemyAttackSe = nullptr;
     m_pPlayerHitSe = nullptr;
     m_pAttackSe = nullptr;
@@ -801,6 +814,11 @@ SceneGame::~SceneGame()
         delete m_pBossAttackRangeMarker;
         m_pBossAttackRangeMarker = nullptr;
     }
+    if (m_pGroundTexture)
+    {
+        delete m_pGroundTexture;
+        m_pGroundTexture = nullptr;
+    }
     ReleaseBossResources();
     if (m_pEnemyHpGauge)
     {
@@ -845,6 +863,8 @@ void SceneGame::SpawnEnemyByIndex(int index, float stageSize)
     case 1: enemy->SetType(Enemy::Type::Tank); break;
     default: enemy->SetType(Enemy::Type::Ranged); break;
     }
+    const float enemyHpScale = m_isBossBattleDebug ? 1.0f : tran.GetEnemyHpScaleByUpgradeProgress();
+    enemy->SetHpScale(enemyHpScale);
 
     const float safeStage = (stageSize > 0.5f) ? stageSize : 5.0f;
     const float ringScale = ClampRange(tran.gameplay.enemySpawnRingScale, 0.1f, 0.9f);
@@ -1155,6 +1175,7 @@ void SceneGame::Update()
     const float playerAttackCooldownScale = tran.GetAttackCooldownScaleByLevel(tran.roguelike.attackSpeedLevel);
     const float playerEvadeCooldownScale = tran.GetEvadeCooldownScaleByLevel(tran.roguelike.evadeCooldownLevel);
     const float difficultyEnemyAttackDamageScale = CalcDifficultyEnemyAttackDamageScale(difficultyPreset);
+    const float roguelikeEnemyAttackScale = m_isBossBattleDebug ? 1.0f : tran.GetEnemyAttackScaleByUpgradeProgress();
 
     if (m_currentWave < kWaveCountMin) m_currentWave = kWaveCountMin;
     if (m_currentWave > m_waveMax) m_currentWave = m_waveMax;
@@ -1206,7 +1227,10 @@ void SceneGame::Update()
         ? 0.0f : tran.gameplay.waveEnemyAttackDamageScalePerWave;
     const float waveStep = static_cast<float>((m_currentWave > 0) ? (m_currentWave - 1) : 0);
     const float enemyAttackDamage =
-        enemyAttackDamageBase * difficultyEnemyAttackDamageScale * (1.0f + waveEnemyAttackDamageScale * waveStep);
+        enemyAttackDamageBase *
+        difficultyEnemyAttackDamageScale *
+        roguelikeEnemyAttackScale *
+        (1.0f + waveEnemyAttackDamageScale * waveStep);
     const float enemyMoveSpeed = enemyMoveSpeedBase + waveEnemyMoveSpeedAdd * waveStep;
     const float enemySeparationRadius = (tran.gameplay.enemySeparationRadius < 0.0f) ? 0.0f : tran.gameplay.enemySeparationRadius;
     const float enemySeparationWeight = (tran.gameplay.enemySeparationWeight < 0.0f) ? 0.0f : tran.gameplay.enemySeparationWeight;
@@ -2223,17 +2247,63 @@ void SceneGame::Draw()
     SetDepthTest(true);
 
     float stage = m_stageSize;
+    float groundTileSize = 1.0f;
     {
         TRAN_INS;
         if (tran.player.stageSize > 0.0f) stage = tran.player.stageSize;
+        groundTileSize = tran.gameplay.groundTileSize;
     }
 
-    DirectX::XMMATRIX S = DirectX::XMMatrixScaling(stage, 0.1f, stage);
-    DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(0.0f, -0.05f, 0.0f);
-    DirectX::XMFLOAT4X4 world;
-    DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranspose(S * T));
-    Geometory::SetWorld(world);
-    Geometory::DrawBox();
+    if (m_pGroundTexture)
+    {
+        const float groundY = -0.001f;
+        const float safeStage = (stage > 0.1f) ? stage : 0.1f;
+        const float baseTileSize = ClampRange(groundTileSize, 0.5f, 10.0f);
+        const int tileCountX = ClampInt(static_cast<int>(std::ceil(safeStage / baseTileSize)), 1, 64);
+        const int tileCountZ = ClampInt(static_cast<int>(std::ceil(safeStage / baseTileSize)), 1, 64);
+        const float stageHalf = safeStage * 0.5f;
+        const DirectX::XMMATRIX rotate = DirectX::XMMatrixRotationX(DirectX::XM_PIDIV2);
+
+        float cursorZ = -stageHalf;
+        for (int z = 0; z < tileCountZ; ++z)
+        {
+            float tileDepth = baseTileSize;
+            if (z == tileCountZ - 1)
+            {
+                tileDepth = safeStage - baseTileSize * static_cast<float>(tileCountZ - 1);
+            }
+            if (tileDepth <= 0.0f) continue;
+
+            float cursorX = -stageHalf;
+            for (int x = 0; x < tileCountX; ++x)
+            {
+                float tileWidth = baseTileSize;
+                if (x == tileCountX - 1)
+                {
+                    tileWidth = safeStage - baseTileSize * static_cast<float>(tileCountX - 1);
+                }
+                if (tileWidth <= 0.0f) continue;
+
+                const float centerX = cursorX + tileWidth * 0.5f;
+                const float centerZ = cursorZ + tileDepth * 0.5f;
+                DirectX::XMMATRIX translate = DirectX::XMMatrixTranslation(centerX, groundY, centerZ);
+                DirectX::XMFLOAT4X4 world;
+                DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranspose(rotate * translate));
+
+                Sprite::SetWorld(world);
+                Sprite::SetSize({ tileWidth, tileDepth });
+                Sprite::SetOffset({ 0.0f, 0.0f });
+                Sprite::SetUVPos({ 0.0f, 0.0f });
+                Sprite::SetUVScale({ tileWidth / baseTileSize, tileDepth / baseTileSize });
+                Sprite::SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+                Sprite::SetTexture(m_pGroundTexture);
+                Sprite::Draw();
+
+                cursorX += tileWidth;
+            }
+            cursorZ += tileDepth;
+        }
+    }
 
     SetDepthTest(false);
 

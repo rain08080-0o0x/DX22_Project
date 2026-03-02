@@ -123,6 +123,7 @@ private:
 		int enemyCount = 3;
 		int waveMax = 3;
 		int waveEnemyAddPerWave = 1;
+		float groundTileSize = 1.0f;
 		float cameraIntroDuration = 1.20f;
 		float cameraIntroFocusDistance = 2.80f;
 
@@ -181,6 +182,7 @@ private:
 		float bossUltimateCrossLaneScale = 1.0f;
 		int bossUltimateStompCount = 5;
 		float bossUltimateStompTelegraph = 3.0f;
+		float bossUltimateStompRepeatTelegraph = 3.0f;
 		float bossUltimateStompRadiusScale = 3.0f;
 		float bossUltimateFieldTelegraph = 7.0f;
 		float bossUltimateFieldSafeScale = 2.0f;
@@ -257,6 +259,8 @@ private:
 		int titleOptionOpen = 0;
 		int titleOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:Back
 		int titleOptionRequestClose = 0;
+		int titleDifficultyOpen = 0;
+		int titleDifficultySelection = 1; // 0:Easy 1:Normal 2:Hard
 		float pauseMenuUiScale = 1.0f;
 		float pauseMenuFontScale = 1.0f;
 		float pauseMenuButtonScale = 1.0f;
@@ -299,15 +303,23 @@ public:
 	}
 	void ResetGameplayTuningToDefault();
 	void ResetRoguelikeUpgrade();
+	void ApplyDifficultyPreset(int preset);
 	void ApplyStageClearUpgrade();
 	void BeginUpgradeSelection();
 	bool RerollUpgradeSelection();
 	bool ApplyUpgradeSelection(int offerIndex);
+	int NormalizeDifficultyPreset(int preset) const;
 	int ClampUpgradeLevel(int level) const;
 	int GetUpgradeLevelMax() const;
+	int GetUpgradeStepForType(int upgradeType, int difficultyPreset) const;
+	int GetTotalUpgradeLevels() const;
 	int GetPlayerAttackDamageByLevel(int level) const;
 	float GetAttackCooldownScaleByLevel(int level) const;
 	float GetEvadeCooldownScaleByLevel(int level) const;
+	float GetEnemyHpScaleByUpgradeProgress() const;
+	float GetEnemyAttackScaleByUpgradeProgress() const;
+	float GetBossHpScaleByDifficulty(int preset) const;
+	float GetBossCooldownScaleByDifficulty(int preset) const;
 	bool LoadGameplayTuning(const char* path = nullptr);
 	bool SaveGameplayTuning(const char* path = nullptr) const;
 	const char* GetGameplayTuningPath() const;

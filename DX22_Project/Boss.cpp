@@ -294,7 +294,13 @@ void BossController::ReleaseRockTexture()
 void SceneGame::InitializeBossForScene()
 {
     auto& tran = Transfer::GetInstance();
-    m_boss.ResetForScene(tran.player.size, tran.gameplay.bossSizeAreaScale, tran.gameplay.bossMaxHp);
+    const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
+    const float bossHpScale = tran.GetBossHpScaleByDifficulty(difficultyPreset);
+    const int effectiveBossMaxHp = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale)),
+        1,
+        9999);
+    m_boss.ResetForScene(tran.player.size, tran.gameplay.bossSizeAreaScale, effectiveBossMaxHp);
 }
 
 void SceneGame::LoadBossResources()
@@ -353,19 +359,26 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
     if (tran.gameplay.bossUltimateCrossLaneScale < 0.25f) tran.gameplay.bossUltimateCrossLaneScale = 0.25f;
     tran.gameplay.bossUltimateStompCount = ClampInt(tran.gameplay.bossUltimateStompCount, 1, 16);
     tran.gameplay.bossUltimateStompTelegraph = ClampRange(tran.gameplay.bossUltimateStompTelegraph, 0.10f, 12.0f);
+    tran.gameplay.bossUltimateStompRepeatTelegraph = ClampRange(tran.gameplay.bossUltimateStompRepeatTelegraph, 0.10f, 12.0f);
     if (tran.gameplay.bossUltimateStompRadiusScale < 0.5f) tran.gameplay.bossUltimateStompRadiusScale = 0.5f;
     tran.gameplay.bossUltimateFieldTelegraph = ClampRange(tran.gameplay.bossUltimateFieldTelegraph, 0.10f, 12.0f);
     if (tran.gameplay.bossUltimateFieldSafeScale < 0.5f) tran.gameplay.bossUltimateFieldSafeScale = 0.5f;
     tran.gameplay.bossMaxHp = ClampInt(tran.gameplay.bossMaxHp, 1, 9999);
+    const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
+    const float bossHpScale = tran.GetBossHpScaleByDifficulty(difficultyPreset);
+    const int effectiveBossMaxHp = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale)),
+        1,
+        9999);
     if (m_boss.maxHp <= 0)
     {
-        m_boss.maxHp = tran.gameplay.bossMaxHp;
+        m_boss.maxHp = effectiveBossMaxHp;
         m_boss.hp = m_boss.maxHp;
     }
-    else if (m_boss.maxHp != tran.gameplay.bossMaxHp)
+    else if (m_boss.maxHp != effectiveBossMaxHp)
     {
         const float hpRate = Clamp01(static_cast<float>(m_boss.hp) / static_cast<float>(m_boss.maxHp));
-        m_boss.maxHp = tran.gameplay.bossMaxHp;
+        m_boss.maxHp = effectiveBossMaxHp;
         m_boss.hp = ClampInt(static_cast<int>(std::ceil(hpRate * static_cast<float>(m_boss.maxHp))), 0, m_boss.maxHp);
     }
     else if (m_boss.hp > m_boss.maxHp)
@@ -435,7 +448,9 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     const float stageHalf = stageSize * 0.5f;
     const float dashSec = ClampRange(tran.gameplay.bossAttackDashDuration, 0.05f, 2.0f);
     const float jumpOutSec = ClampRange(tran.gameplay.bossAttackJumpOutTime, 0.0f, 4.0f);
-    const float cooldownSec = ClampRange(tran.gameplay.bossAttackCooldown, 0.0f, 6.0f);
+    const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
+    const float difficultyBossCooldownScale = tran.GetBossCooldownScaleByDifficulty(difficultyPreset);
+    const float cooldownSec = ClampRange(tran.gameplay.bossAttackCooldown * difficultyBossCooldownScale, 0.0f, 6.0f);
     const float telegraphMultiplier = ClampRange(tran.gameplay.bossAttackTelegraph, 0.10f, 4.0f);
     const float bossDamage = (tran.gameplay.bossAttackDamage < 0.0f) ? 0.0f : tran.gameplay.bossAttackDamage;
     const float lanePlayerRatio = ClampRange(tran.gameplay.bossAttackLanePlayerScale, 0.5f, 8.0f);
@@ -460,6 +475,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     const float ultimateCrossLaneScale = (tran.gameplay.bossUltimateCrossLaneScale < 0.25f) ? 0.25f : tran.gameplay.bossUltimateCrossLaneScale;
     const int ultimateStompCount = ClampInt(tran.gameplay.bossUltimateStompCount, 1, 16);
     const float ultimateStompTelegraphSec = ClampRange(tran.gameplay.bossUltimateStompTelegraph, 0.10f, 12.0f) * telegraphMultiplier;
+    const float ultimateStompRepeatTelegraphSec = ClampRange(tran.gameplay.bossUltimateStompRepeatTelegraph, 0.10f, 12.0f) * telegraphMultiplier;
     const float ultimateStompRadiusScale = (tran.gameplay.bossUltimateStompRadiusScale < 0.5f) ? 0.5f : tran.gameplay.bossUltimateStompRadiusScale;
     const float ultimateFieldTelegraphSec = ClampRange(tran.gameplay.bossUltimateFieldTelegraph, 0.10f, 12.0f) * telegraphMultiplier;
     const float ultimateFieldSafeScale = (tran.gameplay.bossUltimateFieldSafeScale < 0.5f) ? 0.5f : tran.gameplay.bossUltimateFieldSafeScale;
@@ -626,7 +642,10 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             m_boss.attackRepeatsRemaining = ultimateStompCount;
         }
 
-        startTelegraph(BossController::AttackKindUltimateStomp, ultimateStompTelegraphSec, 0.32f);
+        const float stompTelegraphSec = startNewSequence
+            ? ultimateStompTelegraphSec
+            : ultimateStompRepeatTelegraphSec;
+        startTelegraph(BossController::AttackKindUltimateStomp, stompTelegraphSec, 0.32f);
         DirectX::XMFLOAT3 center = {
             tran.player.pos.x,
             tran.player.pos.y + zoneHeight * 0.5f,
@@ -1049,6 +1068,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                         m_screenShakeAmplitude = stompShakeAmplitude;
                     }
                     m_screenShakePhase += 1.0f;
+                    if (m_pDropSe) PlaySound(m_pDropSe);
                     if (applyAttackDamage())
                     {
                         return true;

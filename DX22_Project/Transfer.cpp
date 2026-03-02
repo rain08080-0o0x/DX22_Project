@@ -70,6 +70,30 @@ namespace
 		return v;
 	}
 
+	int NormalizeDifficultyPresetValue(int preset)
+	{
+		return ClampInt(preset, 0, 2);
+	}
+
+	void GetUpgradeStepsForDifficulty(int preset, int& smallStep, int& largeStep)
+	{
+		switch (NormalizeDifficultyPresetValue(preset))
+		{
+		case 0:
+			smallStep = 1;
+			largeStep = 2;
+			break;
+		case 2:
+			smallStep = 3;
+			largeStep = 5;
+			break;
+		default:
+			smallStep = 2;
+			largeStep = 3;
+			break;
+		}
+	}
+
 	const int kUpgradeTierMax = 10;
 
 	int ClampUpgradeTier(int level)
@@ -163,27 +187,32 @@ namespace
 		}
 	}
 
-	void ApplyUpgradeType(int& attackPowerLevel, int& attackSpeedLevel, int& evadeCooldownLevel, int upgradeType)
+	void ApplyUpgradeType(int& attackPowerLevel,
+						  int& attackSpeedLevel,
+						  int& evadeCooldownLevel,
+						  int upgradeType,
+						  int smallStep,
+						  int largeStep)
 	{
 		switch (upgradeType)
 		{
 		case 0:
-			attackPowerLevel = ClampUpgradeTier(attackPowerLevel + 1);
+			attackPowerLevel = ClampUpgradeTier(attackPowerLevel + smallStep);
 			break;
 		case 1:
-			attackSpeedLevel = ClampUpgradeTier(attackSpeedLevel + 1);
+			attackSpeedLevel = ClampUpgradeTier(attackSpeedLevel + smallStep);
 			break;
 		case 2:
-			evadeCooldownLevel = ClampUpgradeTier(evadeCooldownLevel + 1);
+			evadeCooldownLevel = ClampUpgradeTier(evadeCooldownLevel + smallStep);
 			break;
 		case 3:
-			attackPowerLevel = ClampUpgradeTier(attackPowerLevel + 2);
+			attackPowerLevel = ClampUpgradeTier(attackPowerLevel + largeStep);
 			break;
 		case 4:
-			attackSpeedLevel = ClampUpgradeTier(attackSpeedLevel + 2);
+			attackSpeedLevel = ClampUpgradeTier(attackSpeedLevel + largeStep);
 			break;
 		case 5:
-			evadeCooldownLevel = ClampUpgradeTier(evadeCooldownLevel + 2);
+			evadeCooldownLevel = ClampUpgradeTier(evadeCooldownLevel + largeStep);
 			break;
 		default:
 			break;
@@ -201,12 +230,70 @@ void Transfer::ResetRoguelikeUpgrade()
 	roguelike = RoguelikeUpgrade{};
 }
 
+void Transfer::ApplyDifficultyPreset(int preset)
+{
+	const int normalizedPreset = NormalizeDifficultyPresetValue(preset);
+	switch (normalizedPreset)
+	{
+	case 0: // Easy
+		gameplay.enemyCount = 2;
+		gameplay.waveMax = 2;
+		gameplay.waveEnemyAddPerWave = 1;
+		gameplay.enemyAttackWindup = 0.65f;
+		gameplay.enemyAttackCooldown = 1.20f;
+		gameplay.enemyAttackRangeMin = 0.70f;
+		gameplay.enemyAttackRangeScale = 1.20f;
+		gameplay.enemyAttackDamage = 0.8f;
+		gameplay.enemyMoveSpeed = 1.00f;
+		gameplay.waveEnemyMoveSpeedAdd = 0.08f;
+		gameplay.waveEnemyAttackDamageScalePerWave = 0.10f;
+		break;
+	case 2: // Hard
+		gameplay.enemyCount = 4;
+		gameplay.waveMax = 4;
+		gameplay.waveEnemyAddPerWave = 2;
+		gameplay.enemyAttackWindup = 0.45f;
+		gameplay.enemyAttackCooldown = 0.80f;
+		gameplay.enemyAttackRangeMin = 0.90f;
+		gameplay.enemyAttackRangeScale = 1.45f;
+		gameplay.enemyAttackDamage = 1.3f;
+		gameplay.enemyMoveSpeed = 1.35f;
+		gameplay.waveEnemyMoveSpeedAdd = 0.22f;
+		gameplay.waveEnemyAttackDamageScalePerWave = 0.32f;
+		break;
+	default: // Normal
+		gameplay.enemyCount = 3;
+		gameplay.waveMax = 3;
+		gameplay.waveEnemyAddPerWave = 1;
+		gameplay.enemyAttackWindup = 0.55f;
+		gameplay.enemyAttackCooldown = 1.00f;
+		gameplay.enemyAttackRangeMin = 0.80f;
+		gameplay.enemyAttackRangeScale = 1.35f;
+		gameplay.enemyAttackDamage = 1.0f;
+		gameplay.enemyMoveSpeed = 1.20f;
+		gameplay.waveEnemyMoveSpeedAdd = 0.15f;
+		gameplay.waveEnemyAttackDamageScalePerWave = 0.20f;
+		break;
+	}
+	gameplayDebug.difficultyPreset = normalizedPreset;
+	gameplayDebug.titleDifficultySelection = normalizedPreset;
+}
+
 void Transfer::ApplyStageClearUpgrade()
 {
+	int smallStep = 1;
+	int largeStep = 2;
+	GetUpgradeStepsForDifficulty(gameplayDebug.difficultyPreset, smallStep, largeStep);
 	const int nextType = roguelike.stageClearCount % 3;
 	++roguelike.stageClearCount;
 	roguelike.lastUpgradeType = nextType;
-	ApplyUpgradeType(roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel, nextType);
+	ApplyUpgradeType(
+		roguelike.attackPowerLevel,
+		roguelike.attackSpeedLevel,
+		roguelike.evadeCooldownLevel,
+		nextType,
+		smallStep,
+		largeStep);
 }
 
 void Transfer::BeginUpgradeSelection()
@@ -232,12 +319,26 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 
 	const int selectedType = roguelike.offers[offerIndex];
 	if (selectedType < 0 || selectedType >= RoguelikeUpgrade::UpgradeTypeCount) return false;
-	ApplyUpgradeType(roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel, selectedType);
+	int smallStep = 1;
+	int largeStep = 2;
+	GetUpgradeStepsForDifficulty(gameplayDebug.difficultyPreset, smallStep, largeStep);
+	ApplyUpgradeType(
+		roguelike.attackPowerLevel,
+		roguelike.attackSpeedLevel,
+		roguelike.evadeCooldownLevel,
+		selectedType,
+		smallStep,
+		largeStep);
 	++roguelike.stageClearCount;
 	roguelike.lastUpgradeType = selectedType;
 	roguelike.selectionPending = 0;
 	roguelike.rerollRemain = 0;
 	return true;
+}
+
+int Transfer::NormalizeDifficultyPreset(int preset) const
+{
+	return NormalizeDifficultyPresetValue(preset);
 }
 
 int Transfer::ClampUpgradeLevel(int level) const
@@ -248,6 +349,34 @@ int Transfer::ClampUpgradeLevel(int level) const
 int Transfer::GetUpgradeLevelMax() const
 {
 	return RoguelikeUpgrade::kLevelMax;
+}
+
+int Transfer::GetUpgradeStepForType(int upgradeType, int difficultyPreset) const
+{
+	int smallStep = 1;
+	int largeStep = 2;
+	GetUpgradeStepsForDifficulty(difficultyPreset, smallStep, largeStep);
+	switch (upgradeType)
+	{
+	case RoguelikeUpgrade::UpgradeAttackPower:
+	case RoguelikeUpgrade::UpgradeAttackSpeed:
+	case RoguelikeUpgrade::UpgradeEvadeCooldown:
+		return smallStep;
+	case RoguelikeUpgrade::UpgradeAttackPowerLarge:
+	case RoguelikeUpgrade::UpgradeAttackSpeedLarge:
+	case RoguelikeUpgrade::UpgradeEvadeCooldownLarge:
+		return largeStep;
+	default:
+		return 0;
+	}
+}
+
+int Transfer::GetTotalUpgradeLevels() const
+{
+	return
+		ClampUpgradeTier(roguelike.attackPowerLevel) +
+		ClampUpgradeTier(roguelike.attackSpeedLevel) +
+		ClampUpgradeTier(roguelike.evadeCooldownLevel);
 }
 
 int Transfer::GetPlayerAttackDamageByLevel(int level) const
@@ -263,6 +392,38 @@ float Transfer::GetAttackCooldownScaleByLevel(int level) const
 float Transfer::GetEvadeCooldownScaleByLevel(int level) const
 {
 	return kEvadeCooldownScaleByTier[ClampUpgradeTier(level)];
+}
+
+float Transfer::GetEnemyHpScaleByUpgradeProgress() const
+{
+	const int progressTier = ClampInt(GetTotalUpgradeLevels() / 10, 0, 3);
+	return 1.0f + 0.20f * static_cast<float>(progressTier);
+}
+
+float Transfer::GetEnemyAttackScaleByUpgradeProgress() const
+{
+	const int progressTier = ClampInt(GetTotalUpgradeLevels() / 10, 0, 3);
+	return 1.0f + 0.10f * static_cast<float>(progressTier);
+}
+
+float Transfer::GetBossHpScaleByDifficulty(int preset) const
+{
+	switch (NormalizeDifficultyPresetValue(preset))
+	{
+	case 0: return 0.85f;
+	case 2: return 1.25f;
+	default: return 1.0f;
+	}
+}
+
+float Transfer::GetBossCooldownScaleByDifficulty(int preset) const
+{
+	switch (NormalizeDifficultyPresetValue(preset))
+	{
+	case 0: return 1.15f;
+	case 2: return 0.85f;
+	default: return 1.0f;
+	}
 }
 
 
@@ -323,6 +484,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		if (key == "enemyCount") loaded.enemyCount = ToInt(value, loaded.enemyCount);
 		else if (key == "waveMax") loaded.waveMax = ToInt(value, loaded.waveMax);
 		else if (key == "waveEnemyAddPerWave") loaded.waveEnemyAddPerWave = ToInt(value, loaded.waveEnemyAddPerWave);
+		else if (key == "groundTileSize") loaded.groundTileSize = ToFloat(value, loaded.groundTileSize);
 		else if (key == "cameraIntroDuration") loaded.cameraIntroDuration = ToFloat(value, loaded.cameraIntroDuration);
 		else if (key == "cameraIntroFocusDistance") loaded.cameraIntroFocusDistance = ToFloat(value, loaded.cameraIntroFocusDistance);
 		else if (key == "attackWindup") loaded.attackWindup = ToFloat(value, loaded.attackWindup);
@@ -380,6 +542,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "bossUltimateCrossLaneScale") loaded.bossUltimateCrossLaneScale = ToFloat(value, loaded.bossUltimateCrossLaneScale);
 		else if (key == "bossUltimateStompCount") loaded.bossUltimateStompCount = ToInt(value, loaded.bossUltimateStompCount);
 		else if (key == "bossUltimateStompTelegraph") loaded.bossUltimateStompTelegraph = ToFloat(value, loaded.bossUltimateStompTelegraph);
+		else if (key == "bossUltimateStompRepeatTelegraph") loaded.bossUltimateStompRepeatTelegraph = ToFloat(value, loaded.bossUltimateStompRepeatTelegraph);
 		else if (key == "bossUltimateStompRadiusScale") loaded.bossUltimateStompRadiusScale = ToFloat(value, loaded.bossUltimateStompRadiusScale);
 		else if (key == "bossUltimateFieldTelegraph") loaded.bossUltimateFieldTelegraph = ToFloat(value, loaded.bossUltimateFieldTelegraph);
 		else if (key == "bossUltimateFieldSafeScale") loaded.bossUltimateFieldSafeScale = ToFloat(value, loaded.bossUltimateFieldSafeScale);
@@ -415,6 +578,8 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	}
 
 	loaded.screenShakeHitThreshold = ClampInt(loaded.screenShakeHitThreshold, 1, 16);
+	if (loaded.groundTileSize < 0.5f) loaded.groundTileSize = 0.5f;
+	if (loaded.groundTileSize > 10.0f) loaded.groundTileSize = 10.0f;
 	if (loaded.cameraIntroDuration < 0.10f) loaded.cameraIntroDuration = 0.10f;
 	if (loaded.cameraIntroFocusDistance < 0.50f) loaded.cameraIntroFocusDistance = 0.50f;
 	if (loaded.playerDamageInvincible < 0.0f) loaded.playerDamageInvincible = 0.0f;
@@ -456,12 +621,14 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	if (loaded.bossUltimateCrossLaneScale < 0.25f) loaded.bossUltimateCrossLaneScale = 0.25f;
 	loaded.bossUltimateStompCount = ClampInt(loaded.bossUltimateStompCount, 1, 16);
 	if (loaded.bossUltimateStompTelegraph < 0.10f) loaded.bossUltimateStompTelegraph = 0.10f;
+	if (loaded.bossUltimateStompRepeatTelegraph < 0.10f) loaded.bossUltimateStompRepeatTelegraph = 0.10f;
 	if (loaded.bossUltimateStompRadiusScale < 0.5f) loaded.bossUltimateStompRadiusScale = 0.5f;
 	if (loaded.bossUltimateFieldTelegraph < 0.10f) loaded.bossUltimateFieldTelegraph = 0.10f;
 	if (loaded.bossUltimateFieldSafeScale < 0.5f) loaded.bossUltimateFieldSafeScale = 0.5f;
 	gameplay = loaded;
 	loadedPreset = ClampInt(loadedPreset, 0, 2);
 	gameplayDebug.difficultyPreset = loadedPreset;
+	gameplayDebug.titleDifficultySelection = loadedPreset;
 	loadedRogue.stageClearCount = ClampInt(loadedRogue.stageClearCount, 0, 9999);
 	loadedRogue.attackPowerLevel = ClampUpgradeTier(loadedRogue.attackPowerLevel);
 	loadedRogue.attackSpeedLevel = ClampUpgradeTier(loadedRogue.attackSpeedLevel);
@@ -496,6 +663,7 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "enemyCount=" << gameplay.enemyCount << "\n";
 		ofs << "waveMax=" << gameplay.waveMax << "\n";
 		ofs << "waveEnemyAddPerWave=" << gameplay.waveEnemyAddPerWave << "\n";
+		ofs << "groundTileSize=" << gameplay.groundTileSize << "\n";
 		ofs << "cameraIntroDuration=" << gameplay.cameraIntroDuration << "\n";
 		ofs << "cameraIntroFocusDistance=" << gameplay.cameraIntroFocusDistance << "\n";
 		ofs << "attackWindup=" << gameplay.attackWindup << "\n";
@@ -553,6 +721,7 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "bossUltimateCrossLaneScale=" << gameplay.bossUltimateCrossLaneScale << "\n";
 		ofs << "bossUltimateStompCount=" << gameplay.bossUltimateStompCount << "\n";
 		ofs << "bossUltimateStompTelegraph=" << gameplay.bossUltimateStompTelegraph << "\n";
+		ofs << "bossUltimateStompRepeatTelegraph=" << gameplay.bossUltimateStompRepeatTelegraph << "\n";
 		ofs << "bossUltimateStompRadiusScale=" << gameplay.bossUltimateStompRadiusScale << "\n";
 		ofs << "bossUltimateFieldTelegraph=" << gameplay.bossUltimateFieldTelegraph << "\n";
 		ofs << "bossUltimateFieldSafeScale=" << gameplay.bossUltimateFieldSafeScale << "\n";

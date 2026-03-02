@@ -26,6 +26,7 @@ public:
     void SetStageSize(float size);
     void SetMoveSpeed(float speed);
     void SetType(Type type);
+    void SetHpScale(float scale);
     DirectX::XMFLOAT3 GetSize() const;
     Collision::Box GetCollision() const;
     void Damage(int amount);

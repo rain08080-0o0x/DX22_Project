@@ -104,10 +104,12 @@ private:
     Texture* m_pShadow;
     Texture* m_pAttackMarker;
     Texture* m_pBossAttackRangeMarker;
+    Texture* m_pGroundTexture;
     XAUDIO2_BUFFER* m_pAttackSe;
     XAUDIO2_BUFFER* m_pPlayerHitSe;
     XAUDIO2_BUFFER* m_pEnemyAttackSe;
     XAUDIO2_BUFFER* m_pClearSe;
+    XAUDIO2_BUFFER* m_pDropSe;
     XAUDIO2_BUFFER* m_pGameBgm;
     XAUDIO2_BUFFER* m_pBossBgm;
     IXAudio2SourceVoice* m_pGameBgmVoice;

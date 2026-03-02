@@ -9,6 +9,10 @@ BYTE g_oldTable[256]{};
 XINPUT_STATE g_padState{};
 XINPUT_STATE g_oldPadState{};
 bool g_padConnected = false;
+POINT g_mousePos{};
+POINT g_oldMousePos{};
+bool g_mouseLeftDown = false;
+bool g_oldMouseLeftDown = false;
 
 namespace
 {
@@ -31,6 +35,26 @@ namespace
 	bool IsPadButtonDown(const XINPUT_STATE& state, WORD button)
 	{
 		return (state.Gamepad.wButtons & button) != 0;
+	}
+
+	HWND GetInputWindow()
+	{
+		HWND hWnd = GetActiveWindow();
+		if (!hWnd) hWnd = GetForegroundWindow();
+		if (!hWnd) hWnd = GetFocus();
+		return hWnd;
+	}
+
+	POINT QueryMousePosition()
+	{
+		POINT pt{};
+		::GetCursorPos(&pt);
+		HWND hWnd = GetInputWindow();
+		if (hWnd)
+		{
+			::ScreenToClient(hWnd, &pt);
+		}
+		return pt;
 	}
 
 	bool IsMappedPadPress(BYTE key, const XINPUT_STATE& state)
@@ -101,6 +125,11 @@ HRESULT InitInput()
 		ZeroMemory(&g_oldPadState, sizeof(g_oldPadState));
 	}
 
+	g_mousePos = QueryMousePosition();
+	g_oldMousePos = g_mousePos;
+	g_mouseLeftDown = (::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	g_oldMouseLeftDown = g_mouseLeftDown;
+
 	return S_OK;
 }
 
@@ -112,6 +141,11 @@ void UpdateInput()
 {
 	memcpy_s(g_oldTable, sizeof(g_oldTable), g_keyTable, sizeof(g_keyTable));
 	GetKeyboardState(g_keyTable);
+
+	g_oldMousePos = g_mousePos;
+	g_oldMouseLeftDown = g_mouseLeftDown;
+	g_mousePos = QueryMousePosition();
+	g_mouseLeftDown = (::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 
 	g_oldPadState = g_padState;
 	XINPUT_STATE state{};
@@ -172,4 +206,24 @@ float GetPadLeftStickY()
 {
 	if (!g_padConnected) return 0.0f;
 	return NormalizeThumbAxis(g_padState.Gamepad.sThumbLY, kStickDeadZone);
+}
+
+bool IsMouseLeftPress()
+{
+	return g_mouseLeftDown;
+}
+
+bool IsMouseLeftTrigger()
+{
+	return g_mouseLeftDown && !g_oldMouseLeftDown;
+}
+
+bool IsMouseLeftRelease()
+{
+	return !g_mouseLeftDown && g_oldMouseLeftDown;
+}
+
+POINT GetMousePosition()
+{
+	return g_mousePos;
 }

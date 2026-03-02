@@ -1070,3 +1070,87 @@ DX22_Project にて、敵・攻撃・当たり判定可視化・影・敵HP表�
 
 ## 次のタスク
 - 通常ステージクリア時に表示している強化選択UIも、Release ビルドで表示されるようにする。
+
+
+---
+
+# 追記（2026-03-02 / 強化選択UIのRelease表示対応）
+
+## 実施内容
+- 通常ステージクリア時の強化選択UIを、Release ビルドでも表示するよう修正。
+  - `Main.cpp` の Release 描画側に、Win時の強化選択UI描画を追加。
+  - 表示条件は Debug と同様に、`SCENE_RESULT` かつ `ResultType::Win` かつ `selectionPending != 0` へ統一。
+  - 候補あり時は `1/2/3` 選択と `R` リロール案内を表示。
+  - 候補なし時は「なにもない」と `Enter / F / Space` で進行する案内を表示。
+- Release 表示ではデバッグ専用の `B` ボス戦案内は出さないように分離。
+
+## 原因
+- 強化選択UIの既存描画処理が `#ifdef _DEBUG` ブロック内にあり、Release では描画コード自体がコンパイル対象外になっていた。
+
+## 動作確認
+- `Release|x64` ビルド成功（警告0 / エラー0）。
+
+## 追加/更新ファイル
+- 更新
+  - DX22_Project\Main.cpp
+  - WORK_REPORT_2026-02-02.md
+
+
+---
+
+# 追記（2026-03-02 / 床差し替え・難易度UI画像化・ボス踏みつけ調整）
+
+## 実施内容
+- ステージ床を Geometry 描画からテクスチャ描画へ差し替え。
+  - `Assets/Texture/Game/jimen.png` を使用する床描画へ変更。
+  - 床は 1 枚貼りではなくタイル敷きに変更し、ステージ端は余りサイズで補完するように対応。
+  - 既存のステージサイズに追従しつつ、`床タイルサイズ` を ImGui から実行中に調整できるようにした。
+- ステージクリア後の強化選択UIを Debug / Release で共通化。
+  - 片側だけ修正される状態を避けるため、描画処理を共通関数へ統合。
+  - 難易度に応じた実際の強化幅が表示文言に反映されるように変更。
+- 難易度選択をタイトル開始時に挟むフローを追加。
+  - `Easy / Normal / Hard` を開始前に選択し、その後ゲーム開始する構成に変更。
+  - 難易度ごとに強化幅を分離。
+    - Easy: `1-2`
+    - Normal: `2-3`
+    - Hard: `3-5`
+  - ボスは難易度で HP と行動頻度のみ補正し、攻撃力は据え置き。
+  - 通常ステージ敵は、ローグライク強化合計値 10 ごとに HP `+20%` / 攻撃力 `+10%` の補正を追加。
+- タイトルの難易度選択UIを ImGui テキストから画像UIへ差し替え。
+  - `Assets/Texture/Game/Frame.png` をフレームに使用。
+  - `Easy.png / Normal.png / Hard.png / Back.png` をボタン画像として使用。
+  - キー操作に加え、マウスホバーでボタンを拡大、左クリックで決定 / 戻るを行えるようにした。
+  - フレーム位置は下方向へ調整し、ボタン位置は維持するように調整。
+- ボス必殺技「踏みつけ」の連続テンポを個別調整できるように変更。
+  - 既存の `踏みつけ 予兆秒` は初回用として扱うように変更。
+  - 2 発目以降専用の `踏みつけ 連続予兆秒` を追加し、連続落下の間隔だけ短く調整できるようにした。
+- ボス踏みつけ着地時の SE を追加。
+  - `Assets/Sound/SE/drop.mp3` を読み込み、踏みつけ着地の衝突タイミングで再生するようにした。
+
+## 動作確認
+- `Release|x64` ビルド成功（警告0 / エラー0）。
+- `Debug|x64` は実行中の `DX22_Project.exe` を掴んでおり、リンク時に `LNK1104` で未確認。
+
+## 追加/更新ファイル
+- 追加
+  - DX22_Project\Assets\Sound\SE\drop.mp3
+  - DX22_Project\Assets\Texture\Game\Back.png
+  - DX22_Project\Assets\Texture\Game\Easy.png
+  - DX22_Project\Assets\Texture\Game\Frame.png
+  - DX22_Project\Assets\Texture\Game\Hard.png
+  - DX22_Project\Assets\Texture\Game\Normal.png
+  - DX22_Project\Assets\Texture\Game\jimen.png
+- 更新
+  - DX22_Project\Boss.cpp
+  - DX22_Project\Enemy.cpp
+  - DX22_Project\Enemy.h
+  - DX22_Project\Input.cpp
+  - DX22_Project\Input.h
+  - DX22_Project\Main.cpp
+  - DX22_Project\SceneGame.cpp
+  - DX22_Project\SceneGame.h
+  - DX22_Project\SceneTitle.cpp
+  - DX22_Project\SceneTitle.h
+  - DX22_Project\Transfer.cpp
+  - DX22_Project\Transfer.h
+  - WORK_REPORT_2026-02-02.md

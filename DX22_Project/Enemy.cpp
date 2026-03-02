@@ -275,6 +275,20 @@ void Enemy::SetType(Type type)
     m_moveSpeed = m_moveSpeedBase * m_moveSpeedScale;
 }
 
+void Enemy::SetHpScale(float scale)
+{
+    if (scale < 0.1f) scale = 0.1f;
+
+    const float hpRate = (m_maxHp > 0)
+        ? static_cast<float>(m_hp) / static_cast<float>(m_maxHp)
+        : 1.0f;
+    const int scaledMaxHp = static_cast<int>(std::ceil(static_cast<float>(m_maxHp) * scale));
+    m_maxHp = (scaledMaxHp > 0) ? scaledMaxHp : 1;
+    m_hp = static_cast<int>(std::ceil(hpRate * static_cast<float>(m_maxHp)));
+    if (m_hp < 0) m_hp = 0;
+    if (m_hp > m_maxHp) m_hp = m_maxHp;
+}
+
 DirectX::XMFLOAT3 Enemy::GetSize() const
 {
     return m_size;

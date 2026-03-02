@@ -23,6 +23,156 @@
 // デバッグ用
 #include "DebugUtil.h"
 
+namespace
+{
+	void FormatUpgradeLabel(const Transfer& tran, int upgradeType, char* out, size_t outSize)
+	{
+		if (!out || outSize == 0) return;
+
+		const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
+		const int amount = tran.GetUpgradeStepForType(upgradeType, difficultyPreset);
+		const char* name = nullptr;
+		switch (upgradeType)
+		{
+		case 0:
+		case 3:
+			name = u8"攻撃段階";
+			break;
+		case 1:
+		case 4:
+			name = u8"攻撃頻度段階";
+			break;
+		case 2:
+		case 5:
+			name = u8"回避CT段階";
+			break;
+		default:
+			name = nullptr;
+			break;
+		}
+
+		if (!name || amount <= 0)
+		{
+			sprintf_s(out, outSize, "%s", u8"ここには何もないようだ");
+			return;
+		}
+
+		sprintf_s(out, outSize, u8"%s+%d", name, amount);
+	}
+
+	void FormatUpgradeDescription(const Transfer& tran, int upgradeType, char* out, size_t outSize)
+	{
+		if (!out || outSize == 0) return;
+
+		const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
+		const int amount = tran.GetUpgradeStepForType(upgradeType, difficultyPreset);
+		switch (upgradeType)
+		{
+		case 0:
+		case 3:
+			sprintf_s(out, outSize, u8"段階テーブルに沿って攻撃性能を%d段階強化", amount);
+			break;
+		case 1:
+		case 4:
+			sprintf_s(out, outSize, u8"段階テーブルに沿って攻撃CTを%d段階短縮", amount);
+			break;
+		case 2:
+		case 5:
+			sprintf_s(out, outSize, u8"段階テーブルに沿って回避CTを%d段階短縮", amount);
+			break;
+		default:
+			out[0] = '\0';
+			break;
+		}
+	}
+
+	void DrawCenteredOverlayText(const char* text, ImU32 fillColor, ImU32 borderColor)
+	{
+		if (!text || text[0] == '\0') return;
+
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		if (!vp) return;
+		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+		if (!dl) return;
+
+		const ImVec2 pad(14.0f, 12.0f);
+		const ImVec2 textSize = ImGui::CalcTextSize(text);
+		const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - textSize.x) * 0.5f - pad.x,
+							vp->Pos.y + (vp->Size.y - textSize.y) * 0.5f - pad.y);
+		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+
+		dl->AddRectFilled(boxMin, boxMax, fillColor, 8.0f);
+		dl->AddRect(boxMin, boxMax, borderColor, 8.0f);
+		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), text);
+	}
+
+	void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
+	{
+		if (SceneManager::GetCurrent() != SceneManager::SceneType::SCENE_RESULT) return;
+		if (SceneManager::GetResultType() != SceneManager::ResultType::Win) return;
+		if (tran.roguelike.selectionPending == 0) return;
+
+		const bool hasAnyOffer =
+			(tran.roguelike.offers[0] >= 0) ||
+			(tran.roguelike.offers[1] >= 0) ||
+			(tran.roguelike.offers[2] >= 0);
+
+		char upgradeHud[1024]{};
+		if (!hasAnyOffer)
+		{
+			if (showBossDebugHint)
+			{
+				sprintf_s(
+					upgradeHud,
+					u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ\n[B] ボス戦へ（デバッグ）");
+			}
+			else
+			{
+				sprintf_s(
+					upgradeHud,
+					u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ");
+			}
+		}
+		else
+		{
+			char l0[64]{}, l1[64]{}, l2[64]{};
+			char d0[96]{}, d1[96]{}, d2[96]{};
+			FormatUpgradeLabel(tran, tran.roguelike.offers[0], l0, sizeof(l0));
+			FormatUpgradeLabel(tran, tran.roguelike.offers[1], l1, sizeof(l1));
+			FormatUpgradeLabel(tran, tran.roguelike.offers[2], l2, sizeof(l2));
+			FormatUpgradeDescription(tran, tran.roguelike.offers[0], d0, sizeof(d0));
+			FormatUpgradeDescription(tran, tran.roguelike.offers[1], d1, sizeof(d1));
+			FormatUpgradeDescription(tran, tran.roguelike.offers[2], d2, sizeof(d2));
+
+			if (showBossDebugHint)
+			{
+				sprintf_s(
+					upgradeHud,
+					u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d\n[B] ボス戦へ（デバッグ）",
+					l0, d0,
+					l1, d1,
+					l2, d2,
+					tran.roguelike.rerollRemain,
+					tran.roguelike.rerollMaxPerStage);
+			}
+			else
+			{
+				sprintf_s(
+					upgradeHud,
+					u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
+					l0, d0,
+					l1, d1,
+					l2, d2,
+					tran.roguelike.rerollRemain,
+					tran.roguelike.rerollMaxPerStage);
+			}
+		}
+
+		DrawCenteredOverlayText(upgradeHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+	}
+
+}
+
 HRESULT Init(HWND hWnd, UINT width, UINT height)
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -93,32 +243,6 @@ void Draw()
 
 #ifdef _DEBUG
 	TRAN_INS;
-	auto upgradeLabel = [](int upgradeType) -> const char*
-	{
-		switch (upgradeType)
-		{
-		case 0: return u8"攻撃段階+1";
-		case 1: return u8"攻撃頻度段階+1";
-		case 2: return u8"回避CT段階+1";
-		case 3: return u8"攻撃段階+2";
-		case 4: return u8"攻撃頻度段階+2";
-		case 5: return u8"回避CT段階+2";
-		default: return u8"ここには何もないようだ";
-		}
-	};
-	auto upgradeDesc = [](int upgradeType) -> const char*
-	{
-		switch (upgradeType)
-		{
-		case 0: return u8"段階テーブルに沿って攻撃性能を1段階強化";
-		case 1: return u8"段階テーブルに沿って攻撃CTを1段階短縮";
-		case 2: return u8"段階テーブルに沿って回避CTを1段階短縮";
-		case 3: return u8"段階テーブルに沿って攻撃性能を2段階強化";
-		case 4: return u8"段階テーブルに沿って攻撃CTを2段階短縮";
-		case 5: return u8"段階テーブルに沿って回避CTを2段階短縮";
-		default: return u8"";
-		}
-	};
 	auto formatRunTime = [](float sec, char* out, size_t outSize)
 	{
 		float safeSec = sec;
@@ -204,6 +328,7 @@ void Draw()
 				DragFloat(u8"回避CT", &tran.player.dashCooldown, 0.01f, 0.0f, 5.0f);
 				DragFloat(u8"回避時間", &tran.player.dashDuration, 0.01f, 0.01f, 1.0f);
 				DragFloat(u8"ステージサイズ", &tran.player.stageSize, 0.1f, 1.0f, 20.0f);
+				DragFloat(u8"床タイルサイズ", &tran.gameplay.groundTileSize, 0.05f, 0.5f, 10.0f);
 
 				ImGui::SeparatorText(u8"プレイヤー攻撃");
 				ImGui::TextDisabled(u8"初期値: 準備0.04 / 有効0.12 / 後隙0.10 / CT0.24 / Skill1CT4.0 / Skill2CT9.0");
@@ -305,11 +430,12 @@ void Draw()
 				DragFloat(u8"追尾落下 半径倍率", &tran.gameplay.bossTrackingDropRadiusScale, 0.05f, 0.5f, 8.0f);
 
 				ImGui::SeparatorText(u8"ボス: 必殺技");
-				ImGui::TextDisabled(u8"初期値: 交差予兆1.0 / 交差幅1.0 / 踏みつけ5回 / 踏みつけ予兆3.0 / 全体予兆7.0 / 安置2.0");
+				ImGui::TextDisabled(u8"初期値: 交差予兆1.0 / 交差幅1.0 / 踏みつけ5回 / 踏みつけ初回3.0 / 踏みつけ連続3.0 / 全体予兆7.0 / 安置2.0");
 				DragFloat(u8"交差攻撃 予兆秒", &tran.gameplay.bossUltimateCrossTelegraph, 0.01f, 0.10f, 8.0f);
 				DragFloat(u8"交差攻撃 幅倍率", &tran.gameplay.bossUltimateCrossLaneScale, 0.05f, 0.25f, 8.0f);
 				DragInt(u8"踏みつけ 回数", &tran.gameplay.bossUltimateStompCount, 1.0f, 1, 16);
-				DragFloat(u8"踏みつけ 予兆秒", &tran.gameplay.bossUltimateStompTelegraph, 0.01f, 0.10f, 12.0f);
+				DragFloat(u8"踏みつけ 初回予兆秒", &tran.gameplay.bossUltimateStompTelegraph, 0.01f, 0.10f, 12.0f);
+				DragFloat(u8"踏みつけ 連続予兆秒", &tran.gameplay.bossUltimateStompRepeatTelegraph, 0.01f, 0.10f, 12.0f);
 				DragFloat(u8"踏みつけ 半径倍率", &tran.gameplay.bossUltimateStompRadiusScale, 0.05f, 0.5f, 8.0f);
 				DragFloat(u8"全体攻撃 予兆秒", &tran.gameplay.bossUltimateFieldTelegraph, 0.01f, 0.10f, 12.0f);
 				DragFloat(u8"安置 半径倍率", &tran.gameplay.bossUltimateFieldSafeScale, 0.05f, 0.5f, 8.0f);
@@ -332,49 +458,7 @@ void Draw()
 				}
 				auto applyDifficultyPreset = [&](int preset)
 				{
-					switch (preset)
-					{
-					case 0: // Easy
-						tran.gameplay.enemyCount = 2;
-						tran.gameplay.waveMax = 2;
-						tran.gameplay.waveEnemyAddPerWave = 1;
-						tran.gameplay.enemyAttackWindup = 0.65f;
-						tran.gameplay.enemyAttackCooldown = 1.20f;
-						tran.gameplay.enemyAttackRangeMin = 0.70f;
-						tran.gameplay.enemyAttackRangeScale = 1.20f;
-						tran.gameplay.enemyAttackDamage = 0.8f;
-						tran.gameplay.enemyMoveSpeed = 1.00f;
-						tran.gameplay.waveEnemyMoveSpeedAdd = 0.08f;
-						tran.gameplay.waveEnemyAttackDamageScalePerWave = 0.10f;
-						break;
-					case 2: // Hard
-						tran.gameplay.enemyCount = 4;
-						tran.gameplay.waveMax = 4;
-						tran.gameplay.waveEnemyAddPerWave = 2;
-						tran.gameplay.enemyAttackWindup = 0.45f;
-						tran.gameplay.enemyAttackCooldown = 0.80f;
-						tran.gameplay.enemyAttackRangeMin = 0.90f;
-						tran.gameplay.enemyAttackRangeScale = 1.45f;
-						tran.gameplay.enemyAttackDamage = 1.3f;
-						tran.gameplay.enemyMoveSpeed = 1.35f;
-						tran.gameplay.waveEnemyMoveSpeedAdd = 0.22f;
-						tran.gameplay.waveEnemyAttackDamageScalePerWave = 0.32f;
-						break;
-					default: // Normal
-						tran.gameplay.enemyCount = 3;
-						tran.gameplay.waveMax = 3;
-						tran.gameplay.waveEnemyAddPerWave = 1;
-						tran.gameplay.enemyAttackWindup = 0.55f;
-						tran.gameplay.enemyAttackCooldown = 1.00f;
-						tran.gameplay.enemyAttackRangeMin = 0.8f;
-						tran.gameplay.enemyAttackRangeScale = 1.35f;
-						tran.gameplay.enemyAttackDamage = 1.0f;
-						tran.gameplay.enemyMoveSpeed = 1.2f;
-						tran.gameplay.waveEnemyMoveSpeedAdd = 0.15f;
-						tran.gameplay.waveEnemyAttackDamageScalePerWave = 0.20f;
-						break;
-					}
-					tran.gameplayDebug.difficultyPreset = preset;
+					tran.ApplyDifficultyPreset(preset);
 				};
 				ImGui::SeparatorText(u8"難易度プリセット");
 				ImGui::Text(u8"現在: %s", difficultyText);
@@ -454,6 +538,7 @@ void Draw()
 				{
 					tran.ResetGameplayTuningToDefault();
 					tran.gameplayDebug.difficultyPreset = 1;
+					tran.gameplayDebug.titleDifficultySelection = 1;
 				}
 				SameLine();
 				if (Button(u8"強化状態をリセット"))
@@ -465,10 +550,15 @@ void Draw()
 			}
 			if (BeginTabItem(u8"強化状態"))
 			{
-				const char* lastUpgradeText =
-					(tran.gameplayDebug.lastUpgradeType >= 0)
-					? upgradeLabel(tran.gameplayDebug.lastUpgradeType)
-					: u8"なし";
+				char lastUpgradeText[64]{};
+				if (tran.gameplayDebug.lastUpgradeType >= 0)
+				{
+					FormatUpgradeLabel(tran, tran.gameplayDebug.lastUpgradeType, lastUpgradeText, sizeof(lastUpgradeText));
+				}
+				else
+				{
+					sprintf_s(lastUpgradeText, sizeof(lastUpgradeText), "%s", u8"なし");
+				}
 
 				ImGui::Text(u8"ステージクリア回数: %d", tran.gameplayDebug.stageClearCount);
 				ImGui::Text(u8"直近の強化: %s", lastUpgradeText);
@@ -539,9 +629,13 @@ void Draw()
 				ImGui::Text(u8"強化選択待ち: %s", tran.roguelike.selectionPending ? u8"あり" : u8"なし");
 				ImGui::Text(u8"リロール残り: %d / %d", tran.roguelike.rerollRemain, tran.roguelike.rerollMaxPerStage);
 				ImGui::SeparatorText(u8"現在の候補");
-				ImGui::Text(u8"[1] %s", upgradeLabel(tran.roguelike.offers[0]));
-				ImGui::Text(u8"[2] %s", upgradeLabel(tran.roguelike.offers[1]));
-				ImGui::Text(u8"[3] %s", upgradeLabel(tran.roguelike.offers[2]));
+				char offerText0[64]{}, offerText1[64]{}, offerText2[64]{};
+				FormatUpgradeLabel(tran, tran.roguelike.offers[0], offerText0, sizeof(offerText0));
+				FormatUpgradeLabel(tran, tran.roguelike.offers[1], offerText1, sizeof(offerText1));
+				FormatUpgradeLabel(tran, tran.roguelike.offers[2], offerText2, sizeof(offerText2));
+				ImGui::Text(u8"[1] %s", offerText0);
+				ImGui::Text(u8"[2] %s", offerText1);
+				ImGui::Text(u8"[3] %s", offerText2);
 				ImGui::TextDisabled(u8"勝利時に3候補から1つ選択（Rでリロール、回数上限あり）");
 				if (Button(u8"強化状態をリセット##upgrade_tab"))
 				{
@@ -941,15 +1035,19 @@ void Draw()
 			row_i1(u8"ボスデバッグ戦中", tran.gameplayDebug.bossBattleActive);
 			row_f1(u8"ボスHP", tran.gameplayDebug.bossHp);
 			row_f1(u8"ボス最大HP", tran.gameplayDebug.bossMaxHp);
+			char debugOffer0[64]{}, debugOffer1[64]{}, debugOffer2[64]{};
+			FormatUpgradeLabel(tran, tran.gameplayDebug.upgradeOffer0, debugOffer0, sizeof(debugOffer0));
+			FormatUpgradeLabel(tran, tran.gameplayDebug.upgradeOffer1, debugOffer1, sizeof(debugOffer1));
+			FormatUpgradeLabel(tran, tran.gameplayDebug.upgradeOffer2, debugOffer2, sizeof(debugOffer2));
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"強化候補1");
-			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer0, upgradeLabel(tran.gameplayDebug.upgradeOffer0));
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer0, debugOffer0);
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"強化候補2");
-			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer1, upgradeLabel(tran.gameplayDebug.upgradeOffer1));
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer1, debugOffer1);
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(u8"強化候補3");
-			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer2, upgradeLabel(tran.gameplayDebug.upgradeOffer2));
+			ImGui::TableSetColumnIndex(1); ImGui::Text("%d (%s)", tran.gameplayDebug.upgradeOffer2, debugOffer2);
 
 			ImGui::EndTable();
 		}
@@ -1180,52 +1278,6 @@ void Draw()
 		ImGui::PopStyleVar(2);
 	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
-		SceneManager::GetResultType() == SceneManager::ResultType::Win &&
-		tran.roguelike.selectionPending != 0)
-	{
-		ImGuiViewport* vp = ImGui::GetMainViewport();
-		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
-		const bool hasAnyOffer =
-			(tran.roguelike.offers[0] >= 0) ||
-			(tran.roguelike.offers[1] >= 0) ||
-			(tran.roguelike.offers[2] >= 0);
-
-		char upgradeHud[1024]{};
-		if (!hasAnyOffer)
-		{
-			sprintf_s(
-				upgradeHud,
-				u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ\n[B] ボス戦へ（デバッグ）");
-		}
-		else
-		{
-			const char* l0 = upgradeLabel(tran.roguelike.offers[0]);
-			const char* l1 = upgradeLabel(tran.roguelike.offers[1]);
-			const char* l2 = upgradeLabel(tran.roguelike.offers[2]);
-			const char* d0 = upgradeDesc(tran.roguelike.offers[0]);
-			const char* d1 = upgradeDesc(tran.roguelike.offers[1]);
-			const char* d2 = upgradeDesc(tran.roguelike.offers[2]);
-			sprintf_s(
-				upgradeHud,
-				u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d\n[B] ボス戦へ（デバッグ）",
-				l0, d0,
-				l1, d1,
-				l2, d2,
-				tran.roguelike.rerollRemain,
-				tran.roguelike.rerollMaxPerStage);
-		}
-
-		const ImVec2 pad(14.0f, 12.0f);
-		const ImVec2 textSize = ImGui::CalcTextSize(upgradeHud);
-		const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - textSize.x) * 0.5f - pad.x,
-							vp->Pos.y + (vp->Size.y - textSize.y) * 0.5f - pad.y);
-		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
-
-		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 210), 8.0f);
-		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 160), 8.0f);
-		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), upgradeHud);
-	}
-	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
 		!(SceneManager::GetResultType() == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0))
 	{
 		ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -1284,7 +1336,8 @@ void Draw()
 		dl->AddText(font, stateSize, ImVec2(boxMin.x + (boxWidth - stateTextSize.x) * 0.5f, y), IM_COL32(210, 210, 210, 255), timerState);
 	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
-		tran.gameplayDebug.titleOptionOpen == 0)
+		tran.gameplayDebug.titleOptionOpen == 0 &&
+		tran.gameplayDebug.titleDifficultyOpen == 0)
 	{
 		ImGuiViewport* vp = ImGui::GetMainViewport();
 		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
@@ -1496,84 +1549,21 @@ void Draw()
 #endif
 
 	SceneManager::Draw();
+	{
+		TRAN_INS;
+#ifdef _DEBUG
+		const bool showBossDebugHint = true;
+#else
+		const bool showBossDebugHint = false;
+#endif
+		DrawUpgradeSelectionOverlay(tran, showBossDebugHint);
+	}
 #ifndef _DEBUG
 	{
 		TRAN_INS;
-		if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
-			SceneManager::GetResultType() == SceneManager::ResultType::Win &&
-			tran.roguelike.selectionPending != 0)
-		{
-			auto releaseUpgradeLabel = [](int upgradeType) -> const char*
-			{
-				switch (upgradeType)
-				{
-				case 0: return u8"攻撃段階+1";
-				case 1: return u8"攻撃頻度段階+1";
-				case 2: return u8"回避CT段階+1";
-				case 3: return u8"攻撃段階+2";
-				case 4: return u8"攻撃頻度段階+2";
-				case 5: return u8"回避CT段階+2";
-				default: return u8"ここには何もないようだ";
-				}
-			};
-			auto releaseUpgradeDesc = [](int upgradeType) -> const char*
-			{
-				switch (upgradeType)
-				{
-				case 0: return u8"段階テーブルに沿って攻撃性能を1段階強化";
-				case 1: return u8"段階テーブルに沿って攻撃CTを1段階短縮";
-				case 2: return u8"段階テーブルに沿って回避CTを1段階短縮";
-				case 3: return u8"段階テーブルに沿って攻撃性能を2段階強化";
-				case 4: return u8"段階テーブルに沿って攻撃CTを2段階短縮";
-				case 5: return u8"段階テーブルに沿って回避CTを2段階短縮";
-				default: return u8"";
-				}
-			};
-
-			ImGuiViewport* vp = ImGui::GetMainViewport();
-			ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
-			const bool hasAnyOffer =
-				(tran.roguelike.offers[0] >= 0) ||
-				(tran.roguelike.offers[1] >= 0) ||
-				(tran.roguelike.offers[2] >= 0);
-
-			char upgradeHud[1024]{};
-			if (!hasAnyOffer)
-			{
-				sprintf_s(
-					upgradeHud,
-					u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ");
-			}
-			else
-			{
-				const char* l0 = releaseUpgradeLabel(tran.roguelike.offers[0]);
-				const char* l1 = releaseUpgradeLabel(tran.roguelike.offers[1]);
-				const char* l2 = releaseUpgradeLabel(tran.roguelike.offers[2]);
-				const char* d0 = releaseUpgradeDesc(tran.roguelike.offers[0]);
-				const char* d1 = releaseUpgradeDesc(tran.roguelike.offers[1]);
-				const char* d2 = releaseUpgradeDesc(tran.roguelike.offers[2]);
-				sprintf_s(
-					upgradeHud,
-					u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
-					l0, d0,
-					l1, d1,
-					l2, d2,
-					tran.roguelike.rerollRemain,
-					tran.roguelike.rerollMaxPerStage);
-			}
-
-			const ImVec2 pad(14.0f, 12.0f);
-			const ImVec2 textSize = ImGui::CalcTextSize(upgradeHud);
-			const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - textSize.x) * 0.5f - pad.x,
-								vp->Pos.y + (vp->Size.y - textSize.y) * 0.5f - pad.y);
-			const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
-
-			dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 210), 8.0f);
-			dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 160), 8.0f);
-			dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), upgradeHud);
-		}
 		if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
-			tran.gameplayDebug.titleOptionOpen == 0)
+			tran.gameplayDebug.titleOptionOpen == 0 &&
+			tran.gameplayDebug.titleDifficultyOpen == 0)
 		{
 			ImGuiViewport* vp = ImGui::GetMainViewport();
 			ImDrawList* dl = ImGui::GetForegroundDrawList(vp);

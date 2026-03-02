@@ -20,6 +20,15 @@ namespace
     constexpr int kOptionRowBack = 4;
     constexpr int kOptionRowCount = 5;
     constexpr float kVolumeStep = 0.05f;
+    constexpr int kDifficultyChoiceCount = 3;
+    constexpr float kDifficultyFrameWidth = 760.0f;
+    constexpr float kDifficultyFrameHeight = 500.0f;
+    constexpr float kDifficultyButtonWidth = 420.0f;
+    constexpr float kDifficultyButtonHeight = 92.0f;
+    constexpr float kDifficultyBackWidth = 240.0f;
+    constexpr float kDifficultyBackHeight = 68.0f;
+    constexpr float kHoveredScale = 1.12f;
+    constexpr float kDifficultyPanelOffsetY = kDifficultyFrameHeight * 0.5f;
 
     bool IsTitleConfirmTriggered()
     {
@@ -40,6 +49,30 @@ namespace
         if (value > 2.0f) return 2.0f;
         return value;
     }
+
+    bool IsMouseOverUI(UIObject* pUI)
+    {
+        if (!pUI) return false;
+
+        const POINT mousePos = GetMousePosition();
+        const DirectX::XMFLOAT2 pos = pUI->GetPosition();
+        const DirectX::XMFLOAT2 size = pUI->GetSize();
+        const float left = pos.x - size.x * 0.5f;
+        const float right = pos.x + size.x * 0.5f;
+        const float top = pos.y;
+        const float bottom = pos.y + size.y;
+        return mousePos.x >= left && mousePos.x <= right && mousePos.y >= top && mousePos.y <= bottom;
+    }
+
+    void ApplyButtonVisual(UIObject* pUI, float baseWidth, float baseHeight, bool highlighted)
+    {
+        if (!pUI) return;
+
+        const float scale = highlighted ? kHoveredScale : 1.0f;
+        const float color = highlighted ? 1.0f : 0.8f;
+        pUI->SetSize(baseWidth * scale, baseHeight * scale);
+        pUI->SetColor(color, color, color, 1.0f);
+    }
 }
 
 SceneTitle::SceneTitle()
@@ -47,9 +80,16 @@ SceneTitle::SceneTitle()
     , m_pStart(nullptr)
     , m_pOption(nullptr)
     , m_pHint(nullptr)
+    , m_pDifficultyFrame(nullptr)
+    , m_pDifficultyEasy(nullptr)
+    , m_pDifficultyNormal(nullptr)
+    , m_pDifficultyHard(nullptr)
+    , m_pDifficultyBack(nullptr)
     , m_menuSelection(kTitleMenuStart)
     , m_isOptionOpen(false)
     , m_optionSelection(kOptionRowMaster)
+    , m_isDifficultyOpen(false)
+    , m_difficultySelection(1)
 {
     // 画像は Assets/Texture/ を UIObject 側が付ける前提なら相対でOK
     // 例: Assets/Texture/Title/Title_Logo.png を置いた場合は "Title/Title_Logo.png"
@@ -58,10 +98,18 @@ SceneTitle::SceneTitle()
     m_pStart = new UIObject("Title/Btn_Start.png", SCREEN_WIDTH * 0.5f, 500.0f, 360.0f, 96.0f);
     m_pOption = new UIObject("Title/Option.png", SCREEN_WIDTH * 0.5f, 600.0f, 360.0f, 96.0f);
     m_pHint = new UIObject("Title/Title_Hint.png", SCREEN_WIDTH * 0.5f, 680.0f, 300.0f, 90.0f);
+    m_pDifficultyFrame = new UIObject("Game/Frame.png", SCREEN_WIDTH * 0.5f, 200.0f + kDifficultyPanelOffsetY, kDifficultyFrameWidth, kDifficultyFrameHeight);
+    m_pDifficultyEasy = new UIObject("Game/Easy.png", SCREEN_WIDTH * 0.5f, 290.0f, kDifficultyButtonWidth, kDifficultyButtonHeight);
+    m_pDifficultyNormal = new UIObject("Game/Normal.png", SCREEN_WIDTH * 0.5f, 395.0f, kDifficultyButtonWidth, kDifficultyButtonHeight);
+    m_pDifficultyHard = new UIObject("Game/Hard.png", SCREEN_WIDTH * 0.5f, 500.0f, kDifficultyButtonWidth, kDifficultyButtonHeight);
+    m_pDifficultyBack = new UIObject("Game/Back.png", SCREEN_WIDTH * 0.5f, 622.0f, kDifficultyBackWidth, kDifficultyBackHeight);
     TRAN_INS;
     tran.gameplayDebug.titleOptionOpen = 0;
     tran.gameplayDebug.titleOptionSelection = 0;
     tran.gameplayDebug.titleOptionRequestClose = 0;
+    m_difficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
+    tran.gameplayDebug.titleDifficultyOpen = 0;
+    tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
 }
 
 SceneTitle::~SceneTitle()
@@ -70,6 +118,11 @@ SceneTitle::~SceneTitle()
     delete m_pStart; m_pStart = nullptr;
     delete m_pOption; m_pOption = nullptr;
     delete m_pHint;  m_pHint = nullptr;
+    delete m_pDifficultyFrame; m_pDifficultyFrame = nullptr;
+    delete m_pDifficultyEasy; m_pDifficultyEasy = nullptr;
+    delete m_pDifficultyNormal; m_pDifficultyNormal = nullptr;
+    delete m_pDifficultyHard; m_pDifficultyHard = nullptr;
+    delete m_pDifficultyBack; m_pDifficultyBack = nullptr;
 }
 
 void SceneTitle::Update()
@@ -84,6 +137,111 @@ void SceneTitle::Update()
             return;
         }
     }
+    if (m_isDifficultyOpen)
+    {
+        tran.gameplayDebug.titleOptionOpen = 0;
+        tran.gameplayDebug.titleOptionSelection = 0;
+        tran.gameplayDebug.titleOptionRequestClose = 0;
+        tran.gameplayDebug.titleDifficultyOpen = 1;
+        tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
+
+        auto closeDifficultyOverlay = [&]()
+        {
+            m_isDifficultyOpen = false;
+            tran.gameplayDebug.titleDifficultyOpen = 0;
+            tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
+        };
+
+        auto startGameWithDifficulty = [&](int difficulty)
+        {
+            const int selectedDifficulty = tran.NormalizeDifficultyPreset(difficulty);
+            tran.ApplyDifficultyPreset(selectedDifficulty);
+            tran.ResetRoguelikeUpgrade();
+            tran.gameplayDebug.requestBossBattle = 0;
+            tran.gameplayDebug.bossBattleActive = 0;
+            tran.gameplayDebug.showBossResultTimer = 0;
+            tran.gameplayDebug.runElapsedSec = 0.0f;
+            tran.gameplayDebug.runRecordedSec = 0.0f;
+            tran.gameplayDebug.runTimerRunning = 0;
+            tran.gameplayDebug.titleDifficultyOpen = 0;
+            tran.gameplayDebug.titleDifficultySelection = selectedDifficulty;
+            m_isDifficultyOpen = false;
+            SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+        };
+
+        if (IsKeyTrigger(VK_ESCAPE))
+        {
+            closeDifficultyOverlay();
+            return;
+        }
+
+        if (IsKeyTrigger(VK_UP) || IsKeyTrigger('W') || IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A'))
+        {
+            m_difficultySelection = WrapIndex(m_difficultySelection - 1, kDifficultyChoiceCount);
+        }
+        if (IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S') || IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D'))
+        {
+            m_difficultySelection = WrapIndex(m_difficultySelection + 1, kDifficultyChoiceCount);
+        }
+
+        const bool easyHovered = IsMouseOverUI(m_pDifficultyEasy);
+        const bool normalHovered = IsMouseOverUI(m_pDifficultyNormal);
+        const bool hardHovered = IsMouseOverUI(m_pDifficultyHard);
+        const bool backHovered = IsMouseOverUI(m_pDifficultyBack);
+
+        if (easyHovered)
+        {
+            m_difficultySelection = 0;
+        }
+        else if (normalHovered)
+        {
+            m_difficultySelection = 1;
+        }
+        else if (hardHovered)
+        {
+            m_difficultySelection = 2;
+        }
+
+        tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
+
+        ApplyButtonVisual(m_pDifficultyEasy, kDifficultyButtonWidth, kDifficultyButtonHeight, m_difficultySelection == 0 || easyHovered);
+        ApplyButtonVisual(m_pDifficultyNormal, kDifficultyButtonWidth, kDifficultyButtonHeight, m_difficultySelection == 1 || normalHovered);
+        ApplyButtonVisual(m_pDifficultyHard, kDifficultyButtonWidth, kDifficultyButtonHeight, m_difficultySelection == 2 || hardHovered);
+        ApplyButtonVisual(m_pDifficultyBack, kDifficultyBackWidth, kDifficultyBackHeight, backHovered);
+
+        if (IsMouseLeftTrigger())
+        {
+            if (backHovered)
+            {
+                closeDifficultyOverlay();
+                return;
+            }
+            if (easyHovered)
+            {
+                startGameWithDifficulty(0);
+                return;
+            }
+            if (normalHovered)
+            {
+                startGameWithDifficulty(1);
+                return;
+            }
+            if (hardHovered)
+            {
+                startGameWithDifficulty(2);
+                return;
+            }
+        }
+
+        if (IsTitleConfirmTriggered())
+        {
+            startGameWithDifficulty(m_difficultySelection);
+            return;
+        }
+        return;
+    }
+    tran.gameplayDebug.titleDifficultyOpen = 0;
+    tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
     if (m_isOptionOpen)
     {
         tran.gameplayDebug.titleOptionOpen = 1;
@@ -188,15 +346,10 @@ void SceneTitle::Update()
     {
         if (startSelected)
         {
-            TRAN_INS;
-            tran.ResetRoguelikeUpgrade();
-            tran.gameplayDebug.requestBossBattle = 0;
-            tran.gameplayDebug.bossBattleActive = 0;
-            tran.gameplayDebug.showBossResultTimer = 0;
-            tran.gameplayDebug.runElapsedSec = 0.0f;
-            tran.gameplayDebug.runRecordedSec = 0.0f;
-            tran.gameplayDebug.runTimerRunning = 0;
-            SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+            m_isDifficultyOpen = true;
+            m_difficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
+            tran.gameplayDebug.titleDifficultyOpen = 1;
+            tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
             return;
         }
         if (optionSelected)
@@ -218,8 +371,18 @@ void SceneTitle::Update()
 
 void SceneTitle::Draw()
 {
+    UIObject::Begin2D();
     if (m_pLogo)  m_pLogo->Draw();
     if (m_pStart) m_pStart->Draw();
     if (m_pOption) m_pOption->Draw();
     if (m_pHint)  m_pHint->Draw();
+    if (m_isDifficultyOpen)
+    {
+        if (m_pDifficultyFrame) m_pDifficultyFrame->Draw();
+        if (m_pDifficultyEasy) m_pDifficultyEasy->Draw();
+        if (m_pDifficultyNormal) m_pDifficultyNormal->Draw();
+        if (m_pDifficultyHard) m_pDifficultyHard->Draw();
+        if (m_pDifficultyBack) m_pDifficultyBack->Draw();
+    }
+    UIObject::End2D();
 }

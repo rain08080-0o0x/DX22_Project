@@ -16,5 +16,9 @@ bool IsKeyRepeat(BYTE key);
 bool IsPadConnected();
 float GetPadLeftStickX();
 float GetPadLeftStickY();
+bool IsMouseLeftPress();
+bool IsMouseLeftTrigger();
+bool IsMouseLeftRelease();
+POINT GetMousePosition();
 
 #endif // __INPUT_H__
