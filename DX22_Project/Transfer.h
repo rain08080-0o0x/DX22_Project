@@ -158,6 +158,10 @@ private:
 		float directionMarkerOverlapAlpha = 0.45f;
 		float bossHpBarWidthRate = 0.42f;
 		float bossHpBarHeightRate = 0.045f;
+		float bossGuardBarOffsetX = 0.0f;
+		float bossGuardBarOffsetY = 6.0f;
+		float bossGuardBarWidthRate = 0.42f;
+		float bossGuardBarHeightRate = 0.018f;
 		float bossSizeAreaScale = 6.0f;
 		int bossMaxHp = 180;
 		float bossAttackTelegraph = 1.0f;
@@ -166,6 +170,12 @@ private:
 		float bossAttackCooldown = 1.15f;
 		float bossAttackLanePlayerScale = 3.0f;
 		float bossAttackDamage = 20.0f;
+		float bossGuardInitialMax = 14.0f;
+		float bossGuardFinalMax = 24.0f;
+		float bossGuardRecoverStep = 2.0f;
+		float bossDamageScaleNormal = 0.20f;
+		float bossDamageScaleBroken = 2.20f;
+		float bossBreakRecoverSec = 8.0f;
 		float bossDashNarrowTelegraph = 1.0f;
 		float bossDashWideTelegraph = 2.0f;
 		float bossDashWideWidthRate = 0.50f;
@@ -249,6 +259,9 @@ private:
 		int bossBattleActive = 0;
 		float bossHp = 0.0f;
 		float bossMaxHp = 0.0f;
+		float bossGuard = 0.0f;
+		float bossGuardMax = 0.0f;
+		int bossBroken = 0;
 		int showBossResultTimer = 0;
 		int pauseMenuOpen = 0;
 		int pauseMenuSelection = 0; // 0: Continue, 1: Option, 2: Title

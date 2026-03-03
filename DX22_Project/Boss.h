@@ -61,25 +61,36 @@ public:
     BossController() = default;
     ~BossController() = default;
 
-    void ResetForScene(const DirectX::XMFLOAT3& playerSize, float bossSizeAreaScale, int bossMaxHp);
+    void ResetForScene(const DirectX::XMFLOAT3& playerSize,
+                       float bossSizeAreaScale,
+                       int bossMaxHp,
+                       float bossGuardInitialMax);
     void LoadTexture(const char* path);
     void LoadRockTexture(const char* path);
+    void LoadBrokenTexture(const char* path);
     void ReleaseTexture();
     void ReleaseRockTexture();
+    void ReleaseBrokenTexture();
 
     Texture* texture = nullptr;
     Texture* rockTexture = nullptr;
+    Texture* brokenTexture = nullptr;
     DirectX::XMFLOAT3 pos = { 0.0f, 0.0f, 0.0f };
     DirectX::XMFLOAT3 size = { 2.0f, 2.0f, 2.0f };
     DirectX::XMFLOAT4 color = { 0.07f, 0.07f, 0.07f, 1.0f };
     int hp = 1;
     int maxHp = 1;
+    int phase = 1;
     int lastHitSwingId = -1;
     AttackKind attackKind = AttackKindDashNarrow;
     AttackPattern attackPattern = AttackPatternVertical;
     AttackLane attackLane;
     std::vector<AttackZone> attackZones;
     std::vector<FallingRock> fallingRocks;
+    float guard = 0.0f;
+    float guardMax = 0.0f;
+    float breakRecoverTimer = 0.0f;
+    float hpDamageCarry = 0.0f;
     AttackState attackState = AttackIdle;
     float attackStateTimer = 0.0f;
     float attackTelegraphDuration = 0.0f;
@@ -89,6 +100,9 @@ public:
     int attackCycleCount = 0;
     DirectX::XMFLOAT3 dashStartPos = { 0.0f, 0.0f, 0.0f };
     DirectX::XMFLOAT3 dashEndPos = { 0.0f, 0.0f, 0.0f };
+    bool specialUnlocked = false;
+    bool forceUltimatePending = false;
+    bool isBroken = false;
     bool attackResolved = false;
     bool jumpedOut = false;
     bool requiresArenaReset = true;

@@ -402,6 +402,11 @@ void Draw()
 				ImGui::TextDisabled(u8"共通予兆倍率は各攻撃の予兆時間に乗算、予兆幅は細突進の幅かつ全攻撃の範囲倍率");
 				DragFloat(u8"ボスHPバー横幅(画面比)", &tran.gameplay.bossHpBarWidthRate, 0.005f, 0.20f, 0.90f);
 				DragFloat(u8"ボスHPバー縦幅(画面比)", &tran.gameplay.bossHpBarHeightRate, 0.002f, 0.01f, 0.20f);
+				ImGui::TextDisabled(u8"Breakゲージ初期値: X=0 / Y=6 / 横幅0.42 / 縦幅0.018");
+				DragFloat(u8"Breakゲージ Xオフセット", &tran.gameplay.bossGuardBarOffsetX, 1.0f, -960.0f, 960.0f);
+				DragFloat(u8"Breakゲージ Yオフセット", &tran.gameplay.bossGuardBarOffsetY, 1.0f, -120.0f, 320.0f);
+				DragFloat(u8"Breakゲージ 横幅(画面比)", &tran.gameplay.bossGuardBarWidthRate, 0.005f, 0.10f, 0.90f);
+				DragFloat(u8"Breakゲージ 縦幅(画面比)", &tran.gameplay.bossGuardBarHeightRate, 0.001f, 0.005f, 0.10f);
 				DragFloat(u8"ボス面積倍率", &tran.gameplay.bossSizeAreaScale, 0.05f, 4.0f, 12.0f);
 				DragInt(u8"ボス最大HP", &tran.gameplay.bossMaxHp, 1.0f, 1, 9999);
 				DragFloat(u8"共通予兆倍率", &tran.gameplay.bossAttackTelegraph, 0.01f, 0.10f, 4.0f);
@@ -410,6 +415,12 @@ void Draw()
 				DragFloat(u8"ボス攻撃CT", &tran.gameplay.bossAttackCooldown, 0.01f, 0.0f, 6.0f);
 				DragFloat(u8"予兆幅(プレイヤー比)", &tran.gameplay.bossAttackLanePlayerScale, 0.05f, 0.5f, 8.0f);
 				DragFloat(u8"ボス攻撃ダメージ", &tran.gameplay.bossAttackDamage, 0.1f, 0.0f, 200.0f);
+				DragFloat(u8"Breakゲージ 初期最大", &tran.gameplay.bossGuardInitialMax, 0.1f, 1.0f, 200.0f);
+				DragFloat(u8"Breakゲージ 最終最大", &tran.gameplay.bossGuardFinalMax, 0.1f, 1.0f, 200.0f);
+				DragFloat(u8"Break回復毎 上限上昇量", &tran.gameplay.bossGuardRecoverStep, 0.1f, 0.0f, 50.0f);
+				DragFloat(u8"通常時 被ダメ倍率", &tran.gameplay.bossDamageScaleNormal, 0.01f, 0.0f, 5.0f);
+				DragFloat(u8"Broken時 被ダメ倍率", &tran.gameplay.bossDamageScaleBroken, 0.01f, 0.0f, 10.0f);
+				DragFloat(u8"Broken復帰秒", &tran.gameplay.bossBreakRecoverSec, 0.1f, 1.0f, 30.0f);
 
 				ImGui::SeparatorText(u8"ボス: 突進");
 				ImGui::TextDisabled(u8"初期値: 細予兆1.0 / 広予兆2.0 / 広幅0.50");
@@ -1133,10 +1144,23 @@ void Draw()
 			float heightRate = tran.gameplay.bossHpBarHeightRate;
 			if (heightRate < 0.01f) heightRate = 0.01f;
 			if (heightRate > 0.20f) heightRate = 0.20f;
+			float guardWidthRate = tran.gameplay.bossGuardBarWidthRate;
+			if (guardWidthRate < 0.10f) guardWidthRate = 0.10f;
+			if (guardWidthRate > 0.90f) guardWidthRate = 0.90f;
+			float guardHeightRate = tran.gameplay.bossGuardBarHeightRate;
+			if (guardHeightRate < 0.005f) guardHeightRate = 0.005f;
+			if (guardHeightRate > 0.10f) guardHeightRate = 0.10f;
 
 			float hpRate = tran.gameplayDebug.bossHp / tran.gameplayDebug.bossMaxHp;
 			if (hpRate < 0.0f) hpRate = 0.0f;
 			if (hpRate > 1.0f) hpRate = 1.0f;
+			float guardRate = 0.0f;
+			if (tran.gameplayDebug.bossGuardMax > 0.0f)
+			{
+				guardRate = tran.gameplayDebug.bossGuard / tran.gameplayDebug.bossGuardMax;
+			}
+			if (guardRate < 0.0f) guardRate = 0.0f;
+			if (guardRate > 1.0f) guardRate = 1.0f;
 
 			const float barW = vp->Size.x * widthRate;
 			const float barH = vp->Size.y * heightRate;
@@ -1160,6 +1184,31 @@ void Draw()
 					radius * 0.6f);
 			}
 			dl->AddText(ImVec2(x + 8.0f, y - 18.0f), IM_COL32(255, 255, 255, 230), "BOSS");
+
+			const float guardBarW = vp->Size.x * guardWidthRate;
+			const float guardBarH = (vp->Size.y * guardHeightRate < 6.0f) ? 6.0f : (vp->Size.y * guardHeightRate);
+			const float guardX = vp->Pos.x + (vp->Size.x - guardBarW) * 0.5f + tran.gameplay.bossGuardBarOffsetX;
+			const float guardY = vp->Pos.y + 12.0f + barH + tran.gameplay.bossGuardBarOffsetY;
+			dl->AddRectFilled(ImVec2(guardX, guardY), ImVec2(guardX + guardBarW, guardY + guardBarH), IM_COL32(18, 18, 18, 210), radius * 0.45f);
+			dl->AddRect(ImVec2(guardX, guardY), ImVec2(guardX + guardBarW, guardY + guardBarH), IM_COL32(210, 210, 210, 180), radius * 0.45f, 0, 1.5f);
+
+			const float guardInnerW = (guardBarW - padding * 2.0f) * guardRate;
+			if (guardInnerW > 0.0f)
+			{
+				const ImU32 guardColor = (tran.gameplayDebug.bossBroken != 0)
+					? IM_COL32(130, 130, 130, 220)
+					: IM_COL32(50, 175, 255, 220);
+				dl->AddRectFilled(
+					ImVec2(guardX + padding, guardY + padding * 0.35f),
+					ImVec2(guardX + padding + guardInnerW, guardY + guardBarH - padding * 0.35f),
+					guardColor,
+					radius * 0.3f);
+			}
+			dl->AddText(ImVec2(guardX + 8.0f, guardY - 16.0f), IM_COL32(180, 225, 255, 220), "GUARD");
+			if (tran.gameplayDebug.bossBroken != 0)
+			{
+				dl->AddText(ImVec2(guardX + guardBarW - 78.0f, guardY - 16.0f), IM_COL32(255, 220, 120, 230), "BROKEN");
+			}
 		}
 	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_GAME &&
