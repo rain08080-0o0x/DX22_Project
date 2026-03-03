@@ -16,8 +16,14 @@
 
 namespace
 {
+    // Boss update uses a fixed-step simulation to stay aligned with SceneGame.
     const float kBossFixedDt = 1.0f / 60.0f;
 
+    /**
+     * @brief Clamps a float into the 0.0 to 1.0 range.
+     * @param v Value to clamp.
+     * @return Clamped value.
+     */
     float Clamp01(float v)
     {
         if (v < 0.0f) return 0.0f;
@@ -25,6 +31,13 @@ namespace
         return v;
     }
 
+    /**
+     * @brief Clamps a float into an arbitrary range.
+     * @param v Value to clamp.
+     * @param lo Lower bound.
+     * @param hi Upper bound.
+     * @return Clamped value.
+     */
     float ClampRange(float v, float lo, float hi)
     {
         if (v < lo) return lo;
@@ -32,6 +45,13 @@ namespace
         return v;
     }
 
+    /**
+     * @brief Clamps an integer into an arbitrary range.
+     * @param v Value to clamp.
+     * @param lo Lower bound.
+     * @param hi Upper bound.
+     * @return Clamped value.
+     */
     int ClampInt(int v, int lo, int hi)
     {
         if (v < lo) return lo;
@@ -39,33 +59,68 @@ namespace
         return v;
     }
 
+    /**
+     * @brief Returns the greater of two floats.
+     * @param a First value.
+     * @param b Second value.
+     * @return Larger value.
+     */
     float MaxFloat(float a, float b)
     {
         return (a > b) ? a : b;
     }
 
+    /**
+     * @brief Enforces a minimum span for area calculations.
+     * @param v Span to validate.
+     * @param fallback Minimum fallback when the span is too small.
+     * @return v when large enough, otherwise fallback.
+     */
     float SafeSpan(float v, float fallback)
     {
         return (v > 0.05f) ? v : fallback;
     }
 
+    /**
+     * @brief Returns a random float in the 0.0 to 1.0 range.
+     * @return Normalized random value.
+     */
     float Random01()
     {
         const int maxRand = (RAND_MAX > 0) ? RAND_MAX : 1;
         return static_cast<float>(std::rand()) / static_cast<float>(maxRand);
     }
 
+    /**
+     * @brief Returns a random float in the given range.
+     * @param lo Lower bound.
+     * @param hi Upper bound.
+     * @return Random float in range.
+     */
     float RandomRange(float lo, float hi)
     {
         return lo + (hi - lo) * Random01();
     }
 
+    /**
+     * @brief Returns a random integer in the given range.
+     * @param lo Lower bound.
+     * @param hi Upper bound.
+     * @return Random integer in range.
+     */
     int RandomRangeInt(int lo, int hi)
     {
         if (hi <= lo) return lo;
         return lo + (std::rand() % (hi - lo + 1));
     }
 
+    /**
+     * @brief Linearly interpolates a 3D vector.
+     * @param a Start value.
+     * @param b End value.
+     * @param t Blend factor.
+     * @return Interpolated vector.
+     */
     DirectX::XMFLOAT3 LerpFloat3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b, float t)
     {
         const float rate = Clamp01(t);
@@ -76,6 +131,12 @@ namespace
         };
     }
 
+    /**
+     * @brief Builds an AABB from a center and size.
+     * @param center Box center.
+     * @param size Box size.
+     * @return Constructed box.
+     */
     Collision::Box MakeAabb(const DirectX::XMFLOAT3& center, const DirectX::XMFLOAT3& size)
     {
         Collision::Box box{};
@@ -84,11 +145,24 @@ namespace
         return box;
     }
 
+    /**
+     * @brief Performs AABB vs AABB hit detection.
+     * @param a First box.
+     * @param b Second box.
+     * @return True when the boxes overlap.
+     */
     bool HitAabb(const Collision::Box& a, const Collision::Box& b)
     {
         return Collision::Hit(a, b).isHit;
     }
 
+    /**
+     * @brief Draws a flat marker texture on the ground with a tint.
+     * @param texture Marker texture.
+     * @param pos Ground position.
+     * @param size Draw size.
+     * @param color Tint color.
+     */
     void DrawAttackMarkerTintLocal(Texture* texture,
                                    const DirectX::XMFLOAT3& pos,
                                    const DirectX::XMFLOAT3& size,
@@ -112,6 +186,14 @@ namespace
         Sprite::Draw();
     }
 
+    /**
+     * @brief Draws a billboard sprite that faces the active camera.
+     * @param texture Texture to draw.
+     * @param camera Camera used for the billboard orientation.
+     * @param pos Bottom position.
+     * @param size Sprite size.
+     * @param color Tint color.
+     */
     void DrawBillboardSpriteLocal(Texture* texture,
                                   Camera* camera,
                                   const DirectX::XMFLOAT3& pos,
@@ -152,6 +234,18 @@ namespace
         Sprite::Draw();
     }
 
+    /**
+     * @brief Draws the boss HP and guard overlay in screen space.
+     * @param hpRate Boss HP ratio.
+     * @param guardRate Boss guard ratio.
+     * @param isBroken Whether the boss is currently guard-broken.
+     * @param barWidthRate HP bar width ratio.
+     * @param barHeightRate HP bar height ratio.
+     * @param guardOffsetX Guard bar X offset.
+     * @param guardOffsetY Guard bar Y offset.
+     * @param guardWidthRate Guard bar width ratio.
+     * @param guardHeightRate Guard bar height ratio.
+     */
     void DrawBossHpOverlayLocal(float hpRate,
                                 float guardRate,
                                 bool isBroken,
@@ -220,6 +314,12 @@ namespace
         }
     }
 
+    /**
+     * @brief Replaces a texture pointer with a freshly loaded texture.
+     * @param texture Target texture pointer.
+     * @param path Texture path.
+     * @param label Error label used when loading fails.
+     */
     void ReplaceTexture(Texture*& texture, const char* path, const char* label)
     {
         if (texture)
@@ -235,6 +335,10 @@ namespace
         }
     }
 
+    /**
+     * @brief Releases a heap-allocated texture pointer.
+     * @param texture Texture pointer to release.
+     */
     void ReleaseTexturePtr(Texture*& texture)
     {
         if (texture)
@@ -244,6 +348,15 @@ namespace
         }
     }
 
+    /**
+     * @brief Appends a new telegraph zone to the given list.
+     * @param zones Destination vector.
+     * @param center Zone center.
+     * @param size Zone size.
+     * @param color Zone draw color.
+     * @param revealStart Normalized reveal start time.
+     * @param safeZone Whether the zone is safe instead of dangerous.
+     */
     void PushAttackZone(std::vector<BossController::AttackZone>& zones,
                         const DirectX::XMFLOAT3& center,
                         const DirectX::XMFLOAT3& size,
@@ -260,6 +373,12 @@ namespace
         zones.push_back(zone);
     }
 
+    /**
+     * @brief Spawns one temporary falling rock visual.
+     * @param rocks Destination vector.
+     * @param center Ground position.
+     * @param span Base rock size.
+     */
     void SpawnRockVisual(std::vector<BossController::FallingRock>& rocks,
                          const DirectX::XMFLOAT3& center,
                          float span)
@@ -274,6 +393,13 @@ namespace
     }
 }
 
+/**
+ * @brief Resets all boss battle state for a new scene start.
+ * @param playerSize Player size used as the base for boss scaling.
+ * @param bossSizeAreaScale Size multiplier for the boss.
+ * @param bossMaxHp Maximum HP to assign.
+ * @param bossGuardInitialMax Initial guard value.
+ */
 void BossController::ResetForScene(const DirectX::XMFLOAT3& playerSize,
                                    float bossSizeAreaScale,
                                    int bossMaxHp,
@@ -319,39 +445,64 @@ void BossController::ResetForScene(const DirectX::XMFLOAT3& playerSize,
     requiresArenaReset = true;
 }
 
+/**
+ * @brief Loads the boss base texture.
+ * @param path Texture path to load.
+ */
 void BossController::LoadTexture(const char* path)
 {
     ReplaceTexture(texture, path, "Texture load failed.\nBoss texture");
 }
 
+/**
+ * @brief Loads the falling rock texture.
+ * @param path Texture path to load.
+ */
 void BossController::LoadRockTexture(const char* path)
 {
     ReplaceTexture(rockTexture, path, "Texture load failed.\nBoss rock texture");
 }
 
+/**
+ * @brief Loads the broken-state texture.
+ * @param path Texture path to load.
+ */
 void BossController::LoadBrokenTexture(const char* path)
 {
     ReplaceTexture(brokenTexture, path, "Texture load failed.\nBoss broken texture");
 }
 
+/**
+ * @brief Releases the boss base texture.
+ */
 void BossController::ReleaseTexture()
 {
     ReleaseTexturePtr(texture);
 }
 
+/**
+ * @brief Releases the falling rock texture.
+ */
 void BossController::ReleaseRockTexture()
 {
     ReleaseTexturePtr(rockTexture);
 }
 
+/**
+ * @brief Releases the broken-state texture.
+ */
 void BossController::ReleaseBrokenTexture()
 {
     ReleaseTexturePtr(brokenTexture);
 }
 
+/**
+ * @brief Reinitializes the boss using the current gameplay tuning.
+ */
 void SceneGame::InitializeBossForScene()
 {
     auto& tran = Transfer::GetInstance();
+    // Difficulty changes the effective HP before the boss is reset.
     const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
     const float bossHpScale = tran.GetBossHpScaleByDifficulty(difficultyPreset);
     const int effectiveBossMaxHp = ClampInt(
@@ -362,6 +513,9 @@ void SceneGame::InitializeBossForScene()
     m_boss.ResetForScene(tran.player.size, tran.gameplay.bossSizeAreaScale, effectiveBossMaxHp, initialGuardMax);
 }
 
+/**
+ * @brief Loads textures used only during the boss battle.
+ */
 void SceneGame::LoadBossResources()
 {
     m_boss.LoadTexture("Assets/Texture/Chracter/genbaneko.png");
@@ -369,6 +523,9 @@ void SceneGame::LoadBossResources()
     m_boss.LoadBrokenTexture("Assets/Texture/Game/Broken.png");
 }
 
+/**
+ * @brief Releases boss-only textures.
+ */
 void SceneGame::ReleaseBossResources()
 {
     m_boss.ReleaseBrokenTexture();
@@ -376,8 +533,14 @@ void SceneGame::ReleaseBossResources()
     m_boss.ReleaseTexture();
 }
 
+/**
+ * @brief Keeps boss debug state and boss tuning values in a valid range.
+ * @param stageSize Current stage size.
+ * @return Always false here; the return value matches the caller's flow contract.
+ */
 bool SceneGame::UpdateBossDebugSetup(float stageSize)
 {
+    // Outside boss debug mode, there is nothing to maintain.
     if (!m_isBossBattleDebug)
     {
         return false;
@@ -386,6 +549,7 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
     auto& tran = Transfer::GetInstance();
     if (m_boss.requiresArenaReset)
     {
+        // Entering boss mode clears regular enemies and projectiles exactly once.
         EnsureEnemyCount(0, stageSize);
         m_enemyProjectiles.clear();
         m_requestedEnemyCount = 0;
@@ -397,6 +561,8 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
     tran.gameplayDebug.bossGuard = m_boss.guard;
     tran.gameplayDebug.bossGuardMax = m_boss.guardMax;
     tran.gameplayDebug.bossBroken = m_boss.isBroken ? 1 : 0;
+
+    // Clamp all exposed tuning values so live ImGui edits cannot push the boss into invalid state.
     tran.gameplay.bossHpBarWidthRate = ClampRange(tran.gameplay.bossHpBarWidthRate, 0.20f, 0.90f);
     tran.gameplay.bossHpBarHeightRate = ClampRange(tran.gameplay.bossHpBarHeightRate, 0.01f, 0.20f);
     tran.gameplay.bossGuardBarOffsetX = ClampRange(tran.gameplay.bossGuardBarOffsetX, -960.0f, 960.0f);
@@ -448,6 +614,8 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
         static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale)),
         1,
         9999);
+
+    // Preserve the current HP ratio when the effective maximum HP changes.
     if (m_boss.maxHp <= 0)
     {
         m_boss.maxHp = effectiveBossMaxHp;
@@ -470,6 +638,8 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
         (m_boss.guardMax > 0.0f) ? m_boss.guardMax : guardMin,
         guardMin,
         guardMaxLimit);
+
+    // Guard is also kept proportional when the cap changes live.
     if (std::fabs(clampedGuardMax - m_boss.guardMax) > 0.001f)
     {
         const float guardRate = (m_boss.guardMax > 0.01f)
@@ -494,10 +664,18 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
     return false;
 }
 
+/**
+ * @brief Updates boss combat state, applies boss attacks, and processes player hits on the boss.
+ * @param stageSize Current stage size.
+ * @param playerAttackDamage Player damage per hit before boss-side scaling.
+ * @param applyPlayerDamage Callback used to damage the player.
+ * @return True when the function triggers an immediate scene-flow exit.
+ */
 bool SceneGame::UpdateBossBattle(float stageSize,
                                  int playerAttackDamage,
                                  const std::function<bool(float)>& applyPlayerDamage)
 {
+    // When boss mode is inactive, clear debug values so the HUD does not show stale data.
     if (!m_isBossBattleDebug || !m_pPlayer)
     {
         auto& tran = Transfer::GetInstance();
@@ -515,6 +693,8 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     tran.gameplayDebug.bossGuard = m_boss.guard;
     tran.gameplayDebug.bossGuardMax = m_boss.guardMax;
     tran.gameplayDebug.bossBroken = m_boss.isBroken ? 1 : 0;
+
+    // Temporary rock visuals decay independently from the actual gameplay hit timing.
     for (auto& rock : m_boss.fallingRocks)
     {
         if (rock.timer > 0.0f)
@@ -530,6 +710,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             [](const BossController::FallingRock& rock) { return rock.timer <= 0.0f; }),
         m_boss.fallingRocks.end());
 
+    // Snapshot all runtime tuning values into locals so the rest of the update uses one consistent frame view.
     const float stageHalf = stageSize * 0.5f;
     const float dashSec = ClampRange(tran.gameplay.bossAttackDashDuration, 0.05f, 2.0f);
     const float jumpOutSec = ClampRange(tran.gameplay.bossAttackJumpOutTime, 0.0f, 4.0f);
@@ -585,6 +766,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     const float guardDamagePerHit = 1.0f;
     const int ultimateInterval = (m_boss.phase >= 3) ? 3 : 5;
 
+    // Local helpers keep the long attack state machine readable.
     auto clampCenterToStage = [&](DirectX::XMFLOAT3& center, const DirectX::XMFLOAT3& size)
     {
         const float halfX = size.x * 0.5f;
@@ -1035,6 +1217,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         finishCurrentAttack();
     };
 
+    // Main boss state machine: broken recovery, idle selection, telegraph, then execution.
     if (m_boss.hp > 0)
     {
         if (m_boss.isBroken)
@@ -1214,6 +1397,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         m_boss.jumpedOut = false;
     }
 
+    // Player attacks only apply once per swing, using the shared attack AABB from SceneGame.
     if (m_boss.hp > 0 && m_attackActive && m_boss.lastHitSwingId != m_attackSwingId)
     {
         Collision::Box attackBox{};
@@ -1282,6 +1466,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
 
             if (m_boss.hp <= 0)
             {
+                // Boss defeat immediately transitions to the win result flow.
                 m_boss.attackZones.clear();
                 m_boss.fallingRocks.clear();
                 tran.gameplayDebug.runTimerRunning = 0;
@@ -1303,8 +1488,12 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     return false;
 }
 
+/**
+ * @brief Draws boss telegraph zones on the floor during the telegraph state.
+ */
 void SceneGame::DrawBossTelegraphMarker() const
 {
+    // Telegraph markers are only shown during boss debug battle while an attack is charging.
     if (!m_pBossAttackRangeMarker ||
         !m_isBossBattleDebug ||
         m_boss.hp <= 0 ||
@@ -1318,6 +1507,8 @@ void SceneGame::DrawBossTelegraphMarker() const
         ? m_boss.attackTelegraphDuration
         : 0.01f;
     const float telegraphRate = Clamp01(m_boss.attackStateTimer / telegraphSec);
+
+    // Each zone can reveal at a different normalized time for staggered patterns.
     for (const auto& zone : m_boss.attackZones)
     {
         if (telegraphRate + 0.0001f < zone.revealStart)
@@ -1334,6 +1525,7 @@ void SceneGame::DrawBossTelegraphMarker() const
 
         if (zone.safeZone)
         {
+            // Safe zones get a faint outline so players can read the intended dodge spot.
             const DirectX::XMFLOAT3 outlineSize = { zone.size.x * 1.06f, zone.size.y, zone.size.z * 1.06f };
             DrawAttackMarkerTintLocal(
                 m_pBossAttackRangeMarker,
@@ -1354,8 +1546,12 @@ void SceneGame::DrawBossTelegraphMarker() const
     }
 }
 
+/**
+ * @brief Draws boss falling-object visuals and ultimate-field drop previews.
+ */
 void SceneGame::DrawBossFallingObjects() const
 {
+    // These visuals are debug-boss-only and require the dedicated rock texture.
     if (!m_isBossBattleDebug || !m_boss.rockTexture)
     {
         return;
@@ -1372,6 +1568,7 @@ void SceneGame::DrawBossFallingObjects() const
         const float finalDropStartRate = 6.0f / 7.0f;
         if (telegraphRate >= finalDropStartRate)
         {
+            // The field ultimate shows its rocks only near the end of the telegraph.
             const float dropRate = Clamp01((telegraphRate - finalDropStartRate) / (1.0f - finalDropStartRate));
             for (const auto& zone : m_boss.attackZones)
             {
@@ -1394,6 +1591,7 @@ void SceneGame::DrawBossFallingObjects() const
         }
     }
 
+    // Active temporary rock sprites keep falling until their timer expires.
     for (const auto& rock : m_boss.fallingRocks)
     {
         if (rock.timer <= 0.0f || rock.duration <= 0.0f)
@@ -1414,6 +1612,11 @@ void SceneGame::DrawBossFallingObjects() const
     }
 }
 
+/**
+ * @brief Adds the boss to the distance-sorted draw list.
+ * @param drawEntries Draw entry list to append to.
+ * @param cam Camera position.
+ */
 void SceneGame::AddBossDrawEntry(std::vector<DrawEntry>& drawEntries, const DirectX::XMFLOAT3& cam) const
 {
     if (!m_isBossBattleDebug || m_boss.hp <= 0 || !m_boss.texture)
@@ -1432,6 +1635,10 @@ void SceneGame::AddBossDrawEntry(std::vector<DrawEntry>& drawEntries, const Dire
     drawEntries.push_back({ dx * dx + dy * dy + dz * dz, false, true, bossCenter, m_boss.size, nullptr });
 }
 
+/**
+ * @brief Draws the boss entry with state-based visual modulation.
+ * @param entry Sorted draw entry to render.
+ */
 void SceneGame::DrawBossEntry(const DrawEntry& entry) const
 {
     if (!entry.isBoss || !m_boss.texture)
@@ -1449,6 +1656,7 @@ void SceneGame::DrawBossEntry(const DrawEntry& entry) const
     DirectX::XMFLOAT3 drawSize = entry.size;
     DirectX::XMFLOAT4 drawColor = m_boss.color;
 
+    // During telegraph, the boss pose and tint shift to hint at the next attack type.
     if (m_boss.attackState == BossController::AttackTelegraph)
     {
         const float telegraphSec = (m_boss.attackTelegraphDuration > 0.01f)
@@ -1499,6 +1707,7 @@ void SceneGame::DrawBossEntry(const DrawEntry& entry) const
         }
     }
 
+    // Broken state dims the base sprite and adds a separate broken icon overlay.
     if (m_boss.isBroken)
     {
         drawColor.x = MaxFloat(drawColor.x, 0.30f);
@@ -1526,6 +1735,9 @@ void SceneGame::DrawBossEntry(const DrawEntry& entry) const
     }
 }
 
+/**
+ * @brief Draws the screen-space boss HP and guard UI.
+ */
 void SceneGame::DrawBossHpUi() const
 {
     if (!m_isBossBattleDebug || m_boss.maxHp <= 0)

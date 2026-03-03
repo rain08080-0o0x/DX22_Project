@@ -20,6 +20,7 @@
 
 namespace
 {
+    // UI layout and gameplay guard values used inside SceneGame only.
     const float kUiMargin = 20.0f;
     const float kHpFrameWidth = 260.0f;
     const float kHpFrameHeight = 32.0f;
@@ -83,24 +84,46 @@ namespace
     const int kPauseOptionCount = 5;
     const float kOptionVolumeStep = 0.05f;
 
+    /**
+     * @brief カメラモード値を有効な 2 値へ正規化します。
+     * @param mode 補正対象のモード値です。
+     * @return Debug 指定時のみ Debug、それ以外は Game です。
+     */
     int NormalizeCameraMode(int mode)
     {
         return (mode == kCameraModeDebug) ? kCameraModeDebug : kCameraModeGame;
     }
 
+    /**
+     * @brief インデックスを 0 から count-1 の範囲に循環させます。
+     * @param value 補正対象の値です。
+     * @param count 要素数です。
+     * @return 折り返し済みインデックスです。
+     */
     int WrapIndex(int value, int count)
     {
+        // 項目数が無い場合は安全側で 0 を返します。
         if (count <= 0) return 0;
         int wrapped = value % count;
+        // 負方向に動かした時も先頭未満にならないように折り返します。
         if (wrapped < 0) wrapped += count;
         return wrapped;
     }
 
+    /**
+     * @brief ポーズ系 UI の決定入力が押されたかを返します。
+     * @return Enter / F / Space のいずれかがトリガーなら true です。
+     */
     bool IsPauseConfirmTriggered()
     {
         return IsKeyTrigger(VK_RETURN) || IsKeyTrigger('F') || IsKeyTrigger(VK_SPACE);
     }
 
+    /**
+     * @brief 音量値を UI で扱う範囲に丸めます。
+     * @param value 補正対象音量です。
+     * @return 0.0 から 2.0 に丸めた音量です。
+     */
     float ClampVolume(float value)
     {
         if (value < 0.0f) return 0.0f;
@@ -108,19 +131,33 @@ namespace
         return value;
     }
 
+    /**
+     * @brief 敵スポーン位置をインデックスから決定します。
+     * @param index 敵番号です。
+     * @param stageSize 現在のステージサイズです。
+     * @return スポーン用ワールド座標です。
+     */
     DirectX::XMFLOAT3 CalcEnemySpawnPos(int index, float stageSize)
     {
+        // 先頭数体は決め打ち位置を使い、序盤の見え方を安定させます。
         if (index >= 0 && index < kEnemySpawnPresetCount)
         {
             return kEnemySpawnPositions[index];
         }
 
+        // それ以外は円周上に均等配置し、ステージ外へ出にくい半径を使います。
         const float safeStage = (stageSize > 0.5f) ? stageSize : 5.0f;
         const float radius = safeStage * 0.35f;
         const float angle = (2.0f * kPi * static_cast<float>(index)) / static_cast<float>(kEnemyCountMax);
         return { std::cos(angle) * radius, 0.0f, std::sin(angle) * radius };
     }
 
+    /**
+     * @brief カメラが存在する場合だけ Eye / Look を反映します。
+     * @param camera 更新するカメラです。
+     * @param eye 新しい Eye です。
+     * @param look 新しい Look です。
+     */
     void ApplyCameraPose(CameraDebug* camera, const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& look)
     {
         if (camera)
@@ -130,6 +167,11 @@ namespace
     }
 
 
+    /**
+     * @brief 浮動小数を 0.0 から 1.0 に丸めます。
+     * @param v 補正対象です。
+     * @return 0.0 から 1.0 に収めた値です。
+     */
     float Clamp01(float v)
     {
         if (v < 0.0f) return 0.0f;
@@ -137,6 +179,13 @@ namespace
         return v;
     }
 
+    /**
+     * @brief 3 次元ベクトルを線形補間します。
+     * @param a 開始値です。
+     * @param b 終了値です。
+     * @param t 補間係数です。
+     * @return a から b の間を補間したベクトルです。
+     */
     DirectX::XMFLOAT3 LerpFloat3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b, float t)
     {
         const float rate = Clamp01(t);
@@ -147,28 +196,48 @@ namespace
         };
     }
 
+    /**
+     * @brief 3 次元ベクトルを正規化します。
+     * @param v 正規化対象です。
+     * @param fallback 長さ 0 に近い場合に返す代替値です。
+     * @return 正規化ベクトル、または fallback です。
+     */
     DirectX::XMFLOAT3 Normalize3(const DirectX::XMFLOAT3& v, const DirectX::XMFLOAT3& fallback)
     {
         const float lenSq = v.x * v.x + v.y * v.y + v.z * v.z;
         if (lenSq <= 1.0e-6f)
         {
+            // 長さが無い方向は正規化できないため、呼び出し側の既定方向へ逃がします。
             return fallback;
         }
         const float invLen = 1.0f / std::sqrt(lenSq);
         return { v.x * invLen, v.y * invLen, v.z * invLen };
     }
 
+    /**
+     * @brief カメラ導入演出に使う指数イージングを返します。
+     * @param t 0.0 から 1.0 の進行率です。
+     * @return イージング後の進行率です。
+     */
     float ExpEase01(float t)
     {
         const float clamped = Clamp01(t);
         const float denom = 1.0f - expf(-kCameraIntroExpStrength);
         if (denom <= 1.0e-6f)
         {
+            // 分母が壊れる場合は素直な線形値へフォールバックします。
             return clamped;
         }
         return (1.0f - expf(-kCameraIntroExpStrength * clamped)) / denom;
     }
 
+    /**
+     * @brief 浮動小数を任意範囲へ丸めます。
+     * @param v 補正対象値です。
+     * @param lo 下限です。
+     * @param hi 上限です。
+     * @return 指定範囲に収めた値です。
+     */
     float ClampRange(float v, float lo, float hi)
     {
         if (v < lo) return lo;
@@ -176,6 +245,13 @@ namespace
         return v;
     }
 
+    /**
+     * @brief 整数を任意範囲へ丸めます。
+     * @param v 補正対象値です。
+     * @param lo 下限です。
+     * @param hi 上限です。
+     * @return 指定範囲に収めた値です。
+     */
     int ClampInt(int v, int lo, int hi)
     {
         if (v < lo) return lo;
@@ -183,6 +259,11 @@ namespace
         return v;
     }
 
+    /**
+     * @brief 難易度による基準敵数補正を返します。
+     * @param preset 難易度です。
+     * @return Easy は -1、Hard は +1、Normal は 0 です。
+     */
     int CalcDifficultyBaseEnemyBonus(int preset)
     {
         switch (preset)
@@ -193,6 +274,11 @@ namespace
         }
     }
 
+    /**
+     * @brief 難易度による Wave ごとの追加敵数補正を返します。
+     * @param preset 難易度です。
+     * @return Hard のみ +1、それ以外は 0 です。
+     */
     int CalcDifficultyWaveAddBonus(int preset)
     {
         switch (preset)
@@ -203,6 +289,11 @@ namespace
         }
     }
 
+    /**
+     * @brief 難易度による敵攻撃ダメージ倍率を返します。
+     * @param preset 難易度です。
+     * @return 難易度に応じたダメージ倍率です。
+     */
     float CalcDifficultyEnemyAttackDamageScale(int preset)
     {
         switch (preset)
@@ -213,6 +304,12 @@ namespace
         }
     }
 
+    /**
+     * @brief XZ 平面上の距離二乗を返します。
+     * @param a 座標 A です。
+     * @param b 座標 B です。
+     * @return XZ 平面距離の二乗です。
+     */
     float DistSqXZ(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b)
     {
         const float dx = a.x - b.x;
@@ -220,6 +317,12 @@ namespace
         return dx * dx + dz * dz;
     }
 
+    /**
+     * @brief XZ 平面成分だけを正規化します。
+     * @param v 正規化対象ベクトルです。
+     * @param fallback 長さ 0 に近い場合の代替値です。
+     * @return XZ 正規化ベクトル、または fallback です。
+     */
     DirectX::XMFLOAT3 NormalizeXZ(const DirectX::XMFLOAT3& v, const DirectX::XMFLOAT3& fallback)
     {
         const float len = std::sqrt(v.x * v.x + v.z * v.z);
@@ -230,6 +333,12 @@ namespace
         return { v.x / len, 0.0f, v.z / len };
     }
 
+    /**
+     * @brief 中心とサイズから AABB を生成します。
+     * @param center ボックス中心です。
+     * @param size ボックスサイズです。
+     * @return 組み立てた AABB です。
+     */
     Collision::Box MakeAabb(const DirectX::XMFLOAT3& center, const DirectX::XMFLOAT3& size)
     {
         Collision::Box box{};
@@ -238,6 +347,12 @@ namespace
         return box;
     }
 
+    /**
+     * @brief AABB 同士のヒット判定を返します。
+     * @param a 判定対象 A です。
+     * @param b 判定対象 B です。
+     * @return ヒットしていれば true です。
+     */
     bool HitAabb(const Collision::Box& a, const Collision::Box& b)
     {
         // Gameplay collision policy: use AABB (Box vs Box) only.
@@ -279,12 +394,18 @@ namespace
         Geometory::AddLine(v[3], v[7], color);
     }
 
+    /**
+     * @brief 指定カメラのフラスタムを線で可視化します。
+     * @param camera 可視化対象カメラです。
+     * @param color 線色です。
+     */
     void AddCameraFrustumLines(const Camera& camera, const DirectX::XMFLOAT4& color)
     {
         using namespace DirectX;
 
         const float nearZ = camera.GetNear();
         const float farZ = camera.GetFar();
+        // near/far が不正だとフラスタムが組めないため描画しません。
         if (nearZ <= 0.0f || farZ <= 0.0f || farZ <= nearZ)
         {
             return;
@@ -304,6 +425,7 @@ namespace
         XMVECTOR forward = vLook - vPos;
         if (XMVectorGetX(XMVector3LengthSq(forward)) < 1.0e-6f)
         {
+            // Eye と Look が一致している場合は前方既定値を使います。
             forward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
         }
         else
@@ -313,6 +435,7 @@ namespace
 
         if (XMVectorGetX(XMVector3LengthSq(vUp)) < 1.0e-6f)
         {
+            // Up が壊れている場合も描画を継続できるよう既定値に戻します。
             vUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         }
         else
@@ -382,11 +505,19 @@ namespace
         Geometory::AddLine(v[3], v[7], color);
     }
 
+    /**
+     * @brief 足元に影スプライトを描画します。
+     * @param texture 影テクスチャです。
+     * @param pos 描画対象位置です。
+     * @param size 対象サイズです。
+     * @param scaleMultiplier 影サイズ倍率です。
+     */
     void DrawShadow(Texture* texture,
                     const DirectX::XMFLOAT3& pos,
                     const DirectX::XMFLOAT3& size,
                     float scaleMultiplier = 1.0f)
     {
+        // テクスチャ未設定時は描画できません。
         if (!texture) return;
 
         const float kShadowScale = 1.25f;
@@ -398,6 +529,7 @@ namespace
         DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranspose(R * T));
 
         Sprite::SetWorld(world);
+        // 極端に小さい倍率でも影が消え切らないよう下限を設けます。
         const float finalScale = kShadowScale * ((scaleMultiplier > 0.01f) ? scaleMultiplier : 0.01f);
         Sprite::SetSize({ size.x * finalScale, size.z * finalScale });
         Sprite::SetOffset({ 0.0f, 0.0f });
@@ -408,11 +540,19 @@ namespace
         Sprite::Draw();
     }
 
+    /**
+     * @brief 指定色付きの攻撃マーカーを地面へ描画します。
+     * @param texture マーカー画像です。
+     * @param pos 描画位置です。
+     * @param size 描画サイズです。
+     * @param color 表示色です。
+     */
     void DrawAttackMarkerTint(Texture* texture,
                               const DirectX::XMFLOAT3& pos,
                               const DirectX::XMFLOAT3& size,
                               const DirectX::XMFLOAT4& color)
     {
+        // テクスチャ未設定時は何も描画しません。
         if (!texture) return;
 
         const float kMarkerY = 0.002f;
@@ -433,12 +573,21 @@ namespace
         Sprite::Draw();
     }
 
+    /**
+     * @brief 既定色の攻撃マーカーを描画します。
+     * @param texture マーカー画像です。
+     * @param pos 描画位置です。
+     * @param size 描画サイズです。
+     */
     void DrawAttackMarker(Texture* texture, const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& size)
     {
         DrawAttackMarkerTint(texture, pos, size, { 1.0f, 1.0f, 1.0f, 0.9f });
     }
 }
 
+/**
+ * @brief ゲームシーンを生成し、戦闘に必要な各種オブジェクトを初期化します。
+ */
 SceneGame::SceneGame()
     : m_pCamera(nullptr)
     , m_pCameraGame(nullptr)
@@ -511,9 +660,12 @@ SceneGame::SceneGame()
     , m_pauseOptionSelection(kPauseOptionMaster)
     , m_isBossBattleDebug(false)
 {
+    // カメラはゲーム用とデバッグ用を分離して生成します。
     m_pCameraGame = new CameraDebug();
     m_pCameraDebug = new CameraDebug();
     TRAN_INS;
+
+    // Transfer 側のモード値を正規化し、どちらのカメラを使うか決めます。
     tran.cameraMode = NormalizeCameraMode(tran.cameraMode);
     m_cameraMode = tran.cameraMode;
     if (m_pCameraGame)
@@ -528,7 +680,11 @@ SceneGame::SceneGame()
     }
     m_pCamera = (m_cameraMode == kCameraModeDebug) ? static_cast<Camera*>(m_pCameraDebug)
         : static_cast<Camera*>(m_pCameraGame);
+
+    // 現在アクティブなカメラ状態を共有領域へ反映します。
     tran.camera = (m_cameraMode == kCameraModeDebug) ? tran.cameraDebug : tran.cameraGame;
+
+    // シーン開始時にリザルトやポーズ状態が残らないよう初期化します。
     SceneManager::ChangeResult(SceneManager::ResultType::None);
     tran.gameplayDebug.pauseMenuOpen = 0;
     tran.gameplayDebug.pauseMenuSelection = kPauseMenuContinue;
@@ -748,8 +904,12 @@ SceneGame::SceneGame()
     tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
 }
 
+/**
+ * @brief SceneGame が生成したリソースとオブジェクトを解放します。
+ */
 SceneGame::~SceneGame()
 {
+    // BGM 再生中なら先に停止し、ボイスを破棄します。
     if (m_pGameBgmVoice)
     {
         m_pGameBgmVoice->Stop();
@@ -848,15 +1008,23 @@ SceneGame::~SceneGame()
     m_pCamera = nullptr;
 }
 
+/**
+ * @brief 指定スロット向けに敵を 1 体生成して初期化します。
+ * @param index 生成対象インデックスです。
+ * @param stageSize スポーン計算に使うステージサイズです。
+ */
 void SceneGame::SpawnEnemyByIndex(int index, float stageSize)
 {
     Enemy* enemy = new Enemy();
+    // 生成失敗時は初期化を継続できないため中断します。
     if (!enemy) return;
 
     TRAN_INS;
+    // 生成直後に共通設定をまとめて反映します。
     enemy->SetCamera(m_pCamera);
     enemy->SetSize(tran.player.size);
     enemy->SetStageSize(stageSize);
+    // 生成順で敵タイプをローテーションし、編成を分散させます。
     switch ((index % 3 + 3) % 3)
     {
     case 0: enemy->SetType(Enemy::Type::Speed); break;
@@ -866,6 +1034,7 @@ void SceneGame::SpawnEnemyByIndex(int index, float stageSize)
     const float enemyHpScale = m_isBossBattleDebug ? 1.0f : tran.GetEnemyHpScaleByUpgradeProgress();
     enemy->SetHpScale(enemyHpScale);
 
+    // スポーン候補探索で使う値は先に丸めて、異常値でも破綻しないようにします。
     const float safeStage = (stageSize > 0.5f) ? stageSize : 5.0f;
     const float ringScale = ClampRange(tran.gameplay.enemySpawnRingScale, 0.1f, 0.9f);
     const float jitterScale = ClampRange(tran.gameplay.enemySpawnJitterScale, 0.0f, 0.5f);
@@ -898,6 +1067,7 @@ void SceneGame::SpawnEnemyByIndex(int index, float stageSize)
     const float jitterRadius = safeStage * jitterScale;
     const int kSpawnAttempts = 24;
 
+    // 複数候補から、プレイヤーと既存敵に対して最も余裕がある位置を選びます。
     for (int attempt = 0; attempt < kSpawnAttempts; ++attempt)
     {
         DirectX::XMFLOAT3 candidate{};
@@ -951,14 +1121,22 @@ void SceneGame::SpawnEnemyByIndex(int index, float stageSize)
     m_enemies.push_back(slot);
 }
 
+/**
+ * @brief 目標数へ合わせて敵スロットを増減させます。
+ * @param targetCount 目標敵数です。
+ * @param stageSize スポーン計算に使うステージサイズです。
+ */
 void SceneGame::EnsureEnemyCount(int targetCount, float stageSize)
 {
     const int clampedTarget = static_cast<int>(ClampRange(static_cast<float>(targetCount), static_cast<float>(kEnemyCountMin), static_cast<float>(kEnemyCountMax)));
+
+    // 足りない間は必要数に達するまで生成を繰り返します。
     while (static_cast<int>(m_enemies.size()) < clampedTarget)
     {
         SpawnEnemyByIndex(static_cast<int>(m_enemies.size()), stageSize);
     }
 
+    // 多い間は末尾から破棄して要求数へ揃えます。
     while (static_cast<int>(m_enemies.size()) > clampedTarget)
     {
         EnemySlot& back = m_enemies.back();
@@ -971,8 +1149,16 @@ void SceneGame::EnsureEnemyCount(int targetCount, float stageSize)
     }
 }
 
+/**
+ * @brief Wave 番号から出現敵数を計算します。
+ * @param baseCount 基本敵数です。
+ * @param waveIndex 現在 Wave 番号です。
+ * @param addPerWave Wave ごとの増加数です。
+ * @return 計算後の敵数です。
+ */
 int SceneGame::CalcWaveEnemyCount(int baseCount, int waveIndex, int addPerWave) const
 {
+    // 基本値と Wave 値を安全範囲に補正し、負方向の増加は許可しません。
     int safeBase = baseCount;
     if (safeBase < kEnemyCountMin) safeBase = kEnemyCountMin;
     if (safeBase > kEnemyCountMax) safeBase = kEnemyCountMax;
@@ -983,6 +1169,7 @@ int SceneGame::CalcWaveEnemyCount(int baseCount, int waveIndex, int addPerWave) 
     int safeAdd = addPerWave;
     if (safeAdd < 0) safeAdd = 0;
 
+    // Wave 1 を基点に、追加数を累積して最終敵数を決めます。
     const int waveStep = safeWave - 1;
     const int expanded = safeBase + waveStep * safeAdd;
     if (expanded < kEnemyCountMin) return kEnemyCountMin;
@@ -990,14 +1177,19 @@ int SceneGame::CalcWaveEnemyCount(int baseCount, int waveIndex, int addPerWave) 
     return expanded;
 }
 
+/**
+ * @brief 戦闘、UI、カメラ、ポーズ状態を 1 フレーム分更新します。
+ */
 void SceneGame::Update()
 {
     TRAN_INS;
+    // ポーズ UI の拡大率は許容範囲に丸め、異常値で表示が崩れないようにします。
     tran.gameplayDebug.pauseMenuUiScale = ClampRange(tran.gameplayDebug.pauseMenuUiScale, 0.5f, 2.5f);
     tran.gameplayDebug.pauseMenuFontScale = ClampRange(tran.gameplayDebug.pauseMenuFontScale, 0.5f, 2.5f);
     tran.gameplayDebug.pauseMenuButtonScale = ClampRange(tran.gameplayDebug.pauseMenuButtonScale, 0.5f, 2.5f);
     if (m_pGameBgmVoice)
     {
+        // ポーズ中の Option 変更も即時反映するため、毎フレーム音量を適用します。
         const float masterVolume = ClampRange(tran.gameplay.volumeMaster, 0.0f, 2.0f);
         const float bgmVolume = ClampRange(tran.gameplay.volumeBgm, 0.0f, 2.0f);
         m_pGameBgmVoice->SetVolume(masterVolume * bgmVolume);
@@ -1029,6 +1221,7 @@ void SceneGame::Update()
 
     if (m_isPaused)
     {
+        // Pause state splits into menu navigation and option sub-menu navigation.
         if (m_isPauseOptionOpen)
         {
             if (IsKeyTrigger(VK_UP) || IsKeyTrigger('W'))
@@ -1100,11 +1293,13 @@ void SceneGame::Update()
 
                 if (action == 1)
                 {
+                    // Continue closes pause and resumes gameplay immediately.
                     m_isPaused = false;
                     m_isPauseOptionOpen = false;
                 }
                 else if (action == 2)
                 {
+                    // Returning to title also resets transient run/boss state.
                     m_isPaused = false;
                     m_isPauseOptionOpen = false;
                     tran.gameplayDebug.pauseMenuOpen = 0;
@@ -1124,6 +1319,7 @@ void SceneGame::Update()
                 }
                 else if (action == 3)
                 {
+                    // Option opens the nested pause option menu.
                     m_isPauseOptionOpen = true;
                     m_pauseOptionSelection = kPauseOptionMaster;
                     tran.gameplayDebug.pauseOptionRequestClose = 0;
@@ -1138,6 +1334,7 @@ void SceneGame::Update()
     tran.gameplayDebug.pauseOptionSelection = m_pauseOptionSelection;
     if (m_isPaused)
     {
+        // Gameplay update stops completely while paused.
         return;
     }
 
@@ -1301,11 +1498,13 @@ void SceneGame::Update()
 
     if (!m_isBossBattleDebug && waveEnemyTarget != m_requestedEnemyCount)
     {
+        // Regular mode keeps the requested enemy count aligned with current wave rules.
         m_requestedEnemyCount = waveEnemyTarget;
         EnsureEnemyCount(m_requestedEnemyCount, stageSize);
     }
     else if (m_isBossBattleDebug && m_requestedEnemyCount != 0)
     {
+        // Boss debug mode forces the normal enemy population to zero.
         m_requestedEnemyCount = 0;
         EnsureEnemyCount(0, stageSize);
     }
@@ -1350,6 +1549,7 @@ void SceneGame::Update()
 
     if (m_cameraIntroActive)
     {
+        // The intro camera briefly pushes toward the player, then returns to the base pose.
         const float safeIntroDuration = (cameraIntroDuration > 0.0f) ? cameraIntroDuration : kFixedDt;
         m_cameraIntroTimer += kFixedDt;
         const float introT = Clamp01(m_cameraIntroTimer / safeIntroDuration);
@@ -1405,6 +1605,7 @@ void SceneGame::Update()
         UpdateHpGauge();
         UpdateCooldownGauges();
         m_uiManager.Update(UIObjectManager::Layer::Game);
+        // During the intro, gameplay itself stays frozen after UI state is refreshed.
         return;
     }
 
@@ -1582,6 +1783,7 @@ void SceneGame::Update()
 
     if (m_pPlayer && !m_enemyProjectiles.empty())
     {
+        // Enemy projectiles are stepped first so their hits resolve before the rest of the melee update.
         Collision::Box playerBox = MakeAabb({
             tran.player.pos.x,
             tran.player.pos.y + tran.player.size.y * 0.5f,
@@ -1641,6 +1843,7 @@ void SceneGame::Update()
 
     if (UpdateBossBattle(stageSize, playerAttackDamage, applyPlayerDamage))
     {
+        // Boss update can end the run immediately, so stop further processing when it does.
         return;
     }
 
@@ -1654,6 +1857,8 @@ void SceneGame::Update()
     {
         EnemySlot& slot = m_enemies[i];
         if (!slot.enemy) continue;
+
+        // Enemy tuning is refreshed every frame so live ImGui edits take effect immediately.
         slot.enemy->SetSize(tran.player.size);
         slot.enemy->SetStageSize(stageSize);
         slot.enemy->SetMoveSpeed(enemyMoveSpeed);
@@ -1758,6 +1963,7 @@ void SceneGame::Update()
         m_attackRecoveryTimer <= 0.0f &&
         m_attackCooldownTimer <= 0.0f)
     {
+        // Attack can only start when no other attack phase is still running.
         m_attackWindupTimer = attackWindup;
         m_attackCooldownUiDuration = attackWindup + attackDuration + attackRecovery + attackCooldown;
         if (m_attackCooldownUiDuration < kMinDuration) m_attackCooldownUiDuration = kMinDuration;
@@ -1766,6 +1972,7 @@ void SceneGame::Update()
 
     if (!m_attackActive && m_attackWindupTimer > 0.0f)
     {
+        // Windup counts down first, then flips into the active hit window.
         m_attackWindupTimer -= kFixedDt;
         if (m_attackWindupTimer <= 0.0f)
         {
@@ -1780,6 +1987,7 @@ void SceneGame::Update()
 
     if (m_attackActive)
     {
+        // Active attack expires into recovery and cooldown.
         m_attackTimer -= kFixedDt;
         if (m_attackTimer <= 0.0f)
         {
@@ -2151,6 +2359,7 @@ void SceneGame::Update()
 
         if (!m_isBossBattleDebug && m_enemies.empty())
         {
+            // Clearing all enemies advances the wave, or finishes the stage on the final wave.
             m_enemyProjectiles.clear();
             if (m_currentWave < m_waveMax)
             {
@@ -2184,6 +2393,8 @@ void SceneGame::Update()
         TRAN_INS;
         Enemy* trackedEnemy = nullptr;
         float nearestDistSq = 1.0e30f;
+
+        // Publish the nearest enemy into Transfer for UI and direction-marker overlap checks.
         for (const auto& slot : m_enemies)
         {
             if (!slot.enemy) continue;
@@ -2227,18 +2438,24 @@ void SceneGame::Update()
     tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
     tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
 
+    // Final UI state is refreshed after all gameplay mutations for the frame are complete.
     UpdateHpGauge();
     UpdateCooldownGauges();
     m_uiManager.Update(UIObjectManager::Layer::Game);
 }
 
+/**
+ * @brief ゲームシーンの 3D と UI を描画します。
+ */
 void SceneGame::Draw()
 {
+    // カメラが無いと描画行列を作れないため何も描画しません。
     if (!m_pCamera) return;
 
     DirectX::XMFLOAT4X4 view = m_pCamera->GetViewMatrix();
     DirectX::XMFLOAT4X4 proj = m_pCamera->GetProjectionMatrix();
 
+    // Geometry と Sprite の両方へ同じカメラ行列を設定します。
     Geometory::SetView(view);
     Geometory::SetProjection(proj);
     Sprite::SetView(view);
@@ -2256,6 +2473,7 @@ void SceneGame::Draw()
 
     if (m_pGroundTexture)
     {
+        // The floor is drawn as tiled sprites so arbitrary stage sizes are covered without stretching.
         const float groundY = -0.001f;
         const float safeStage = (stage > 0.1f) ? stage : 0.1f;
         const float baseTileSize = ClampRange(groundTileSize, 0.5f, 10.0f);
@@ -2309,6 +2527,7 @@ void SceneGame::Draw()
 
     if (m_attackActive)
     {
+        // Active player swing is visualized as a floor marker.
         DrawAttackMarker(m_pAttackMarker, m_attackCenter, m_attackSize);
     }
     if (m_pAttackMarker)
@@ -2367,6 +2586,7 @@ void SceneGame::Draw()
         return a.distSq > b.distSq;
     });
 
+    // Transparent-ish billboard sprites are drawn back-to-front for more natural overlap.
     for (const auto& entry : drawEntries)
     {
         float shadowScale = 1.0f;
@@ -2398,6 +2618,7 @@ void SceneGame::Draw()
     if (m_pAttackMarker)
     {
         TRAN_INS;
+        // Marker effects cover temporary hit flashes, defeat flashes, and player damage flashes.
         for (const auto& fx : m_markerEffects)
         {
             if (fx.timer <= 0.0f || fx.duration <= 0.0f) continue;
@@ -2452,6 +2673,7 @@ void SceneGame::Draw()
     if (m_cameraMode == kCameraModeDebug)
     {
         TRAN_INS;
+        // Debug mode overlays all important gameplay AABBs and attack ranges.
         Collision::Box playerBox{};
         playerBox.size = tran.player.size;
         playerBox.center = {
@@ -2533,6 +2755,7 @@ void SceneGame::Draw()
 
     if (m_pEnemyHpFrame && m_pEnemyHpGauge && m_pCamera)
     {
+        // Heavy enemy counts throttle HP billboard draws to reduce per-frame cost.
         const int enemyCount = static_cast<int>(m_enemies.size());
         const bool reduceHpBillboardLoad = (enemyCount >= 10);
         const int hpStep = reduceHpBillboardLoad ? 2 : 1;
@@ -2561,8 +2784,12 @@ void SceneGame::Draw()
     DrawBossHpUi();
 }
 
+/**
+ * @brief プレイヤー HP ゲージの位置と残量表示を更新します。
+ */
 void SceneGame::UpdateHpGauge()
 {
+    // UI 未生成時は更新先がないため何もしません。
     if (!m_pHpGauge || !m_pHpFrame) return;
 
     TRAN_INS;
@@ -2577,12 +2804,16 @@ void SceneGame::UpdateHpGauge()
     const float gaugeX = gaugeLeft + gaugeWidth * rate * 0.5f;
     const float gaugeY = kUiMargin + kHpFrameHeight * 0.5f;
 
+    // ゲージは左詰め表示にするため、中心位置と UV 幅を残量に合わせて調整します。
     m_pHpGauge->SetPosition(gaugeX, gaugeY);
     m_pHpGauge->SetSize(gaugeWidth * rate, gaugeHeight);
     m_pHpGauge->SetUVPosition(0.0f, 0.0f);
     m_pHpGauge->SetUVScale(rate, 1.0f);
 }
 
+/**
+ * @brief 攻撃・回避・スキルのクールタイムゲージを更新します。
+ */
 void SceneGame::UpdateCooldownGauges()
 {
     float attackRate = 1.0f;
@@ -2594,6 +2825,7 @@ void SceneGame::UpdateCooldownGauges()
     float evadeRate = 1.0f;
     if (m_pPlayer)
     {
+        // 回避は Player 側の実効クールタイムを参照して進行率を出します。
         const float evadeDuration = m_pPlayer->GetEvadeCooldownDuration();
         const float evadeRemain = m_pPlayer->GetEvadeCooldownRemain();
         if (evadeDuration > 0.0f)
@@ -2616,6 +2848,7 @@ void SceneGame::UpdateCooldownGauges()
 
     {
         TRAN_INS;
+        // デバッグ UI からも見えるように、各ゲージ進行率を共有します。
         tran.gameplayDebug.cooldownRateAttack = attackRate;
         tran.gameplayDebug.cooldownRateEvade = evadeRate;
         tran.gameplayDebug.cooldownRateSkill1 = skill1Rate;
@@ -2641,6 +2874,7 @@ void SceneGame::UpdateCooldownGauges()
         }
         if (m_pCooldownGauge[i])
         {
+            // 各ゲージも HP ゲージと同様、左詰め表示になるよう中心を調整します。
             const float rate = Clamp01(rates[i]);
             const float gaugeLeft = frameX - kCooldownFrameWidth * 0.5f + kCooldownGaugePadding;
             const float gaugeX = gaugeLeft + gaugeWidth * rate * 0.5f;
@@ -2652,10 +2886,17 @@ void SceneGame::UpdateCooldownGauges()
     }
 }
 
+/**
+ * @brief 敵の頭上にビルボード HP ゲージを描画します。
+ * @param headPos 頭上基準位置です。
+ * @param enemySize 敵サイズです。
+ * @param rate 残 HP 比率です。
+ */
 void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
                                           const DirectX::XMFLOAT3& enemySize,
                                           float rate)
 {
+    // 必要な描画リソースかカメラが欠けている場合は描画しません。
     if (!m_pEnemyHpGauge || !m_pEnemyHpFrame || !m_pCamera) return;
 
     const float clampedRate = Clamp01(rate);
@@ -2664,6 +2905,7 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
     if (width < kEnemyHpBillboardMinWidth) width = kEnemyHpBillboardMinWidth;
     if (height < kEnemyHpBillboardMinHeight) height = kEnemyHpBillboardMinHeight;
 
+    // フレームとゲージの余白を敵サイズ比から決めます。
     const float padding = height * kEnemyHpBillboardPaddingScale;
     const float gaugeWidth = width - padding * 2.0f;
     const float gaugeHeight = height - padding * 2.0f;
@@ -2675,6 +2917,7 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
     DirectX::XMVECTOR forward = DirectX::XMVectorSubtract(lookV, camV);
     if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(forward)) < 1.0e-6f)
     {
+        // カメラ向きが壊れている場合は既定の前方で代用します。
         forward = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
     }
     else
@@ -2686,6 +2929,7 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
     DirectX::XMVECTOR right = DirectX::XMVector3Cross(up, forward);
     if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(right)) < 1.0e-6f)
     {
+        // 真上/真下に近い視線でも右軸を作れるよう、Up を差し替えます。
         up = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
         right = DirectX::XMVector3Cross(up, forward);
     }
@@ -2695,6 +2939,7 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
     DirectX::XMFLOAT3 rightAxis;
     DirectX::XMStoreFloat3(&rightAxis, right);
 
+    // 残量が減っても左端が固定されるよう、ゲージ中心だけを横へずらします。
     const float gaugeCenterShift = (clampedRate - 1.0f) * gaugeWidth * 0.5f;
     DirectX::XMFLOAT3 gaugePos = {
         headPos.x + rightAxis.x * gaugeCenterShift,
@@ -2717,6 +2962,7 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
 
     if (clampedRate > 0.0f)
     {
+        // 残量 0 より大きい時だけ中身ゲージを重ねます。
         DirectX::XMFLOAT4X4 gaugeWorld;
         DirectX::XMStoreFloat4x4(&gaugeWorld, DirectX::XMMatrixTranspose(R * DirectX::XMMatrixTranslation(gaugePos.x, gaugePos.y, gaugePos.z)));
         Sprite::SetWorld(gaugeWorld);

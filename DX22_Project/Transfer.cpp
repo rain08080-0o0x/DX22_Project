@@ -5,46 +5,73 @@
 
 namespace
 {
+	// Default config paths used depending on launch location.
 	const char* kDefaultGameplayTuningPath = "Assets/gameplay_tuning.cfg";
 	const char* kMirrorGameplayTuningPath = "DX22_Project/Assets/gameplay_tuning.cfg";
 	const char* kDebugGameplayTuningPath = "x64/Debug/Assets/gameplay_tuning.cfg";
 	const char* kUpstreamMirrorGameplayTuningPath = "../../DX22_Project/Assets/gameplay_tuning.cfg";
 
+	/**
+	 * @brief 呼び出し側が既定パスを使いたい指定かどうかを判定します。
+	 * @param path 呼び出し側が渡したパスです。
+	 * @return nullptr または空文字なら true です。
+	 */
 	bool IsDefaultPathArgument(const char* path)
 	{
 		return !(path && path[0] != '\0');
 	}
 
+	/**
+	 * @brief 実際に使う設定ファイルパスを決定します。
+	 * @param path 呼び出し側指定パスです。
+	 * @return 指定があればそのパス、無ければ既定パスです。
+	 */
 	const char* ResolvePath(const char* path)
 	{
+		// 明示指定がある場合は、そのパスを優先します。
 		if (!IsDefaultPathArgument(path))
 		{
 			return path;
 		}
+		// 未指定時だけ既定パスを返します。
 		return kDefaultGameplayTuningPath;
 	}
 
+	/**
+	 * @brief 文字列前後の空白を除去します。
+	 * @param s 前後空白を除去する文字列です。
+	 */
 	void Trim(std::string& s)
 	{
 		size_t begin = 0;
+		// 先頭側の空白を読み飛ばします。
 		while (begin < s.size() && (s[begin] == ' ' || s[begin] == '\t' || s[begin] == '\r' || s[begin] == '\n'))
 		{
 			++begin;
 		}
 
 		size_t end = s.size();
+		// 末尾側の空白も同様に削ります。
 		while (end > begin && (s[end - 1] == ' ' || s[end - 1] == '\t' || s[end - 1] == '\r' || s[end - 1] == '\n'))
 		{
 			--end;
 		}
 
+		// 空白を除いた範囲だけ残します。
 		s = s.substr(begin, end - begin);
 	}
 
+	/**
+	 * @brief 文字列を整数へ変換します。
+	 * @param s 変換元文字列です。
+	 * @param fallback 変換できない場合に返す値です。
+	 * @return 変換成功時は整数値、失敗時は fallback です。
+	 */
 	int ToInt(const std::string& s, int fallback)
 	{
 		char* endPtr = nullptr;
 		const long v = std::strtol(s.c_str(), &endPtr, 10);
+		// 数字として 1 文字も読めなかった場合は既定値へ戻します。
 		if (endPtr == s.c_str())
 		{
 			return fallback;
@@ -52,10 +79,17 @@ namespace
 		return static_cast<int>(v);
 	}
 
+	/**
+	 * @brief 文字列を浮動小数へ変換します。
+	 * @param s 変換元文字列です。
+	 * @param fallback 変換できない場合に返す値です。
+	 * @return 変換成功時は浮動小数値、失敗時は fallback です。
+	 */
 	float ToFloat(const std::string& s, float fallback)
 	{
 		char* endPtr = nullptr;
 		const float v = std::strtof(s.c_str(), &endPtr);
+		// 数値解釈できない場合は既定値を維持します。
 		if (endPtr == s.c_str())
 		{
 			return fallback;
@@ -63,6 +97,13 @@ namespace
 		return v;
 	}
 
+	/**
+	 * @brief 整数値を指定範囲に丸めます。
+	 * @param v 補正対象値です。
+	 * @param lo 下限です。
+	 * @param hi 上限です。
+	 * @return lo 以上 hi 以下に丸めた値です。
+	 */
 	int ClampInt(int v, int lo, int hi)
 	{
 		if (v < lo) return lo;
@@ -70,13 +111,25 @@ namespace
 		return v;
 	}
 
+	/**
+	 * @brief 難易度プリセット値を有効範囲へ補正します。
+	 * @param preset 補正対象値です。
+	 * @return 0 から 2 の範囲に収めた値です。
+	 */
 	int NormalizeDifficultyPresetValue(int preset)
 	{
 		return ClampInt(preset, 0, 2);
 	}
 
+	/**
+	 * @brief 難易度に応じた小/大強化幅を返します。
+	 * @param preset 難易度です。
+	 * @param smallStep 小強化の増加量出力先です。
+	 * @param largeStep 大強化の増加量出力先です。
+	 */
 	void GetUpgradeStepsForDifficulty(int preset, int& smallStep, int& largeStep)
 	{
+		// 難易度が高いほど、1回あたりの強化量を大きくします。
 		switch (NormalizeDifficultyPresetValue(preset))
 		{
 		case 0:
@@ -96,11 +149,17 @@ namespace
 
 	const int kUpgradeTierMax = 10;
 
+	/**
+	 * @brief 強化レベルを有効範囲へ丸めます。
+	 * @param level 補正対象レベルです。
+	 * @return 0 から上限までに丸めたレベルです。
+	 */
 	int ClampUpgradeTier(int level)
 	{
 		return ClampInt(level, 0, kUpgradeTierMax);
 	}
 
+	// Level tables used to convert upgrade tiers into actual runtime values.
 	const int kAttackDamageByTier[kUpgradeTierMax + 1] =
 	{
 		1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 10
@@ -127,6 +186,14 @@ namespace
 	const int kUpgradeTypeCount = 6;
 	const int kUpgradeOfferNone = -1;
 
+	/**
+	 * @brief 指定強化タイプがまだ提示可能かどうかを返します。
+	 * @param upgradeType 判定する強化タイプです。
+	 * @param attackPowerLevel 現在の攻撃力レベルです。
+	 * @param attackSpeedLevel 現在の攻撃速度レベルです。
+	 * @param evadeCooldownLevel 現在の回避短縮レベルです。
+	 * @return 上限未到達なら true です。
+	 */
 	bool IsUpgradeTypeAvailable(int upgradeType, int attackPowerLevel, int attackSpeedLevel, int evadeCooldownLevel)
 	{
 		switch (upgradeType)
@@ -145,12 +212,20 @@ namespace
 		}
 	}
 
+	/**
+	 * @brief 現在レベルに応じて提示可能な強化候補を生成します。
+	 * @param offers 生成した候補の書き込み先です。
+	 * @param attackPowerLevel 現在の攻撃力レベルです。
+	 * @param attackSpeedLevel 現在の攻撃速度レベルです。
+	 * @param evadeCooldownLevel 現在の回避短縮レベルです。
+	 */
 	void GenerateUpgradeOffers(int offers[kUpgradeOfferCount], int attackPowerLevel, int attackSpeedLevel, int evadeCooldownLevel)
 	{
 		int available[kUpgradeTypeCount]{};
 		int availableCount = 0;
 		for (int t = 0; t < kUpgradeTypeCount; ++t)
 		{
+			// 上限に達していない候補だけ抽出します。
 			if (IsUpgradeTypeAvailable(t, attackPowerLevel, attackSpeedLevel, evadeCooldownLevel))
 			{
 				available[availableCount++] = t;
@@ -159,6 +234,7 @@ namespace
 
 		if (availableCount == 0)
 		{
+			// 提示可能な強化が無い場合は全スロットを空にします。
 			for (int i = 0; i < kUpgradeOfferCount; ++i)
 			{
 				offers[i] = kUpgradeOfferNone;
@@ -166,6 +242,7 @@ namespace
 			return;
 		}
 
+		// Fisher-Yates 風に並びを崩し、提示順を毎回変えます。
 		for (int i = 0; i < availableCount; ++i)
 		{
 			const int j = RandRangeInt(i, availableCount - 1);
@@ -174,6 +251,7 @@ namespace
 			available[j] = tmp;
 		}
 
+		// 候補数が足りない場合は、利用可能候補から重複許可で埋めます。
 		for (int i = 0; i < kUpgradeOfferCount; ++i)
 		{
 			if (i < availableCount)
@@ -187,6 +265,15 @@ namespace
 		}
 	}
 
+	/**
+	 * @brief 強化タイプに応じて対象レベルを増やします。
+	 * @param attackPowerLevel 攻撃力レベル参照です。
+	 * @param attackSpeedLevel 攻撃速度レベル参照です。
+	 * @param evadeCooldownLevel 回避短縮レベル参照です。
+	 * @param upgradeType 適用する強化タイプです。
+	 * @param smallStep 小強化量です。
+	 * @param largeStep 大強化量です。
+	 */
 	void ApplyUpgradeType(int& attackPowerLevel,
 						  int& attackSpeedLevel,
 						  int& evadeCooldownLevel,
@@ -220,19 +307,32 @@ namespace
 	}
 }
 
+/**
+ * @brief ゲームプレイ調整値を既定値へ戻します。
+ */
 void Transfer::ResetGameplayTuningToDefault()
 {
+	// 既定構築子で丸ごと初期値へ戻します。
 	gameplay = GameplayTuning{};
 }
 
+/**
+ * @brief ローグライク強化状態を初期値へ戻します。
+ */
 void Transfer::ResetRoguelikeUpgrade()
 {
+	// 選択候補や残リロールも含めて、すべて初期化します。
 	roguelike = RoguelikeUpgrade{};
 }
 
+/**
+ * @brief 難易度プリセットに応じた基準値を反映します。
+ * @param preset 0:Easy 1:Normal 2:Hard の難易度値です。
+ */
 void Transfer::ApplyDifficultyPreset(int preset)
 {
 	const int normalizedPreset = NormalizeDifficultyPresetValue(preset);
+	// 難易度ごとに敵数、Wave 数、敵性能の基準値を切り替えます。
 	switch (normalizedPreset)
 	{
 	case 0: // Easy
@@ -275,15 +375,22 @@ void Transfer::ApplyDifficultyPreset(int preset)
 		gameplay.waveEnemyAttackDamageScalePerWave = 0.20f;
 		break;
 	}
+
+	// 実際に適用した難易度はデバッグ表示とタイトル UI にも反映します。
 	gameplayDebug.difficultyPreset = normalizedPreset;
 	gameplayDebug.titleDifficultySelection = normalizedPreset;
 }
 
+/**
+ * @brief ステージクリア時の自動強化を適用します。
+ */
 void Transfer::ApplyStageClearUpgrade()
 {
 	int smallStep = 1;
 	int largeStep = 2;
 	GetUpgradeStepsForDifficulty(gameplayDebug.difficultyPreset, smallStep, largeStep);
+
+	// 旧自動付与ルートでは 3 種を順番に回して、強化の偏りを抑えます。
 	const int nextType = roguelike.stageClearCount % 3;
 	++roguelike.stageClearCount;
 	roguelike.lastUpgradeType = nextType;
@@ -296,28 +403,46 @@ void Transfer::ApplyStageClearUpgrade()
 		largeStep);
 }
 
+/**
+ * @brief 三択強化候補の提示を開始します。
+ */
 void Transfer::BeginUpgradeSelection()
 {
+	// 選択待ちへ入り、現在の上限設定からリロール残数を初期化します。
 	roguelike.selectionPending = 1;
 	roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
 	GenerateUpgradeOffers(roguelike.offers, roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel);
 }
 
+/**
+ * @brief 現在の強化候補を再抽選します。
+ * @return 再抽選できた場合は true です。
+ */
 bool Transfer::RerollUpgradeSelection()
 {
+	// 選択待ちでなければ、そもそも再抽選する候補がありません。
 	if (roguelike.selectionPending == 0) return false;
+	// 残回数が無い場合も再抽選できません。
 	if (roguelike.rerollRemain <= 0) return false;
 	--roguelike.rerollRemain;
 	GenerateUpgradeOffers(roguelike.offers, roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel);
 	return true;
 }
 
+/**
+ * @brief 指定した候補番号の強化を適用します。
+ * @param offerIndex 選択した候補の添字です。
+ * @return 適用に成功した場合は true です。
+ */
 bool Transfer::ApplyUpgradeSelection(int offerIndex)
 {
+	// 選択待ちでない状態では適用しません。
 	if (roguelike.selectionPending == 0) return false;
+	// 候補範囲外の番号は無効です。
 	if (offerIndex < 0 || offerIndex >= RoguelikeUpgrade::kOfferCount) return false;
 
 	const int selectedType = roguelike.offers[offerIndex];
+	// 候補が空か壊れている場合は適用しません。
 	if (selectedType < 0 || selectedType >= RoguelikeUpgrade::UpgradeTypeCount) return false;
 	int smallStep = 1;
 	int largeStep = 2;
@@ -336,26 +461,48 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 	return true;
 }
 
+/**
+ * @brief 難易度値を有効範囲へ丸めます。
+ * @param preset 補正対象の難易度値です。
+ * @return 0 から 2 に丸めた値です。
+ */
 int Transfer::NormalizeDifficultyPreset(int preset) const
 {
 	return NormalizeDifficultyPresetValue(preset);
 }
 
+/**
+ * @brief 強化レベルを有効範囲へ丸めます。
+ * @param level 補正対象レベルです。
+ * @return 0 から上限までに丸めた値です。
+ */
 int Transfer::ClampUpgradeLevel(int level) const
 {
 	return ClampUpgradeTier(level);
 }
 
+/**
+ * @brief 強化レベル上限を返します。
+ * @return 強化レベル上限です。
+ */
 int Transfer::GetUpgradeLevelMax() const
 {
 	return RoguelikeUpgrade::kLevelMax;
 }
 
+/**
+ * @brief 強化タイプと難易度から実際の増加量を返します。
+ * @param upgradeType 強化種別です。
+ * @param difficultyPreset 難易度です。
+ * @return その強化で増えるレベル数です。
+ */
 int Transfer::GetUpgradeStepForType(int upgradeType, int difficultyPreset) const
 {
 	int smallStep = 1;
 	int largeStep = 2;
 	GetUpgradeStepsForDifficulty(difficultyPreset, smallStep, largeStep);
+
+	// Small / Large の別に応じて、難易度別の増加量を返します。
 	switch (upgradeType)
 	{
 	case RoguelikeUpgrade::UpgradeAttackPower:
@@ -371,6 +518,10 @@ int Transfer::GetUpgradeStepForType(int upgradeType, int difficultyPreset) const
 	}
 }
 
+/**
+ * @brief 3 系統の強化レベル合計を返します。
+ * @return 合計強化レベルです。
+ */
 int Transfer::GetTotalUpgradeLevels() const
 {
 	return
@@ -379,33 +530,62 @@ int Transfer::GetTotalUpgradeLevels() const
 		ClampUpgradeTier(roguelike.evadeCooldownLevel);
 }
 
+/**
+ * @brief 攻撃力レベルから実ダメージ値を返します。
+ * @param level 攻撃力レベルです。
+ * @return 実ダメージ値です。
+ */
 int Transfer::GetPlayerAttackDamageByLevel(int level) const
 {
 	return kAttackDamageByTier[ClampUpgradeTier(level)];
 }
 
+/**
+ * @brief 攻撃速度レベルから攻撃クールタイム倍率を返します。
+ * @param level 攻撃速度レベルです。
+ * @return クールタイム倍率です。
+ */
 float Transfer::GetAttackCooldownScaleByLevel(int level) const
 {
 	return kAttackCooldownScaleByTier[ClampUpgradeTier(level)];
 }
 
+/**
+ * @brief 回避強化レベルから回避クールタイム倍率を返します。
+ * @param level 回避強化レベルです。
+ * @return クールタイム倍率です。
+ */
 float Transfer::GetEvadeCooldownScaleByLevel(int level) const
 {
 	return kEvadeCooldownScaleByTier[ClampUpgradeTier(level)];
 }
 
+/**
+ * @brief 強化進行度に応じた通常敵 HP 倍率を返します。
+ * @return 敵 HP 倍率です。
+ */
 float Transfer::GetEnemyHpScaleByUpgradeProgress() const
 {
+	// 合計強化 10 ごとに 1 段階だけ上げ、極端な伸びを抑えます。
 	const int progressTier = ClampInt(GetTotalUpgradeLevels() / 10, 0, 3);
 	return 1.0f + 0.20f * static_cast<float>(progressTier);
 }
 
+/**
+ * @brief 強化進行度に応じた通常敵攻撃倍率を返します。
+ * @return 敵攻撃倍率です。
+ */
 float Transfer::GetEnemyAttackScaleByUpgradeProgress() const
 {
 	const int progressTier = ClampInt(GetTotalUpgradeLevels() / 10, 0, 3);
 	return 1.0f + 0.10f * static_cast<float>(progressTier);
 }
 
+/**
+ * @brief 難易度に応じたボス HP 倍率を返します。
+ * @param preset 難易度です。
+ * @return ボス HP 倍率です。
+ */
 float Transfer::GetBossHpScaleByDifficulty(int preset) const
 {
 	switch (NormalizeDifficultyPresetValue(preset))
@@ -416,6 +596,11 @@ float Transfer::GetBossHpScaleByDifficulty(int preset) const
 	}
 }
 
+/**
+ * @brief 難易度に応じたボス行動頻度倍率を返します。
+ * @param preset 難易度です。
+ * @return ボスのクールタイム倍率です。
+ */
 float Transfer::GetBossCooldownScaleByDifficulty(int preset) const
 {
 	switch (NormalizeDifficultyPresetValue(preset))
@@ -427,15 +612,26 @@ float Transfer::GetBossCooldownScaleByDifficulty(int preset) const
 }
 
 
+/**
+ * @brief 既定のゲームプレイ設定ファイルパスを返します。
+ * @return 既定設定ファイルパスです。
+ */
 const char* Transfer::GetGameplayTuningPath() const
 {
 	return kDefaultGameplayTuningPath;
 }
 
+/**
+ * @brief 設定ファイルからゲームプレイ調整値を読み込みます。
+ * @param path 読み込むファイルパスです。nullptr の場合は既定パスです。
+ * @return 読み込みに成功した場合は true です。
+ */
 bool Transfer::LoadGameplayTuning(const char* path)
 {
 	const char* resolvedPath = ResolvePath(path);
 	std::ifstream ifs(resolvedPath);
+
+	// 既定パスで開けない場合は、実行場所ごとの代表パスも順に試します。
 	if (!ifs.is_open() && IsDefaultPathArgument(path))
 	{
 		const char* fallbackPaths[] =
@@ -461,6 +657,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		return false;
 	}
 
+	// 読み込み途中で失敗しても既存値を壊さないよう、一旦ローカルへ集めます。
 	GameplayTuning loaded{};
 	int loadedPreset = gameplayDebug.difficultyPreset;
 	RoguelikeUpgrade loadedRogue = roguelike;
@@ -468,6 +665,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	std::string line;
 	while (std::getline(ifs, line))
 	{
+		// 空行とコメント行は設定値ではないので無視します。
 		Trim(line);
 		if (line.empty()) continue;
 		if (line[0] == '#') continue;
@@ -481,6 +679,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		Trim(value);
 		if (key.empty() || value.empty()) continue;
 
+		// キー名に応じて、対象項目だけを個別に復元します。
 		if (key == "enemyCount") loaded.enemyCount = ToInt(value, loaded.enemyCount);
 		else if (key == "waveMax") loaded.waveMax = ToInt(value, loaded.waveMax);
 		else if (key == "waveEnemyAddPerWave") loaded.waveEnemyAddPerWave = ToInt(value, loaded.waveEnemyAddPerWave);
@@ -587,6 +786,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "upgradeRerollMax") loadedRogue.rerollMaxPerStage = ToInt(value, loadedRogue.rerollMaxPerStage);
 	}
 
+	// 読み込んだ値はここで全体的にクランプし、壊れた設定を防ぎます。
 	loaded.screenShakeHitThreshold = ClampInt(loaded.screenShakeHitThreshold, 1, 16);
 	if (loaded.groundTileSize < 0.5f) loaded.groundTileSize = 0.5f;
 	if (loaded.groundTileSize > 10.0f) loaded.groundTileSize = 10.0f;
@@ -656,6 +856,8 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	if (loaded.bossUltimateStompRadiusScale < 0.5f) loaded.bossUltimateStompRadiusScale = 0.5f;
 	if (loaded.bossUltimateFieldTelegraph < 0.10f) loaded.bossUltimateFieldTelegraph = 0.10f;
 	if (loaded.bossUltimateFieldSafeScale < 0.5f) loaded.bossUltimateFieldSafeScale = 0.5f;
+
+	// 正常化済みの値だけを本体へ反映します。
 	gameplay = loaded;
 	loadedPreset = ClampInt(loadedPreset, 0, 2);
 	gameplayDebug.difficultyPreset = loadedPreset;
@@ -680,8 +882,14 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	return true;
 }
 
+/**
+ * @brief 現在のゲームプレイ調整値を設定ファイルへ保存します。
+ * @param path 保存先パスです。nullptr の場合は既定同期パス群へ保存します。
+ * @return 1 つ以上保存に成功した場合は true です。
+ */
 bool Transfer::SaveGameplayTuning(const char* path) const
 {
+	// 単一パスへ書き出すためのローカル関数です。
 	auto writeToPath = [&](const char* targetPath) -> bool
 	{
 		std::ofstream ofs(targetPath, std::ios::trunc);
@@ -690,6 +898,7 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 			return false;
 		}
 
+		// すべての調整値を key=value 形式で書き出し、次回起動時に復元できるようにします。
 		ofs << "# DX22 gameplay tuning\n";
 		ofs << "enemyCount=" << gameplay.enemyCount << "\n";
 		ofs << "waveMax=" << gameplay.waveMax << "\n";
@@ -798,12 +1007,14 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		return ofs.good();
 	};
 
+	// 明示パス指定時は、そのパスだけを更新します。
 	if (!IsDefaultPathArgument(path))
 	{
 		return writeToPath(ResolvePath(path));
 	}
 
 	bool anySaved = false;
+	// 既定保存時は実行側/ソース側の代表パスへ同期保存します。
 	const char* syncPaths[] =
 	{
 		kDefaultGameplayTuningPath,

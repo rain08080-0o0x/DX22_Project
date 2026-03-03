@@ -3,18 +3,28 @@
 #include <DirectXMath.h>
 #include "Defines.h"
 
+/** @brief Transfer シングルトン参照をローカル変数 `tran` として取り出す簡易マクロです。 */
 #define TRAN_INS Transfer &tran = Transfer::GetInstance();
+/** @brief `tran` を式として使いたい箇所向けのシングルトン参照取得マクロです。 */
 #define TRAN_INS_Get Transfer &tran = Transfer::GetInstance();tran
 
+/**
+ * @brief シーン間・システム間で共有するゲーム状態と調整値を保持するシングルトンです。
+ */
 class Transfer
 {
 private:
 	Transfer() = default;
 	~Transfer() = default;
 
+	/**
+	 * @brief カメラの Eye / Look をまとめて扱う共有データです。
+	 */
 	struct CameraInfo
 	{
+		/** @brief カメラ位置です。 */
 		DirectX::XMFLOAT3 eye;
+		/** @brief 注視点です。 */
 		DirectX::XMFLOAT3 look;
 	};
 	struct ObjectfromAtoB
@@ -118,8 +128,12 @@ private:
 		DirectX::XMFLOAT3 rotate;
 		DirectX::XMFLOAT3 scale;
 	};
+	/**
+	 * @brief 実行中に調整可能なゲームプレイ設定値です。
+	 */
 	struct GameplayTuning
 	{
+		// Stage / wave progression.
 		int enemyCount = 3;
 		int waveMax = 3;
 		int waveEnemyAddPerWave = 1;
@@ -127,6 +141,7 @@ private:
 		float cameraIntroDuration = 1.20f;
 		float cameraIntroFocusDistance = 2.80f;
 
+		// Player attack / combat feedback.
 		float attackWindup = 0.04f;
 		float attackDuration = 0.12f;
 		float attackRecovery = 0.10f;
@@ -151,11 +166,15 @@ private:
 		float playerDamageFlashScale = 1.65f;
 		float enemyDefeatFlash = 0.28f;
 		float enemyDefeatFlashScale = 1.60f;
+
+		// Audio / player-facing presentation.
 		float volumeMaster = 1.0f;
 		float volumeBgm = 0.7f;
 		float volumeSe = 1.0f;
 		float directionMarkerAlpha = 0.92f;
 		float directionMarkerOverlapAlpha = 0.45f;
+
+		// Boss UI / base stats.
 		float bossHpBarWidthRate = 0.42f;
 		float bossHpBarHeightRate = 0.045f;
 		float bossGuardBarOffsetX = 0.0f;
@@ -176,6 +195,8 @@ private:
 		float bossDamageScaleNormal = 0.20f;
 		float bossDamageScaleBroken = 2.20f;
 		float bossBreakRecoverSec = 8.0f;
+
+		// Boss attack tuning.
 		float bossDashNarrowTelegraph = 1.0f;
 		float bossDashWideTelegraph = 2.0f;
 		float bossDashWideWidthRate = 0.50f;
@@ -197,6 +218,7 @@ private:
 		float bossUltimateFieldTelegraph = 7.0f;
 		float bossUltimateFieldSafeScale = 2.0f;
 
+		// Enemy behavior / projectile tuning.
 		float enemyAttackWindup = 0.55f;
 		float enemyAttackCooldown = 1.00f;
 		float enemyAttackRangeMin = 0.8f;
@@ -217,15 +239,23 @@ private:
 		float enemySpawnMinPlayerDist = 1.5f;
 		float enemySpawnMinEnemyDist = 0.9f;
 
+		// Push-out resolution tuning.
 		float pushSlop = 0.01f;
 		float playerPushShare = 0.55f;
 		float enemyPushShare = 0.45f;
 	};
+
+	/**
+	 * @brief デバッグ UI や監視表示に公開する実行時状態です。
+	 */
 	struct GameplayDebug
 	{
+		// Player attack runtime state.
 		int attackSwingId = 0;
 		int swingHitCount = 0;
 		int attackActive = 0;
+
+		// Wave / difficulty state.
 		int currentWave = 1;
 		int maxWave = 1;
 		int enemiesAlive = 0;
@@ -242,6 +272,8 @@ private:
 		float cooldownRateSkill1 = 1.0f;
 		float cooldownRateSkill2 = 1.0f;
 		int playerEvading = 0;
+
+		// Roguelike upgrade state.
 		int stageClearCount = 0;
 		int attackPowerLevel = 0;
 		int attackSpeedLevel = 0;
@@ -252,6 +284,8 @@ private:
 		int upgradeOffer0 = -1;
 		int upgradeOffer1 = -1;
 		int upgradeOffer2 = -1;
+
+		// Run timer / boss request state.
 		float runElapsedSec = 0.0f;
 		float runRecordedSec = 0.0f;
 		int runTimerRunning = 0;
@@ -263,6 +297,8 @@ private:
 		float bossGuardMax = 0.0f;
 		int bossBroken = 0;
 		int showBossResultTimer = 0;
+
+		// Pause / title UI runtime state.
 		int pauseMenuOpen = 0;
 		int pauseMenuSelection = 0; // 0: Continue, 1: Option, 2: Title
 		int pauseMenuRequest = 0;   // 0: None, 1: Continue, 2: Title, 3: Option
@@ -278,10 +314,20 @@ private:
 		float pauseMenuFontScale = 1.0f;
 		float pauseMenuButtonScale = 1.0f;
 	};
+
+	/**
+	 * @brief ローグライク強化の進行状況と選択候補を保持します。
+	 */
 	struct RoguelikeUpgrade
 	{
+		/** @brief 各強化項目の最大レベルです。 */
 		static const int kLevelMax = 10;
+		/** @brief 同時提示する強化候補数です。 */
 		static const int kOfferCount = 3;
+
+		/**
+		 * @brief 強化候補の種類です。
+		 */
 		enum UpgradeType
 		{
 			UpgradeAttackPower = 0,
@@ -293,14 +339,23 @@ private:
 			UpgradeTypeCount = 6
 		};
 
+		/** @brief クリア済みステージ数です。 */
 		int stageClearCount = 0;
+		/** @brief 攻撃力強化レベルです。 */
 		int attackPowerLevel = 0;
+		/** @brief 攻撃速度強化レベルです。 */
 		int attackSpeedLevel = 0;
+		/** @brief 回避クールタイム短縮レベルです。 */
 		int evadeCooldownLevel = 0;
+		/** @brief 最後に取得した強化種別です。 */
 		int lastUpgradeType = -1; // UpgradeType
+		/** @brief 1 ステージあたりの最大リロール回数です。 */
 		int rerollMaxPerStage = 2;
+		/** @brief 現在残っているリロール回数です。 */
 		int rerollRemain = 0;
+		/** @brief 強化選択待ちかどうかです。 */
 		int selectionPending = 0;
+		/** @brief 現在提示中の強化候補です。 */
 		int offers[kOfferCount] =
 		{
 			UpgradeAttackPower,
@@ -309,40 +364,165 @@ private:
 		};
 	};
 public:
+	/**
+	 * @brief Transfer の唯一のインスタンスを返します。
+	 * @return シングルトンインスタンスへの参照です。
+	 */
 	static Transfer& GetInstance()
 	{
 		static Transfer instance;
 		return instance;
 	}
+
+	/**
+	 * @brief ゲームプレイ調整値を既定値へ戻します。
+	 */
 	void ResetGameplayTuningToDefault();
+
+	/**
+	 * @brief ローグライク強化状態を初期値へ戻します。
+	 */
 	void ResetRoguelikeUpgrade();
+
+	/**
+	 * @brief 難易度プリセットに応じて基準調整値を設定します。
+	 * @param preset 0:Easy 1:Normal 2:Hard の難易度です。
+	 */
 	void ApplyDifficultyPreset(int preset);
+
+	/**
+	 * @brief ステージクリア時の強化を自動適用します。
+	 */
 	void ApplyStageClearUpgrade();
+
+	/**
+	 * @brief 三択強化候補の生成を開始します。
+	 */
 	void BeginUpgradeSelection();
+
+	/**
+	 * @brief 現在の強化候補を再抽選します。
+	 * @return 再抽選に成功した場合は true です。
+	 */
 	bool RerollUpgradeSelection();
+
+	/**
+	 * @brief 指定した候補番号の強化を適用します。
+	 * @param offerIndex 選択した候補の添字です。
+	 * @return 適用に成功した場合は true です。
+	 */
 	bool ApplyUpgradeSelection(int offerIndex);
+
+	/**
+	 * @brief 難易度値を有効範囲へ丸めます。
+	 * @param preset 補正対象の難易度値です。
+	 * @return 0 から 2 に丸めた難易度値です。
+	 */
 	int NormalizeDifficultyPreset(int preset) const;
+
+	/**
+	 * @brief 強化レベルを有効範囲へ丸めます。
+	 * @param level 補正対象レベルです。
+	 * @return 0 から最大値に丸めたレベルです。
+	 */
 	int ClampUpgradeLevel(int level) const;
+
+	/**
+	 * @brief 強化レベル上限を返します。
+	 * @return 強化レベル上限です。
+	 */
 	int GetUpgradeLevelMax() const;
+
+	/**
+	 * @brief 強化種別と難易度から増加段階数を返します。
+	 * @param upgradeType 強化種別です。
+	 * @param difficultyPreset 難易度です。
+	 * @return 該当強化の増加量です。
+	 */
 	int GetUpgradeStepForType(int upgradeType, int difficultyPreset) const;
+
+	/**
+	 * @brief 全強化レベル合計を返します。
+	 * @return 攻撃力、攻撃速度、回避短縮の合計レベルです。
+	 */
 	int GetTotalUpgradeLevels() const;
+
+	/**
+	 * @brief 攻撃力レベルから実ダメージ値を返します。
+	 * @param level 攻撃力レベルです。
+	 * @return 実ダメージ値です。
+	 */
 	int GetPlayerAttackDamageByLevel(int level) const;
+
+	/**
+	 * @brief 攻撃速度レベルから攻撃クールタイム倍率を返します。
+	 * @param level 攻撃速度レベルです。
+	 * @return 攻撃クールタイム倍率です。
+	 */
 	float GetAttackCooldownScaleByLevel(int level) const;
+
+	/**
+	 * @brief 回避強化レベルから回避クールタイム倍率を返します。
+	 * @param level 回避強化レベルです。
+	 * @return 回避クールタイム倍率です。
+	 */
 	float GetEvadeCooldownScaleByLevel(int level) const;
+
+	/**
+	 * @brief 強化進行度から通常敵 HP 補正倍率を返します。
+	 * @return 敵 HP 倍率です。
+	 */
 	float GetEnemyHpScaleByUpgradeProgress() const;
+
+	/**
+	 * @brief 強化進行度から通常敵攻撃補正倍率を返します。
+	 * @return 敵攻撃倍率です。
+	 */
 	float GetEnemyAttackScaleByUpgradeProgress() const;
+
+	/**
+	 * @brief 難易度からボス HP 補正倍率を返します。
+	 * @param preset 難易度です。
+	 * @return ボス HP 倍率です。
+	 */
 	float GetBossHpScaleByDifficulty(int preset) const;
+
+	/**
+	 * @brief 難易度からボス行動頻度補正倍率を返します。
+	 * @param preset 難易度です。
+	 * @return ボスクールタイム倍率です。
+	 */
 	float GetBossCooldownScaleByDifficulty(int preset) const;
+
+	/**
+	 * @brief 調整値設定ファイルを読み込みます。
+	 * @param path 読込元パスです。nullptr の場合は既定パスです。
+	 * @return 読み込みに成功した場合は true です。
+	 */
 	bool LoadGameplayTuning(const char* path = nullptr);
+
+	/**
+	 * @brief 調整値設定ファイルを保存します。
+	 * @param path 保存先パスです。nullptr の場合は既定パスです。
+	 * @return 保存に成功した場合は true です。
+	 */
 	bool SaveGameplayTuning(const char* path = nullptr) const;
+
+	/**
+	 * @brief 既定の調整値設定ファイルパスを返します。
+	 * @return 調整値設定ファイルパスです。
+	 */
 	const char* GetGameplayTuningPath() const;
 public:
 	PlayerInfo player;
 	EnemyInfo enemy;
 	DiceInfo dice;
 	CameraInfo camera{ { 0.0f, 6.0f, -6.0f },{ 0.0f, 0.0f, 0.0f } };
+	/** @brief ゲーム用カメラの初期値・保存値です。 */
 	CameraInfo cameraGame{ { 0.0f, 6.0f, -6.0f },{ 0.0f, 0.0f, 0.0f } };
+	/** @brief デバッグ用カメラの初期値・保存値です。 */
 	CameraInfo cameraDebug{ { 0.0f, 10.0f, 0.001f },{ 0.0f, 0.0f, 0.0f } };
+	/** @brief 現在のカメラモードです。 */
 	int cameraMode = 0;
 	ObjectfromAtoB obj;
 	UIInfo diceui;
@@ -353,7 +533,10 @@ public:
 	Tyabudai tyawan;
 	ModelEditer modelediter;
 	Arrow arrow;
+	/** @brief 実行中に変更可能なゲームプレイ調整値です。 */
 	GameplayTuning gameplay;
+	/** @brief デバッグ UI へ公開する実行時状態です。 */
 	GameplayDebug gameplayDebug;
+	/** @brief ローグライク強化の進行状況です。 */
 	RoguelikeUpgrade roguelike;
 };
