@@ -44,24 +44,72 @@ public:
 
 	void UpdateBase()
 	{
+		for (auto& objectList : m_GameObject)
+		{
+			for (GameObject* object : objectList)
+			{
+				object->UpDateBase();
+			}
+			objectList.remove_if([](GameObject* object) {return object->Destroy(); });
+		}
 
+		Update();
 	}
 
+	void DrawBase()
+	{
+		for (auto& objectList : m_GameObject)
+		{
+			for (GameObject* object : objectList)
+			{
+				object->DrawBase();
+			}
+		}
+		Draw();
+	}
 
-//protected:
-//	Fade* m_pFade;  // フェード処理クラス 
-//	int  m_next;  // 切り替え先のシーン 
-public:
-	// シーンで実行するフェードクラスを設定 
-	//void SetFade(Fade* fade) { m_pFade = fade; }
+	template<typename T>
+	T* AddGameObject(int Layer = 0)
+	{
+		T* gameObject = new T();
+		m_GameObject[Layer].push_back(gameObject);
 
-	//// 基本クラスでは、フェードアウトの終了を検知してシーンの切り替えを有効にする 
-	//virtual bool IsChangeScene();
+		gameObject->init();
 
-	//// 次の切り替え先シーンを取得 
-	//int GetNext() { return m_next; }
+		return gameObject;
+	}
 
-	//// 切り替え先のシーンを設定 
-	//void SetNext(int next);
-};;
+	template<typename T>
+	T* GetGameObject()
+	{
+		for (auto& objectList : m_GameObject)
+		{
+			for (GameObject* object : objectList)
+			{
+				if (typeid(*object) == typeid(T))
+				{
+					return (T*)object;
+				}
+			}
+		}
+		return nullptr;
+	}
+
+	template<typename T>
+	std::vector<T*> GetGameObjects()
+	{
+		std::vector<T*> objects; // STLの配列
+		for (auto& objectList : m_GameObject)
+		{
+			for (GameObject* object : objectList)
+			{
+				if (typeid(object) == typeid(T))
+				{
+					objects.push_back((T*)object);
+				}
+			}
+		}
+		return objects;
+	}
+};
 

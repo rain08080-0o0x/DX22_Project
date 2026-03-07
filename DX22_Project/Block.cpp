@@ -6,7 +6,7 @@ Block::Block()
 	m_collision.size = DirectX::XMFLOAT3(3.0f,3.0f,1.0f);
 	m_collision.center = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 
-	m_pos = {5.0f,0.0f,0.0f};
+	m_position = {5.0f,0.0f,0.0f};
 }
 
 Block::~Block()
@@ -16,14 +16,14 @@ Block::~Block()
 
 void Block::Update()
 {
-	m_collision.center = m_pos;
+	m_collision.center = m_position;
 }
 
 void Block::Draw()
 {
 #if _DEBUG // デバッグで当たり判定表示 
 	// 変換行列の計算 
-	DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(m_pos.x,m_pos.y,m_pos.z);
+	DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(m_position.x,m_position.y,m_position.z);
 	DirectX::XMMATRIX S = DirectX::XMMatrixScaling(m_collision.size.x,m_collision.size.y,m_collision.size.z);
 	DirectX::XMMATRIX mat;
 	mat = S * T;
@@ -46,5 +46,5 @@ Collision::Box Block::GetCollision()
 
 void Block::SetPos(DirectX::XMFLOAT3 pos)
 {
-	m_pos = pos;
+	m_position = pos;
 }

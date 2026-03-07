@@ -147,11 +147,11 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraDebug.cpp" />
     <ClCompile Include="Collision.cpp" />
+    <ClCompile Include="Component.cpp" />
     <ClCompile Include="Dice.cpp" />
     <ClCompile Include="DirectX.cpp" />
     <ClCompile Include="Fade.cpp" />
     <ClCompile Include="FadeBlack.cpp" />
-    <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GaugeUI.cpp" />
     <ClCompile Include="Geometory.cpp" />
     <ClCompile Include="imgui.cpp" />
@@ -162,6 +162,7 @@
     <ClCompile Include="imgui_widgets.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="manager.cpp" />
     <ClCompile Include="MeshBuffer.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="Player.cpp" />
@@ -189,6 +190,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraDebug.h" />
     <ClInclude Include="Collision.h" />
+    <ClInclude Include="Component.h" />
     <ClInclude Include="DebugUtil.h" />
     <ClInclude Include="Defines.h" />
     <ClInclude Include="Dice.h" />
@@ -208,6 +210,7 @@
     <ClInclude Include="imstb_truetype.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Main.h" />
+    <ClInclude Include="manager.h" />
     <ClInclude Include="MeshBuffer.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="Player.h" />

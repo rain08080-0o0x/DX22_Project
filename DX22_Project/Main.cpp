@@ -8,6 +8,7 @@
 #include "Defines.h"
 #include "ShaderList.h"
 #include "Transfer.h"
+#include "manager.h"
 // rand初期化用
 #include <cstdlib>
 #include <ctime>
@@ -20,6 +21,7 @@
 // デバッグ用
 #include "DebugUtil.h"
 
+
 HRESULT Init(HWND hWnd, UINT width, UINT height)
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
@@ -31,14 +33,9 @@ HRESULT Init(HWND hWnd, UINT width, UINT height)
 
 	std::srand(static_cast<unsigned int>(std::time(NULL)));
 
-	// 他機能初期化
-	Geometory::Init();
-	Sprite::Init();
-	InitInput();
-	ShaderList::Init();
 
 	// シーン
-	SceneManager::Init();
+	Manager::Init();
 
 	return hr;
 }
@@ -48,12 +45,9 @@ void Uninit()
 	double t0 = NowMS();
 	DebugLog("App shutdown begin\n");
 
-	SceneManager::Uninit();
+	Manager::Uninit();
 
 	ShaderList::Uninit();
-	UninitInput();
-	Sprite::Uninit();
-	Geometory::Uninit();
 	UninitDirectX();
 
 	DebugLog("App shutdown end : %.2f ms\n", NowMS() - t0);
@@ -61,8 +55,7 @@ void Uninit()
 
 void Update()
 {
-	UpdateInput();
-	SceneManager::Update();
+	Manager::Update();
 }
 
 void Draw()
@@ -284,7 +277,7 @@ void Draw()
 	Geometory::SetProjection(mat[1]);
 #endif
 
-	SceneManager::Draw();
+	Manager::Draw();
 	EndDrawDirectX();
 }
 

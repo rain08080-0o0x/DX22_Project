@@ -13,9 +13,9 @@ Player::Player()
     , m_shotPower(0.0f)
     , m_shotstep(SHOT_WAIT)
 {
-    m_pos.x = 0.0f;
-    m_pos.y = 0.0f;
-    m_pos.z = 0.0f;
+    m_position.x = 0.0f;
+    m_position.y = 0.0f;
+    m_position.z = 0.0f;
     m_collision.size = DirectX::XMFLOAT3(1.0f,1.0f,1.0f);
     m_collision.center = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
 
@@ -43,12 +43,12 @@ void Player::Update()
         UpdateShot(); // 球を打つ処理 
     else
         UpdateMove(); // 打った球の移動処理 
-    m_collision.center = m_pos;
+    m_collision.center = m_position;
 }
 
 void Player::Draw() 
 {
-    DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(m_pos.x,m_pos.y,m_pos.z);
+    DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(m_position.x,m_position.y,m_position.z);
     DirectX::XMMATRIX S = DirectX::XMMatrixScaling(
         m_collision.size.x,
         m_collision.size.y,
@@ -60,7 +60,7 @@ void Player::Draw()
     Geometory::DrawBox();
 
     // 影の大きさを計算 
-    float rate = (m_pos.y - m_shadowPos.y) / 4.0f; // 距離が近ければ0,遠ければ1 
+    float rate = (m_position.y - m_shadowPos.y) / 4.0f; // 距離が近ければ0,遠ければ1 
     float scale = (1.0f - rate);      // rateを0なら1、1なら0になるよう反転 
 
     // 影を表示するための行列計算 
@@ -108,9 +108,9 @@ void Player::Bound(BoundAxis axis)
 {
     // 接触方向に応じてめり込み解消 
     switch (axis) {
-    case BoundX: m_pos.x -= m_move.x; break;
-    case BoundY: m_pos.y -= m_move.y; break;
-    case BoundZ: m_pos.z -= m_move.z; break;
+    case BoundX: m_position.x -= m_move.x; break;
+    case BoundY: m_position.y -= m_move.y; break;
+    case BoundZ: m_position.z -= m_move.z; break;
     }
     // 接触方向に応じた摩擦を設定（数値は適当） 
     DirectX::XMFLOAT3 friction; // 摩擦 
@@ -179,7 +179,7 @@ void Player::UpdateShot()
 		// 打ち出す計算
         DirectX::XMFLOAT3 camPos = m_pCamera->GetPos();						//カメラの位置を取得
         DirectX::XMVECTOR vCamPos = DirectX::XMLoadFloat3(&camPos);			//カメラの位置を計算用の型に変換
-        DirectX::XMVECTOR vPos = DirectX::XMLoadFloat3(&m_pos);				//自分の位置を計算用の型に変換
+        DirectX::XMVECTOR vPos = DirectX::XMLoadFloat3(&m_position);				//自分の位置を計算用の型に変換
         DirectX::XMVECTOR vec = DirectX::XMVectorSubtract(vPos, vCamPos);	//カメラから自分の位置に向かうベクトルを計算
         vec = DirectX::XMVector3Normalize(vec);		//ベクトルの正規化
         vec = DirectX::XMVectorScale(vec, m_shotPower);		//正規化したベクトルを、溜めた力に応じて伸ばす
@@ -205,13 +205,13 @@ void Player::UpdateMove()
     m_move.z *= 0.99f;
 
     // 移動処理 
-    m_pos.x += m_move.x;
-    m_pos.y += m_move.y;
-    m_pos.z += m_move.z;
+    m_position.x += m_move.x;
+    m_position.y += m_move.y;
+    m_position.z += m_move.z;
 
     // 地面接触判定 
-    if (m_pos.y < 0.0f) {
-        m_pos.y = 0.0f;
+    if (m_position.y < 0.0f) {
+        m_position.y = 0.0f;
         Bound(BoundY);
     }
 
