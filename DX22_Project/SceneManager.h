@@ -9,7 +9,6 @@ public:
         SCENE_TITLE = 0,
         SCENE_GAME,
         SCENE_RESULT,
-        SCENE_3DEDITOR,
         SCENE_ENGINE_EDITOR,
         SCENE_MAX
     };
@@ -29,6 +28,7 @@ public:
 
     static void ChangeScene(SceneType next);
     static SceneType GetCurrent() { return m_current; }
+    static Scene* GetScene() { return m_pScene; }
 
     static ResultType GetResultType();
     static void ChangeResult(ResultType set);

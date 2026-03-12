@@ -5,6 +5,8 @@
 #include "Sprite.h"
 #include "Input.h"
 #include "SceneManager.h"
+#include "CastleSaveData.h"
+#include "SceneCastleEditor.h"
 #include "Defines.h"
 #include "ShaderList.h"
 #include "Transfer.h"
@@ -469,23 +471,15 @@ namespace
 		DrawCenteredOverlayText(upgradeHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
 	}
 
-	enum EngineEditorNode
-	{
-		EngineEditorNode_None = -1,
-		EngineEditorNode_Body = 0,
-		EngineEditorNode_ArmRight1,
-		EngineEditorNode_ArmRight2,
-		EngineEditorNode_ArmLeft1,
-		EngineEditorNode_ArmLeft2,
-		EngineEditorNode_LegRight1,
-		EngineEditorNode_LegRight2,
-		EngineEditorNode_LegLeft1,
-		EngineEditorNode_LegLeft2,
-	};
-
 	bool IsEngineEditorScene(SceneManager::SceneType sceneType)
 	{
 		return sceneType == SceneManager::SceneType::SCENE_ENGINE_EDITOR;
+	}
+
+	SceneCastleEditor* GetCastleEditorScene()
+	{
+		if (!IsEngineEditorScene(SceneManager::GetCurrent())) return nullptr;
+		return dynamic_cast<SceneCastleEditor*>(SceneManager::GetScene());
 	}
 
 	RenderTarget* g_pEngineEditorRT = nullptr;
@@ -534,245 +528,584 @@ namespace
 		return true;
 	}
 
-	const char* GetEngineEditorNodeName(int node)
+	void DrawCastleEditorPaletteWindow(SceneCastleEditor* editor)
 	{
-		switch (node)
-		{
-		case EngineEditorNode_Body: return u8"Body";
-		case EngineEditorNode_ArmRight1: return u8"RightArm1";
-		case EngineEditorNode_ArmRight2: return u8"RightArm2";
-		case EngineEditorNode_ArmLeft1: return u8"LeftArm1";
-		case EngineEditorNode_ArmLeft2: return u8"LeftArm2";
-		case EngineEditorNode_LegRight1: return u8"RightLeg1";
-		case EngineEditorNode_LegRight2: return u8"RightLeg2";
-		case EngineEditorNode_LegLeft1: return u8"LeftLeg1";
-		case EngineEditorNode_LegLeft2: return u8"LeftLeg2";
-		default: return u8"(None)";
-		}
-	}
-
-	void DrawEngineEditorHierarchyWindow(int& selectedNode)
-	{
-		if (!ImGui::Begin(u8"ヒエラルキー"))
+		if (!editor) return;
+		if (!ImGui::Begin(u8"パレット"))
 		{
 			ImGui::End();
 			return;
 		}
 
-		ImGui::TextDisabled(u8"SCENE_ENGINE_EDITOR");
-		const ImGuiTreeNodeFlags rootFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow;
-		if (ImGui::TreeNodeEx("CharacterRoot", rootFlags))
+		const int selectedAssetIndex = editor->GetSelectedAssetIndex();
+		const SceneCastleEditor::ToolMode toolMode = editor->GetToolMode();
+		ImGui::TextDisabled(u8"Build Assets");
+		if (ImGui::BeginChild("##asset_grid", ImVec2(0.0f, 170.0f), true))
 		{
-			const ImGuiTreeNodeFlags leafBase = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-			auto drawLeaf = [&](int node, const char* label)
+			const int columnCount = 8;
+			if (ImGui::BeginTable("AssetGrid", columnCount, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_BordersInnerV))
 			{
-				ImGuiTreeNodeFlags flags = leafBase;
-				if (selectedNode == node) flags |= ImGuiTreeNodeFlags_Selected;
-				ImGui::TreeNodeEx(label, flags);
-				if (ImGui::IsItemClicked())
+				int tileIndex = 0;
+				const float contentWidth = ImGui::GetContentRegionAvail().x;
+				const float spacingX = ImGui::GetStyle().ItemSpacing.x;
+				float tileSize = (contentWidth - spacingX * static_cast<float>(columnCount - 1)) / static_cast<float>(columnCount);
+				if (tileSize < 56.0f) tileSize = 56.0f;
+				const float innerPadding = 6.0f;
+				const auto drawTile = [&](const char* label, bool selected, int assetIndex)
 				{
-					selectedNode = node;
+					ImGui::TableNextColumn();
+					ImGui::PushID(tileIndex++);
+					const ImVec2 pos = ImGui::GetCursorScreenPos();
+					ImGui::InvisibleButton("##asset_tile", ImVec2(tileSize, tileSize));
+					const bool hovered = ImGui::IsItemHovered();
+					const bool clicked = ImGui::IsItemClicked();
+					ImDrawList* drawList = ImGui::GetWindowDrawList();
+					const ImVec2 min = pos;
+					const ImVec2 max(pos.x + tileSize, pos.y + tileSize);
+					const ImU32 bgColor = selected
+						? IM_COL32(54, 102, 156, 255)
+						: hovered ? IM_COL32(48, 56, 68, 255) : IM_COL32(36, 42, 52, 255);
+					const ImU32 borderColor = selected ? IM_COL32(130, 200, 255, 255) : IM_COL32(84, 92, 108, 255);
+					drawList->AddRectFilled(min, max, bgColor, 8.0f);
+					drawList->AddRect(min, max, borderColor, 8.0f, 0, selected ? 2.0f : 1.0f);
+
+					const ImVec2 thumbMin(min.x + innerPadding, min.y + innerPadding);
+					const ImVec2 thumbMax(max.x - innerPadding, max.y - 24.0f);
+					if (assetIndex >= 0)
+					{
+						void* textureId = editor->GetAssetThumbnailTextureId(assetIndex, static_cast<UINT>(thumbMax.x - thumbMin.x));
+						if (textureId)
+						{
+							drawList->AddImage(textureId, thumbMin, thumbMax);
+						}
+						else
+						{
+							drawList->AddRectFilled(thumbMin, thumbMax, IM_COL32(28, 32, 40, 255), 6.0f);
+						}
+					}
+					else
+					{
+						drawList->AddRectFilled(thumbMin, thumbMax, IM_COL32(28, 32, 40, 255), 6.0f);
+						const ImVec2 center((thumbMin.x + thumbMax.x) * 0.5f, (thumbMin.y + thumbMax.y) * 0.5f);
+						drawList->AddCircle(center, (thumbMax.x - thumbMin.x) * 0.18f, IM_COL32(220, 228, 240, 255), 32, 2.0f);
+						drawList->AddLine(ImVec2(center.x + 10.0f, center.y + 10.0f), ImVec2(center.x + 20.0f, center.y + 20.0f), IM_COL32(220, 228, 240, 255), 2.0f);
+					}
+
+					const ImVec2 textSize = ImGui::CalcTextSize(label);
+					drawList->AddText(
+						ImVec2(min.x + (tileSize - textSize.x) * 0.5f, max.y - 18.0f),
+						IM_COL32(236, 240, 246, 255),
+						label);
+					if (clicked)
+					{
+						if (assetIndex < 0)
+						{
+							editor->SetToolMode(SceneCastleEditor::ToolMode::SelectSingle);
+						}
+						else
+						{
+							editor->SetSelectedAssetIndex(assetIndex);
+						}
+					}
+					ImGui::PopID();
+				};
+
+				drawTile(
+					u8"Select",
+					toolMode == SceneCastleEditor::ToolMode::SelectSingle ||
+					toolMode == SceneCastleEditor::ToolMode::SelectFill,
+					-1);
+				for (int i = 0; i < editor->GetAssetCount(); ++i)
+				{
+					const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(i);
+					if (!asset) continue;
+					drawTile(
+						asset->name,
+						toolMode != SceneCastleEditor::ToolMode::SelectSingle &&
+						toolMode != SceneCastleEditor::ToolMode::SelectFill &&
+						selectedAssetIndex == i,
+						i);
 				}
-			};
 
-			drawLeaf(EngineEditorNode_Body, u8"Body");
+				while (tileIndex % columnCount != 0)
+				{
+					ImGui::TableNextColumn();
+					tileIndex++;
+				}
 
-			if (ImGui::TreeNode(u8"Arms"))
-			{
-				drawLeaf(EngineEditorNode_ArmRight1, u8"RightArm1");
-				drawLeaf(EngineEditorNode_ArmRight2, u8"RightArm2");
-				drawLeaf(EngineEditorNode_ArmLeft1, u8"LeftArm1");
-				drawLeaf(EngineEditorNode_ArmLeft2, u8"LeftArm2");
-				ImGui::TreePop();
+				ImGui::EndTable();
 			}
+		}
+		ImGui::EndChild();
 
-			if (ImGui::TreeNode(u8"Legs"))
+		if (ImGui::Button(u8"回転 -90"))
+		{
+			editor->RotatePreview(-1);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(u8"回転 +90"))
+		{
+			editor->RotatePreview(1);
+		}
+
+		ImGui::SeparatorText(u8"ツール");
+		if (ImGui::RadioButton(u8"Select", toolMode == SceneCastleEditor::ToolMode::SelectSingle))
+		{
+			editor->SetToolMode(SceneCastleEditor::ToolMode::SelectSingle);
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton(u8"Select Fill", toolMode == SceneCastleEditor::ToolMode::SelectFill))
+		{
+			editor->SetToolMode(SceneCastleEditor::ToolMode::SelectFill);
+		}
+		if (selectedAssetIndex >= 0)
+		{
+			ImGui::SameLine();
+			if (ImGui::RadioButton(u8"Place", toolMode == SceneCastleEditor::ToolMode::PlaceSingle))
 			{
-				drawLeaf(EngineEditorNode_LegRight1, u8"RightLeg1");
-				drawLeaf(EngineEditorNode_LegRight2, u8"RightLeg2");
-				drawLeaf(EngineEditorNode_LegLeft1, u8"LeftLeg1");
-				drawLeaf(EngineEditorNode_LegLeft2, u8"LeftLeg2");
-				ImGui::TreePop();
+				editor->SetToolMode(SceneCastleEditor::ToolMode::PlaceSingle);
 			}
+			ImGui::SameLine();
+			if (ImGui::RadioButton(u8"Paint", toolMode == SceneCastleEditor::ToolMode::PlacePaint))
+			{
+				editor->SetToolMode(SceneCastleEditor::ToolMode::PlacePaint);
+			}
+			ImGui::SameLine();
+			if (ImGui::RadioButton(u8"Fill", toolMode == SceneCastleEditor::ToolMode::PlaceFill))
+			{
+				editor->SetToolMode(SceneCastleEditor::ToolMode::PlaceFill);
+			}
+		}
 
-			ImGui::TreePop();
+		ImGui::SeparatorText(u8"操作");
+		if (toolMode == SceneCastleEditor::ToolMode::SelectSingle)
+		{
+			ImGui::TextUnformatted(u8"左クリック: 選択 / Ctrl+クリック: 追加解除 / Shift+クリック: 追加");
+			if (editor->IsSelectFillStartActive())
+			{
+				ImGui::TextDisabled(u8"Select Fill の始点設定が残っています。");
+			}
+		}
+		else if (toolMode == SceneCastleEditor::ToolMode::SelectFill)
+		{
+			ImGui::TextUnformatted(u8"LMB: 始点選択 -> LMB: 終点選択で3D範囲選択");
+			ImGui::TextDisabled(u8"Ctrlを押しながら確定すると既存選択へ追加");
+			ImGui::TextDisabled(u8"空セルも指定可能 / Shift押下中はアクティブレイヤーへスナップ");
+			if (editor->IsSelectFillStartActive())
+			{
+				ImGui::TextDisabled(u8"始点設定済み / 終点までの直方体を選択");
+			}
+		}
+		else if (toolMode == SceneCastleEditor::ToolMode::PlacePaint)
+		{
+			ImGui::TextUnformatted(u8"LMB Drag: 連続配置");
+		}
+		else if (toolMode == SceneCastleEditor::ToolMode::PlaceFill)
+		{
+			ImGui::TextUnformatted(u8"LMB: 始点選択 -> LMB: 終点選択で範囲配置");
+			ImGui::TextDisabled(u8"Shift+Wheel: 始点からの高さオフセット変更");
+			ImGui::TextDisabled(u8"Shift中も水平面配置は可能 / 高さ差をつけると縦面配置");
+			if (editor->IsFillStartActive())
+			{
+				ImGui::TextDisabled(u8"始点設定済み / 終点は同一平面上で指定");
+			}
+		}
+		else
+		{
+			ImGui::TextUnformatted(u8"左クリック: 面の隣に配置");
+		}
+		ImGui::TextUnformatted(u8"右ドラッグ: 回転");
+		ImGui::TextUnformatted(u8"中ドラッグ: 平行移動");
+		ImGui::TextUnformatted(u8"ホイール: ズーム");
+		ImGui::TextUnformatted(u8"R / Shift+R: 選択中オブジェクト回転");
+		ImGui::TextUnformatted(u8"Delete: 選択中オブジェクト削除");
+		ImGui::TextUnformatted(u8"Ctrl+Z / Ctrl+Y: Undo / Redo");
+		if (toolMode == SceneCastleEditor::ToolMode::SelectSingle)
+		{
+			ImGui::TextDisabled(u8"現在: Select ツール");
+		}
+		else if (toolMode == SceneCastleEditor::ToolMode::SelectFill)
+		{
+			ImGui::TextDisabled(u8"現在: Select Fill ツール");
+		}
+		else if (toolMode == SceneCastleEditor::ToolMode::PlacePaint)
+		{
+			const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
+			ImGui::TextDisabled(u8"現在: Paint (%s)", asset ? asset->name : u8"Unknown");
+		}
+		else if (toolMode == SceneCastleEditor::ToolMode::PlaceFill)
+		{
+			const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
+			ImGui::TextDisabled(u8"現在: Fill (%s)", asset ? asset->name : u8"Unknown");
+		}
+		else
+		{
+			const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
+			ImGui::TextDisabled(u8"現在: Place (%s)", asset ? asset->name : u8"Unknown");
 		}
 
 		ImGui::End();
 	}
 
-	void DrawEngineEditorInspectorWindow(Transfer& tran, int selectedNode)
+	void DrawCastleEditorHierarchyWindow(SceneCastleEditor* editor)
 	{
+		if (!editor) return;
+		if (!ImGui::Begin(u8"配置一覧"))
+		{
+			ImGui::End();
+			return;
+		}
+
+		for (int i = 0; i < editor->GetPlacementCount(); ++i)
+		{
+			const SceneCastleEditor::PlacementInfo* placement = editor->GetPlacement(i);
+			if (!placement) continue;
+			const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(placement->assetIndex);
+			char label[128];
+			sprintf_s(
+				label,
+				"%s (%d, %d, %d)",
+				asset ? asset->name : "Unknown",
+				placement->gridX,
+				placement->gridY,
+				placement->gridZ);
+			const bool selected = editor->IsPlacementSelected(i);
+			if (ImGui::Selectable(label, selected))
+			{
+				const ImGuiIO& io = ImGui::GetIO();
+				if (io.KeyCtrl)
+				{
+					editor->ToggleSelectedPlacementIndex(i);
+				}
+				else if (io.KeyShift)
+				{
+					editor->AddSelectedPlacementIndex(i);
+				}
+				else
+				{
+					editor->SetSelectedPlacementIndex(i);
+				}
+			}
+		}
+
+		if (ImGui::Button(u8"選択解除"))
+		{
+			editor->ClearSelection();
+		}
+
+		ImGui::End();
+	}
+
+	void DrawCastleEditorInspectorWindow(SceneCastleEditor* editor)
+	{
+		if (!editor) return;
+		static int castleSaveStatus = 0;
 		if (!ImGui::Begin(u8"インスペクタ"))
 		{
 			ImGui::End();
 			return;
 		}
 
-		ImGui::Text(u8"選択中: %s", GetEngineEditorNodeName(selectedNode));
-		ImGui::Separator();
-
-		switch (selectedNode)
+		const int selectedCount = editor->GetSelectedPlacementCount();
+		const int selectedIndex = (selectedCount == 1) ? editor->GetSelectedPlacementIndex() : -1;
+		const bool canUndo = editor->CanUndo();
+		const bool canRedo = editor->CanRedo();
+		if (!canUndo) ImGui::BeginDisabled();
+		if (ImGui::Button(u8"Undo"))
 		{
-		case EngineEditorNode_Body:
-			ImGui::DragFloat3(u8"位置##body_pos", reinterpret_cast<float*>(&tran.modelediter.body.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##body_size", reinterpret_cast<float*>(&tran.modelediter.body.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##body_rot", reinterpret_cast<float*>(&tran.modelediter.body.angle), 0.05f);
-			ImGui::SeparatorText(u8"ジョイント");
-			ImGui::DragFloat3(u8"右腕##joint_ra", reinterpret_cast<float*>(&tran.modelediter.body.jointRightArmPos), 0.05f);
-			ImGui::DragFloat3(u8"左腕##joint_la", reinterpret_cast<float*>(&tran.modelediter.body.jointLeftArmPos), 0.05f);
-			ImGui::DragFloat3(u8"右脚##joint_rl", reinterpret_cast<float*>(&tran.modelediter.body.jointRightLegPos), 0.05f);
-			ImGui::DragFloat3(u8"左脚##joint_ll", reinterpret_cast<float*>(&tran.modelediter.body.jointLeftLegPos), 0.05f);
+			editor->Undo();
+		}
+		if (!canUndo) ImGui::EndDisabled();
+		ImGui::SameLine();
+		if (!canRedo) ImGui::BeginDisabled();
+		if (ImGui::Button(u8"Redo"))
+		{
+			editor->Redo();
+		}
+		if (!canRedo) ImGui::EndDisabled();
+		ImGui::SameLine();
+		if (ImGui::Button(u8"保存"))
+		{
+			castleSaveStatus = editor->SaveCastleData() ? 1 : 2;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(u8"読込"))
+		{
+			castleSaveStatus = editor->LoadCastleData() ? 3 : 4;
+		}
+		ImGui::TextDisabled(u8"保存先: %s", CastleSaveData::GetDefaultPath());
+		switch (castleSaveStatus)
+		{
+		case 1:
+			ImGui::TextColored(ImVec4(0.45f, 0.82f, 0.55f, 1.0f), u8"保存成功");
 			break;
-		case EngineEditorNode_ArmRight1:
-			ImGui::DragFloat3(u8"角度##ra1_sub", reinterpret_cast<float*>(&tran.modelediter.armRight1.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##ra1_pos", reinterpret_cast<float*>(&tran.modelediter.armRight1.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##ra1_size", reinterpret_cast<float*>(&tran.modelediter.armRight1.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##ra1_rot", reinterpret_cast<float*>(&tran.modelediter.armRight1.rotate), 0.05f);
+		case 2:
+			ImGui::TextColored(ImVec4(0.92f, 0.38f, 0.38f, 1.0f), u8"保存失敗");
 			break;
-		case EngineEditorNode_ArmRight2:
-			ImGui::DragFloat3(u8"角度##ra2_sub", reinterpret_cast<float*>(&tran.modelediter.armRight2.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##ra2_pos", reinterpret_cast<float*>(&tran.modelediter.armRight2.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##ra2_size", reinterpret_cast<float*>(&tran.modelediter.armRight2.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##ra2_rot", reinterpret_cast<float*>(&tran.modelediter.armRight2.rotate), 0.05f);
+		case 3:
+			ImGui::TextColored(ImVec4(0.45f, 0.82f, 0.55f, 1.0f), u8"読込成功");
 			break;
-		case EngineEditorNode_ArmLeft1:
-			ImGui::DragFloat3(u8"角度##la1_sub", reinterpret_cast<float*>(&tran.modelediter.armLeft1.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##la1_pos", reinterpret_cast<float*>(&tran.modelediter.armLeft1.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##la1_size", reinterpret_cast<float*>(&tran.modelediter.armLeft1.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##la1_rot", reinterpret_cast<float*>(&tran.modelediter.armLeft1.rotate), 0.05f);
-			break;
-		case EngineEditorNode_ArmLeft2:
-			ImGui::DragFloat3(u8"角度##la2_sub", reinterpret_cast<float*>(&tran.modelediter.armLeft2.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##la2_pos", reinterpret_cast<float*>(&tran.modelediter.armLeft2.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##la2_size", reinterpret_cast<float*>(&tran.modelediter.armLeft2.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##la2_rot", reinterpret_cast<float*>(&tran.modelediter.armLeft2.rotate), 0.05f);
-			break;
-		case EngineEditorNode_LegRight1:
-			ImGui::DragFloat3(u8"角度##rl1_sub", reinterpret_cast<float*>(&tran.modelediter.legRight1.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##rl1_pos", reinterpret_cast<float*>(&tran.modelediter.legRight1.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##rl1_size", reinterpret_cast<float*>(&tran.modelediter.legRight1.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##rl1_rot", reinterpret_cast<float*>(&tran.modelediter.legRight1.rotate), 0.05f);
-			break;
-		case EngineEditorNode_LegRight2:
-			ImGui::DragFloat3(u8"角度##rl2_sub", reinterpret_cast<float*>(&tran.modelediter.legRight2.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##rl2_pos", reinterpret_cast<float*>(&tran.modelediter.legRight2.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##rl2_size", reinterpret_cast<float*>(&tran.modelediter.legRight2.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##rl2_rot", reinterpret_cast<float*>(&tran.modelediter.legRight2.rotate), 0.05f);
-			break;
-		case EngineEditorNode_LegLeft1:
-			ImGui::DragFloat3(u8"角度##ll1_sub", reinterpret_cast<float*>(&tran.modelediter.legLeft1.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##ll1_pos", reinterpret_cast<float*>(&tran.modelediter.legLeft1.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##ll1_size", reinterpret_cast<float*>(&tran.modelediter.legLeft1.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##ll1_rot", reinterpret_cast<float*>(&tran.modelediter.legLeft1.rotate), 0.05f);
-			break;
-		case EngineEditorNode_LegLeft2:
-			ImGui::DragFloat3(u8"角度##ll2_sub", reinterpret_cast<float*>(&tran.modelediter.legLeft2.subAngle), 0.05f);
-			ImGui::DragFloat3(u8"位置##ll2_pos", reinterpret_cast<float*>(&tran.modelediter.legLeft2.pos), 0.05f);
-			ImGui::DragFloat3(u8"サイズ##ll2_size", reinterpret_cast<float*>(&tran.modelediter.legLeft2.size), 0.05f);
-			ImGui::DragFloat3(u8"回転##ll2_rot", reinterpret_cast<float*>(&tran.modelediter.legLeft2.rotate), 0.05f);
+		case 4:
+			ImGui::TextColored(ImVec4(0.92f, 0.38f, 0.38f, 1.0f), u8"読込失敗");
 			break;
 		default:
-			ImGui::TextDisabled(u8"ヒエラルキーからオブジェクトを選択してください。");
 			break;
+		}
+		ImGui::Separator();
+
+		if (selectedCount > 1)
+		{
+			ImGui::Text(u8"%d件選択中", selectedCount);
+			ImGui::TextDisabled(u8"位置や回転の編集は1件選択時のみ可能です。");
+			if (ImGui::Button(u8"選択中を一括削除"))
+			{
+				editor->DeleteSelectedPlacement();
+			}
+		}
+		else if (selectedIndex >= 0)
+		{
+			const SceneCastleEditor::PlacementInfo* placement = editor->GetPlacement(selectedIndex);
+			const SceneCastleEditor::AssetInfo* asset = placement ? editor->GetAssetInfo(placement->assetIndex) : nullptr;
+			if (placement)
+			{
+				ImGui::Text(u8"選択中: %s", asset ? asset->name : u8"Unknown");
+
+				int gridX = placement->gridX;
+				int gridY = placement->gridY;
+				int gridZ = placement->gridZ;
+				int rotation = placement->rotationQuarterTurns;
+
+				bool changed = false;
+				changed |= ImGui::InputInt("Grid X", &gridX);
+				changed |= ImGui::InputInt("Grid Y", &gridY);
+				changed |= ImGui::InputInt("Grid Z", &gridZ);
+				changed |= ImGui::InputInt(u8"回転(90度単位)", &rotation);
+				if (changed)
+				{
+					editor->UpdateSelectedPlacement(gridX, gridY, gridZ, rotation);
+				}
+
+				if (ImGui::Button(u8"削除"))
+				{
+					editor->DeleteSelectedPlacement();
+				}
+			}
+		}
+		else
+		{
+			ImGui::TextDisabled(u8"配置済みオブジェクトを選択すると詳細を編集できます。");
+			if (editor->HasPreview())
+			{
+				ImGui::SeparatorText(u8"プレビュー");
+				ImGui::TextUnformatted(editor->CanPlacePreview() ? u8"配置可能" : u8"配置不可");
+			}
+		}
+
+		const int modelViewAssetIndex =
+			(editor->GetSelectedAssetIndex() >= 0)
+			? editor->GetSelectedAssetIndex()
+			: ((selectedIndex >= 0 && editor->GetPlacement(selectedIndex))
+				? editor->GetPlacement(selectedIndex)->assetIndex
+				: -1);
+
+		ImGui::SeparatorText(u8"ModelView");
+		if (modelViewAssetIndex >= 0)
+		{
+			const float viewSize = ImGui::GetContentRegionAvail().x;
+			const float clampedSize = (viewSize < 180.0f) ? 180.0f : viewSize;
+			const ImVec2 imagePos = ImGui::GetCursorScreenPos();
+			void* textureId = editor->GetModelViewTextureId(static_cast<unsigned int>(clampedSize));
+			if (textureId)
+			{
+				ImGui::Image(textureId, ImVec2(clampedSize, clampedSize));
+			}
+			else
+			{
+				ImGui::InvisibleButton("##model_view_dummy", ImVec2(clampedSize, clampedSize));
+			}
+
+			const bool hovered = ImGui::IsItemHovered();
+			ImGuiIO& io = ImGui::GetIO();
+			editor->HandleModelViewInput(
+				hovered,
+				hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Right),
+				io.MouseDelta.x,
+				io.MouseDelta.y,
+				hovered ? io.MouseWheel : 0.0f);
+
+			ImGui::GetWindowDrawList()->AddText(
+				ImVec2(imagePos.x + 10.0f, imagePos.y + 10.0f),
+				IM_COL32(240, 245, 255, 255),
+				u8"RMB: Orbit  Wheel: Zoom");
+			if (ImGui::Button(u8"ModelViewリセット"))
+			{
+				editor->ResetModelViewCamera();
+			}
+		}
+		else
+		{
+			ImGui::TextDisabled(u8"アセットか配置オブジェクトを選択すると表示されます。");
 		}
 
 		ImGui::End();
 	}
 
-	void DrawEngineEditorCameraWindow(Transfer& tran)
+	void DrawCastleEditorCameraWindow(SceneCastleEditor* editor)
 	{
+		if (!editor) return;
 		if (!ImGui::Begin(u8"カメラ"))
 		{
 			ImGui::End();
 			return;
 		}
 
-		const char* cameraModes[] = { u8"ゲーム", u8"デバッグ" };
-		int mode = tran.cameraMode;
-		if (ImGui::Combo(u8"モード", &mode, cameraModes, IM_ARRAYSIZE(cameraModes)))
+		DirectX::XMFLOAT3 eye = editor->GetCameraEye();
+		DirectX::XMFLOAT3 look = editor->GetCameraLook();
+		int activeLayer = editor->GetActiveLayer();
+		bool changed = false;
+		changed |= ImGui::DragFloat3("Eye", reinterpret_cast<float*>(&eye), 0.05f);
+		changed |= ImGui::DragFloat3("Look", reinterpret_cast<float*>(&look), 0.05f);
+		if (changed)
 		{
-			tran.cameraMode = mode;
+			editor->SetCameraEye(eye);
+			editor->SetCameraLook(look);
 		}
 
-		const char* activeLabel = (tran.cameraMode == 1) ? u8"デバッグ" : u8"ゲーム";
-		ImGui::Text(u8"現在アクティブ: %s", activeLabel);
-		ImGui::SeparatorText(u8"ゲームカメラ");
-		ImGui::DragFloat3(u8"Eye##camera_game_eye", reinterpret_cast<float*>(&tran.cameraGame.eye), 0.05f);
-		ImGui::DragFloat3(u8"Look##camera_game_look", reinterpret_cast<float*>(&tran.cameraGame.look), 0.05f);
-		ImGui::SeparatorText(u8"デバッグカメラ");
-		ImGui::DragFloat3(u8"Eye##camera_debug_eye", reinterpret_cast<float*>(&tran.cameraDebug.eye), 0.05f);
-		ImGui::DragFloat3(u8"Look##camera_debug_look", reinterpret_cast<float*>(&tran.cameraDebug.look), 0.05f);
+		if (ImGui::Button(u8"カメラをリセット"))
+		{
+			editor->ResetCamera();
+		}
+		if (ImGui::InputInt(u8"アクティブレイヤー", &activeLayer))
+		{
+			editor->SetActiveLayer(activeLayer);
+		}
+		ImGui::TextDisabled(u8"Shift+Wheel: アクティブレイヤー変更");
 
 		ImGui::End();
 	}
 
-	void DrawEngineEditorSceneViewWindow(Transfer& tran)
+	void DrawEngineEditorSceneViewWindow(SceneCastleEditor* editor)
 	{
-		if (!ImGui::Begin(u8"シーンビュー（カメラ）"))
+		if (!editor) return;
+		if (!ImGui::Begin(u8"シーンビュー"))
 		{
 			ImGui::End();
 			return;
 		}
 
-		auto drawModeButton = [&](const char* label, int mode)
-		{
-			const bool selected = (tran.cameraMode == mode);
-			if (selected)
-			{
-				ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(56, 120, 200, 255));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(72, 140, 224, 255));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(44, 102, 178, 255));
-			}
-			if (ImGui::Button(label, ImVec2(92.0f, 0.0f)))
-			{
-				tran.cameraMode = mode;
-			}
-			if (selected)
-			{
-				ImGui::PopStyleColor(3);
-			}
-		};
-
-		drawModeButton("Game", 0);
-		ImGui::SameLine();
-		drawModeButton("Debug", 1);
-		ImGui::Separator();
-
 		ImVec2 area = ImGui::GetContentRegionAvail();
-		if (area.x < 240.0f) area.x = 240.0f;
-		if (area.y < 160.0f) area.y = 160.0f;
+		if (area.x < 320.0f) area.x = 320.0f;
+		if (area.y < 220.0f) area.y = 220.0f;
 		g_engineEditorRequestWidth = static_cast<UINT>(area.x);
 		g_engineEditorRequestHeight = static_cast<UINT>(area.y);
 
 		const bool targetReady = EnsureEngineEditorRenderTarget(g_engineEditorRequestWidth, g_engineEditorRequestHeight);
+		ImVec2 imageTopLeft = ImGui::GetCursorScreenPos();
+		bool imageHovered = false;
 		if (targetReady && g_pEngineEditorRT && g_pEngineEditorRT->GetResource())
 		{
 			ImGui::Image(reinterpret_cast<ImTextureID>(g_pEngineEditorRT->GetResource()), area);
+			imageHovered = ImGui::IsItemHovered();
 		}
 		else
 		{
-			const ImVec2 topLeft = ImGui::GetCursorScreenPos();
-			ImGui::InvisibleButton("##scene_view_dummy", area);
+			ImGui::InvisibleButton("##castle_scene_view_dummy", area);
+			imageHovered = ImGui::IsItemHovered();
 			ImDrawList* drawList = ImGui::GetWindowDrawList();
-			const ImVec2 bottomRight(topLeft.x + area.x, topLeft.y + area.y);
-			drawList->AddRectFilled(topLeft, bottomRight, IM_COL32(16, 24, 32, 255), 4.0f);
-			drawList->AddRect(topLeft, bottomRight, IM_COL32(120, 160, 200, 255), 4.0f);
-			drawList->AddText(ImVec2(topLeft.x + 12.0f, topLeft.y + 12.0f), IM_COL32(220, 235, 255, 255), u8"Camera View");
+			const ImVec2 bottomRight(imageTopLeft.x + area.x, imageTopLeft.y + area.y);
+			drawList->AddRectFilled(imageTopLeft, bottomRight, IM_COL32(16, 24, 32, 255), 4.0f);
+			drawList->AddRect(imageTopLeft, bottomRight, IM_COL32(120, 160, 200, 255), 4.0f);
 		}
+
+		ImGuiIO& io = ImGui::GetIO();
+		const float localMouseX = io.MousePos.x - imageTopLeft.x;
+		const float localMouseY = io.MousePos.y - imageTopLeft.y;
+		editor->HandleSceneViewInput(
+			localMouseX,
+			localMouseY,
+			area.x,
+			area.y,
+			imageHovered,
+			imageHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
+			imageHovered && ImGui::IsMouseDown(ImGuiMouseButton_Left),
+			io.KeyCtrl,
+			io.KeyShift,
+			imageHovered && ImGui::IsMouseDragging(ImGuiMouseButton_Right),
+			imageHovered && ImGui::IsMouseDragging(ImGuiMouseButton_Middle),
+			io.MouseDelta.x,
+			io.MouseDelta.y,
+			imageHovered ? io.MouseWheel : 0.0f);
+
+		const ImVec2 overlayPos(imageTopLeft.x + 12.0f, imageTopLeft.y + 12.0f);
+		ImGui::GetWindowDrawList()->AddText(
+			overlayPos,
+			IM_COL32(240, 245, 255, 255),
+			(editor->GetToolMode() == SceneCastleEditor::ToolMode::SelectSingle)
+				? u8"LMB: Select  Ctrl/Shift+LMB: Multi  RMB: Orbit  MMB: Pan  Wheel: Zoom"
+				: (editor->GetToolMode() == SceneCastleEditor::ToolMode::SelectFill)
+					? u8"LMB: Start/End Select Box  Ctrl+Confirm: Add  Shift: Layer Snap  Shift+Wheel: Layer  RMB: Orbit  MMB: Pan"
+				: (editor->GetToolMode() == SceneCastleEditor::ToolMode::PlacePaint)
+					? u8"LMB Drag: Paint  RMB: Orbit  MMB: Pan  Wheel: Zoom"
+					: (editor->GetToolMode() == SceneCastleEditor::ToolMode::PlaceFill)
+						? u8"LMB: Start/End Fill  Shift+Wheel: Height  RMB: Orbit  MMB: Pan  Wheel: Zoom"
+					: u8"LMB: Place  RMB: Orbit  MMB: Pan  Wheel: Zoom");
 
 		ImGui::End();
 	}
 
-	void DrawEngineEditorWindows(Transfer& tran)
+	void DrawEngineEditorWindows()
 	{
-		if (!IsEngineEditorScene(SceneManager::GetCurrent())) return;
+		SceneCastleEditor* editor = GetCastleEditorScene();
+		if (!editor) return;
 
-		static int selectedNode = EngineEditorNode_Body;
-		DrawEngineEditorHierarchyWindow(selectedNode);
-		DrawEngineEditorInspectorWindow(tran, selectedNode);
-		DrawEngineEditorCameraWindow(tran);
-		DrawEngineEditorSceneViewWindow(tran);
+		DrawCastleEditorPaletteWindow(editor);
+		DrawCastleEditorHierarchyWindow(editor);
+		DrawCastleEditorInspectorWindow(editor);
+		DrawCastleEditorCameraWindow(editor);
+		DrawEngineEditorSceneViewWindow(editor);
+
+		ImGuiIO& io = ImGui::GetIO();
+		if (!io.WantTextInput && io.KeyCtrl)
+		{
+			if (ImGui::IsKeyPressed(ImGuiKey_Z, false))
+			{
+				if (io.KeyShift)
+				{
+					editor->Redo();
+				}
+				else
+				{
+					editor->Undo();
+				}
+			}
+			else if (ImGui::IsKeyPressed(ImGuiKey_Y, false))
+			{
+				editor->Redo();
+			}
+		}
+
+		if (!io.WantTextInput &&
+			editor->GetSelectedPlacementCount() == 1 &&
+			ImGui::IsKeyPressed(ImGuiKey_R, false))
+		{
+			const SceneCastleEditor::PlacementInfo* placement = editor->GetPlacement(editor->GetSelectedPlacementIndex());
+			if (placement)
+			{
+				const int rotationDelta = io.KeyShift ? -1 : 1;
+				editor->UpdateSelectedPlacement(
+					placement->gridX,
+					placement->gridY,
+					placement->gridZ,
+					placement->rotationQuarterTurns + rotationDelta);
+			}
+		}
+
+		if (editor->GetSelectedPlacementCount() > 0 &&
+			ImGui::IsKeyPressed(ImGuiKey_Delete, false) &&
+			!io.WantTextInput)
+		{
+			editor->DeleteSelectedPlacement();
+		}
 	}
 
 	void DrawSceneToEngineEditorRenderTarget()
@@ -929,11 +1262,8 @@ void Draw()
 		case SceneManager::SceneType::SCENE_RESULT:
 			sceneTxt = u8"リザルト";
 			break;
-		case SceneManager::SceneType::SCENE_3DEDITOR:
-			sceneTxt = u8"3Dエディタ";
-			break;
 		case SceneManager::SceneType::SCENE_ENGINE_EDITOR:
-			sceneTxt = u8"エンジンエディタ";
+			sceneTxt = u8"城エディタ";
 			break;
 		default:
 			sceneTxt = u8"不明";
@@ -1607,11 +1937,7 @@ void Draw()
 					changeScene = SceneManager::SceneType::SCENE_RESULT;
 					break;
 				case 3:
-					sceneTxt = u8"3Dエディタ";
-					changeScene = SceneManager::SceneType::SCENE_3DEDITOR;
-					break;
-				case 4:
-					sceneTxt = u8"エンジンエディタ";
+					sceneTxt = u8"城エディタ";
 					changeScene = SceneManager::SceneType::SCENE_ENGINE_EDITOR;
 					break;
 				default:
@@ -1647,7 +1973,7 @@ void Draw()
 		End();
 	}	// -----------------------------
 
-	DrawEngineEditorWindows(tran);
+	DrawEngineEditorWindows();
 
 	// Debug Tools : Tables + DrawList
 	//   - Tables : 一覧/監視用
