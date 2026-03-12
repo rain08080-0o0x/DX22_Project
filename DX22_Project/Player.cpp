@@ -15,7 +15,7 @@ namespace
     const float kDefaultMaxHp = 100.0f;
     const float kDefaultDashDistance = 1.4f;
     const float kDefaultDashCooldown = 0.4f;
-    const float kDefaultDashDuration = 0.12f;
+    const float kDefaultDashDuration = 0.16f;
     const float kMoveDt = 1.0f / 60.0f;
 
     /**
@@ -137,8 +137,8 @@ void Player::Update()
     ClampToStage();
 
 #ifdef _DEBUG
-    // デバッグ中は P キーで HP を増やして確認しやすくします。
-    if (IsKeyTrigger('P'))
+    // デバッグ中は H キーで HP を増やして確認しやすくします。
+    if (IsKeyTrigger('H'))
         m_hp += 1.0f;
 
     // デバッグ操作を含めても HP が負値にならないように切り上げます。

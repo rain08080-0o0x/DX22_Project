@@ -504,13 +504,17 @@ void SceneGame::InitializeBossForScene()
     auto& tran = Transfer::GetInstance();
     // Difficulty changes the effective HP before the boss is reset.
     const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
-    const float bossHpScale = tran.GetBossHpScaleByDifficulty(difficultyPreset);
+    const float bossHpScale =
+        tran.GetBossHpScaleByDifficulty(difficultyPreset) *
+        tran.GetBossHpScaleByUpgradeProgress();
     const int effectiveBossMaxHp = ClampInt(
         static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale)),
         1,
         9999);
     const float initialGuardMax = ClampRange(tran.gameplay.bossGuardInitialMax, 1.0f, 200.0f);
     m_boss.ResetForScene(tran.player.size, tran.gameplay.bossSizeAreaScale, effectiveBossMaxHp, initialGuardMax);
+    m_lastBossSkillProjectileId = -1;
+    m_bossSkillContactCooldownTimer = 0.0f;
 }
 
 /**
@@ -552,6 +556,10 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
         // Entering boss mode clears regular enemies and projectiles exactly once.
         EnsureEnemyCount(0, stageSize);
         m_enemyProjectiles.clear();
+        m_skillProjectiles.clear();
+        m_orbitSkill.active = false;
+        m_lastBossSkillProjectileId = -1;
+        m_bossSkillContactCooldownTimer = 0.0f;
         m_requestedEnemyCount = 0;
         m_boss.requiresArenaReset = false;
     }
@@ -609,7 +617,9 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
     if (tran.gameplay.bossUltimateFieldSafeScale < 0.5f) tran.gameplay.bossUltimateFieldSafeScale = 0.5f;
     tran.gameplay.bossMaxHp = ClampInt(tran.gameplay.bossMaxHp, 1, 9999);
     const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
-    const float bossHpScale = tran.GetBossHpScaleByDifficulty(difficultyPreset);
+    const float bossHpScale =
+        tran.GetBossHpScaleByDifficulty(difficultyPreset) *
+        tran.GetBossHpScaleByUpgradeProgress();
     const int effectiveBossMaxHp = ClampInt(
         static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale)),
         1,
@@ -688,6 +698,16 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     }
 
     auto& tran = Transfer::GetInstance();
+    if (tran.gameplayDebug.bossHpEditRequest != 0)
+    {
+        const int requestedMaxHp = ClampInt(tran.gameplayDebug.bossMaxHpEditValue, 1, 9999);
+        const int requestedHp = ClampInt(tran.gameplayDebug.bossHpEditValue, 0, requestedMaxHp);
+        m_boss.maxHp = requestedMaxHp;
+        m_boss.hp = requestedHp;
+        if (m_boss.guardMax < 1.0f) m_boss.guardMax = 1.0f;
+        if (m_boss.guard > m_boss.guardMax) m_boss.guard = m_boss.guardMax;
+        tran.gameplayDebug.bossHpEditRequest = 0;
+    }
     tran.gameplayDebug.bossHp = static_cast<float>(m_boss.hp);
     tran.gameplayDebug.bossMaxHp = static_cast<float>(m_boss.maxHp);
     tran.gameplayDebug.bossGuard = m_boss.guard;
@@ -765,6 +785,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     const float guardRecoverStep = ClampRange(tran.gameplay.bossGuardRecoverStep, 0.0f, 50.0f);
     const float guardDamagePerHit = 1.0f;
     const int ultimateInterval = (m_boss.phase >= 3) ? 3 : 5;
+    const float bossHitStop = ClampRange(tran.gameplay.bossAttackHitStop, 0.0f, 0.20f);
 
     // Local helpers keep the long attack state machine readable.
     auto clampCenterToStage = [&](DirectX::XMFLOAT3& center, const DirectX::XMFLOAT3& size)
@@ -1043,6 +1064,38 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         }
     };
 
+    auto applyBossDamageToPlayer = [&]() -> bool
+    {
+        const float hpBefore = tran.player.hp;
+        const bool endedRun = applyPlayerDamage && applyPlayerDamage(bossDamage);
+        if (tran.player.hp < hpBefore && m_hitStopTimer < bossHitStop)
+        {
+            m_hitStopTimer = bossHitStop;
+        }
+        if (tran.player.hp < hpBefore)
+        {
+            const float bossHitShakeDuration = ClampRange(
+                tran.gameplay.bossHitShakeDuration,
+                0.0f,
+                1.0f);
+            const float bossHitShakeAmplitude = ClampRange(
+                tran.gameplay.bossHitShakeAmplitude,
+                0.0f,
+                1.0f);
+            m_screenShakeDuration = bossHitShakeDuration;
+            if (m_screenShakeTimer < bossHitShakeDuration)
+            {
+                m_screenShakeTimer = bossHitShakeDuration;
+            }
+            if (m_screenShakeAmplitude < bossHitShakeAmplitude)
+            {
+                m_screenShakeAmplitude = bossHitShakeAmplitude;
+            }
+            m_screenShakePhase = 0.0f;
+        }
+        return endedRun;
+    };
+
     auto applyAttackDamage = [&]() -> bool
     {
         Collision::Box playerBox = MakeAabb(
@@ -1081,7 +1134,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             break;
 
         case BossController::AttackKindUltimateField:
-            if (!safeFromField && applyPlayerDamage && applyPlayerDamage(bossDamage))
+            if (!safeFromField && applyBossDamageToPlayer())
             {
                 return true;
             }
@@ -1097,7 +1150,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                     { zone.size.x, zoneHeight, zone.size.z });
                 if (HitAabb(playerBox, hitBox))
                 {
-                    if (applyPlayerDamage && applyPlayerDamage(bossDamage))
+                    if (applyBossDamageToPlayer())
                     {
                         return true;
                     }
@@ -1122,7 +1175,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                     { zone.size.x, zoneHeight, zone.size.z });
                 if (HitAabb(playerBox, hitBox))
                 {
-                    if (applyPlayerDamage && applyPlayerDamage(bossDamage))
+                    if (applyBossDamageToPlayer())
                     {
                         return true;
                     }
@@ -1140,7 +1193,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                     { zone.size.x, zoneHeight, zone.size.z });
                 if (HitAabb(playerBox, hitBox))
                 {
-                    if (applyPlayerDamage && applyPlayerDamage(bossDamage))
+                    if (applyBossDamageToPlayer())
                     {
                         return true;
                     }
@@ -1521,7 +1574,7 @@ void SceneGame::DrawBossTelegraphMarker() const
         {
             localRate = Clamp01((telegraphRate - zone.revealStart) / (1.0f - zone.revealStart));
         }
-        const float pulse = 0.55f + 0.45f * static_cast<float>(std::sin((telegraphRate + localRate) * DirectX::XM_PI * 6.0f));
+        const float pulse = 0.50f + 0.50f * static_cast<float>(std::sin((telegraphRate + localRate) * DirectX::XM_PI * 6.0f));
 
         if (zone.safeZone)
         {
@@ -1531,12 +1584,21 @@ void SceneGame::DrawBossTelegraphMarker() const
                 m_pBossAttackRangeMarker,
                 zone.center,
                 outlineSize,
-                { 1.0f, 1.0f, 1.0f, 0.10f + 0.08f * pulse });
+                { 1.0f, 1.0f, 1.0f, 0.14f + 0.12f * pulse });
+        }
+        else
+        {
+            const DirectX::XMFLOAT3 outlineSize = { zone.size.x * 1.04f, zone.size.y, zone.size.z * 1.04f };
+            DrawAttackMarkerTintLocal(
+                m_pBossAttackRangeMarker,
+                zone.center,
+                outlineSize,
+                { 1.0f, 0.95f, 0.95f, 0.10f + 0.10f * pulse });
         }
 
         DirectX::XMFLOAT4 color = zone.color;
-        const float baseAlpha = zone.safeZone ? 0.08f : 0.14f;
-        const float pulseAlpha = zone.safeZone ? 0.20f : 0.34f;
+        const float baseAlpha = zone.safeZone ? 0.12f : 0.22f;
+        const float pulseAlpha = zone.safeZone ? 0.24f : 0.42f;
         color.w = baseAlpha + pulseAlpha * pulse;
         DrawAttackMarkerTintLocal(
             m_pBossAttackRangeMarker,

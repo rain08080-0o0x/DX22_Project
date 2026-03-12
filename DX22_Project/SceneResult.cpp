@@ -8,15 +8,35 @@ namespace
 {
 	constexpr int kMenuRestart = 0;
 	constexpr int kMenuTitle = 1;
+	constexpr int kRewardContinue = 100;
+	constexpr int kRewardBossBattle = 101;
 
 	bool IsResultConfirmTriggered()
 	{
-		return IsKeyTrigger(VK_RETURN) || IsKeyTrigger('F') || IsKeyTrigger(VK_SPACE);
+		return IsKeyTrigger(VK_RETURN) || IsKeyTrigger(VK_SPACE);
 	}
 
-	bool IsBossStartTriggered()
+	bool IsSelectionPrevTriggered()
 	{
-		return IsKeyTrigger('B');
+		return IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A') || IsKeyTrigger(VK_UP) || IsKeyTrigger('W');
+	}
+
+	bool IsSelectionNextTriggered()
+	{
+		return IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D') || IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S');
+	}
+
+	void StartBossBattleDebug(Transfer& tran)
+	{
+		tran.FinishUpgradeSelection();
+		tran.gameplayDebug.upgradeSelectionPending = 0;
+		tran.gameplayDebug.upgradeRerollRemain = 0;
+		tran.gameplayDebug.upgradeOffer0 = -1;
+		tran.gameplayDebug.upgradeOffer1 = -1;
+		tran.gameplayDebug.upgradeOffer2 = -1;
+		tran.gameplayDebug.requestBossBattle = 1;
+		tran.gameplayDebug.bossBattleActive = 0;
+		tran.gameplayDebug.showBossResultTimer = 0;
 	}
 }
 
@@ -34,6 +54,7 @@ SceneResult::SceneResult()
 		m_pResultBgmVoice = PlaySound(m_pResultBgm);
 	}
 	m_current = SceneManager::GetResultType();
+	m_rewardSelection = 0;
 }
 
 SceneResult::~SceneResult()
@@ -72,6 +93,7 @@ void SceneResult::Update()
 {
 	TRAN_INS;
 	tran.gameplayDebug.runTimerRunning = 0;
+	tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
 	if (m_pResultBgmVoice)
 	{
 		float masterVolume = tran.gameplay.volumeMaster;
@@ -91,56 +113,94 @@ void SceneResult::Update()
 	}
 	if (m_current == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0)
 	{
-		if (IsBossStartTriggered())
+		tran.RefreshUpgradeSelectionState();
+#ifdef _DEBUG
+		const bool showBossDebugHint = true;
+#else
+		const bool showBossDebugHint = false;
+#endif
+		const bool hasAnyOffer = tran.HasAnyUpgradeOffer();
+		int optionIds[4] = {};
+		int optionCount = 0;
+		if (hasAnyOffer)
 		{
-			tran.roguelike.selectionPending = 0;
-			tran.roguelike.rerollRemain = 0;
-			tran.gameplayDebug.upgradeSelectionPending = 0;
-			tran.gameplayDebug.upgradeRerollRemain = 0;
-			tran.gameplayDebug.upgradeOffer0 = -1;
-			tran.gameplayDebug.upgradeOffer1 = -1;
-			tran.gameplayDebug.upgradeOffer2 = -1;
-			tran.gameplayDebug.requestBossBattle = 1;
-			tran.gameplayDebug.bossBattleActive = 0;
-			tran.gameplayDebug.showBossResultTimer = 0;
-			SceneManager::ChangeResult(SceneManager::ResultType::None);
-			SceneManager::ChangeScene(SceneManager::SCENE_GAME);
-			return;
-		}
-
-		const bool hasAnyOffer =
-			(tran.roguelike.offers[0] >= 0) ||
-			(tran.roguelike.offers[1] >= 0) ||
-			(tran.roguelike.offers[2] >= 0);
-		if (!hasAnyOffer)
-		{
-			if (IsResultConfirmTriggered())
+			for (int i = 0; i < Transfer::RoguelikeUpgrade::kOfferCount; ++i)
 			{
-				tran.roguelike.selectionPending = 0;
-				tran.roguelike.rerollRemain = 0;
-				tran.gameplayDebug.upgradeSelectionPending = 0;
-				tran.gameplayDebug.upgradeRerollRemain = 0;
-				tran.gameplayDebug.upgradeOffer0 = -1;
-				tran.gameplayDebug.upgradeOffer1 = -1;
-				tran.gameplayDebug.upgradeOffer2 = -1;
+				if (tran.roguelike.offers[i] >= 0)
+				{
+					optionIds[optionCount++] = i;
+				}
 			}
-			return;
 		}
-		if (IsKeyTrigger('R'))
+		else
 		{
-			tran.RerollUpgradeSelection();
+			optionIds[optionCount++] = kRewardContinue;
+		}
+		if (showBossDebugHint && optionCount < 4)
+		{
+			optionIds[optionCount++] = kRewardBossBattle;
+		}
+		if (optionCount <= 0)
+		{
+			optionIds[0] = kRewardContinue;
+			optionCount = 1;
+		}
+		if (m_rewardSelection < 0) m_rewardSelection = 0;
+		if (m_rewardSelection >= optionCount) m_rewardSelection = optionCount - 1;
+		tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+
+		if (IsSelectionPrevTriggered())
+		{
+			--m_rewardSelection;
+			if (m_rewardSelection < 0) m_rewardSelection = optionCount - 1;
+			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+		}
+		else if (IsSelectionNextTriggered())
+		{
+			++m_rewardSelection;
+			if (m_rewardSelection >= optionCount) m_rewardSelection = 0;
+			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
 		}
 
-		int selectedIndex = -1;
-		if (IsKeyTrigger('1')) selectedIndex = 0;
-		else if (IsKeyTrigger('2')) selectedIndex = 1;
-		else if (IsKeyTrigger('3')) selectedIndex = 2;
-
-		if (selectedIndex >= 0 && tran.ApplyUpgradeSelection(selectedIndex))
+		if (hasAnyOffer && IsKeyTrigger('R'))
 		{
-			SceneManager::ChangeResult(SceneManager::ResultType::None);
-			SceneManager::ChangeScene(SceneManager::SCENE_GAME);
-			return;
+			if (tran.RerollUpgradeSelection())
+			{
+				m_rewardSelection = 0;
+				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+			}
+		}
+
+		if (IsResultConfirmTriggered())
+		{
+			const int selectedOption = optionIds[m_rewardSelection];
+			if (selectedOption == kRewardBossBattle)
+			{
+				StartBossBattleDebug(tran);
+				SceneManager::ChangeResult(SceneManager::ResultType::None);
+				SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+				return;
+			}
+			bool handled = false;
+			if (selectedOption == kRewardContinue)
+			{
+				handled = tran.AdvanceUpgradeSelectionPhase();
+			}
+			else if (selectedOption >= 0)
+			{
+				handled = tran.ApplyUpgradeSelection(selectedOption);
+			}
+			if (handled)
+			{
+				m_rewardSelection = 0;
+				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+				if (tran.roguelike.selectionPending == 0)
+				{
+					SceneManager::ChangeResult(SceneManager::ResultType::None);
+					SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+				}
+				return;
+			}
 		}
 		return;
 	}

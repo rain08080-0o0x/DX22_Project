@@ -10,6 +10,7 @@ public:
         SCENE_GAME,
         SCENE_RESULT,
         SCENE_3DEDITOR,
+        SCENE_ENGINE_EDITOR,
         SCENE_MAX
     };
 

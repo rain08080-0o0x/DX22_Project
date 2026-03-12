@@ -50,6 +50,9 @@ void SceneManager::CreateScene(SceneType type)
     case SCENE_3DEDITOR:
         m_pScene = new Scene3DEditor();
         break;
+    case SCENE_ENGINE_EDITOR:
+        m_pScene = new Scene3DEditor();
+        break;
     default:
         m_pScene = new SceneTitle();
         break;

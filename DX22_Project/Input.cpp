@@ -142,8 +142,10 @@ namespace
 		case 'F':
 			return IsPadButtonDown(state, XINPUT_GAMEPAD_B);
 		case 'Q':
+		case 'O':
 			return IsPadButtonDown(state, XINPUT_GAMEPAD_Y);
 		case 'E':
+		case 'P':
 			return IsPadButtonDown(state, XINPUT_GAMEPAD_X);
 		case 'R':
 			return IsPadButtonDown(state, XINPUT_GAMEPAD_Y);
@@ -190,8 +192,10 @@ namespace
 		case 'F':
 			return IsDirectInputButtonDown(state, 1);
 		case 'Q':
+		case 'O':
 			return IsDirectInputButtonDown(state, 3);
 		case 'E':
+		case 'P':
 			return IsDirectInputButtonDown(state, 2);
 		case 'R':
 			return IsDirectInputButtonDown(state, 3);
@@ -433,6 +437,24 @@ float GetPadLeftStickY()
 	const float xinputValue = g_padConnected ? NormalizeThumbAxis(g_padState.Gamepad.sThumbLY, kStickDeadZone) : 0.0f;
 	const float directInputValue = g_diPadConnected ? -NormalizeDirectInputAxis(g_diPadState.lY) : 0.0f;
 	return SelectStrongerAxis(xinputValue, directInputValue);
+}
+
+bool IsPadLeftShoulderTrigger()
+{
+	const bool xinputNow = g_padConnected && IsPadButtonDown(g_padState, XINPUT_GAMEPAD_LEFT_SHOULDER);
+	const bool xinputOld = IsPadButtonDown(g_oldPadState, XINPUT_GAMEPAD_LEFT_SHOULDER);
+	const bool directInputNow = g_diPadConnected && IsDirectInputButtonDown(g_diPadState, 4);
+	const bool directInputOld = IsDirectInputButtonDown(g_oldDiPadState, 4);
+	return (xinputNow && !xinputOld) || (directInputNow && !directInputOld);
+}
+
+bool IsPadRightShoulderTrigger()
+{
+	const bool xinputNow = g_padConnected && IsPadButtonDown(g_padState, XINPUT_GAMEPAD_RIGHT_SHOULDER);
+	const bool xinputOld = IsPadButtonDown(g_oldPadState, XINPUT_GAMEPAD_RIGHT_SHOULDER);
+	const bool directInputNow = g_diPadConnected && IsDirectInputButtonDown(g_diPadState, 5);
+	const bool directInputOld = IsDirectInputButtonDown(g_oldDiPadState, 5);
+	return (xinputNow && !xinputOld) || (directInputNow && !directInputOld);
 }
 
 bool IsMouseLeftPress()

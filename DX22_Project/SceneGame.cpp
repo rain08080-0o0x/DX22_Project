@@ -76,6 +76,10 @@ namespace
     const int kPauseMenuContinue = 0;
     const int kPauseMenuOption = 1;
     const int kPauseMenuToTitle = 2;
+    const int kPauseTabGame = 0;
+    const int kPauseTabUpgrade = 1;
+    const int kPauseTabSettings = 2;
+    const int kPauseTabCount = 3;
     const int kPauseOptionMaster = 0;
     const int kPauseOptionBgm = 1;
     const int kPauseOptionSe = 2;
@@ -83,6 +87,21 @@ namespace
     const int kPauseOptionBack = 4;
     const int kPauseOptionCount = 5;
     const float kOptionVolumeStep = 0.05f;
+    const float kPlayerDamageBurstDuration = 0.18f;
+    const float kPlayerDamageBurstScale = 0.34f;
+    const float kSkillShotRadius = 0.28f;
+    const float kSkillShotSpeed = 11.5f;
+    const float kSkillShotMarkerLife = 0.16f;
+    const float kSkillNovaRadiusScale = 2.6f;
+    const float kSkillNovaHeightScale = 1.2f;
+    const float kSkillNovaDamageScale = 1.8f;
+    const float kSkillOrbitDuration = 5.0f;
+    const float kSkillOrbitAngularSpeed = 5.6f;
+    const float kSkillOrbitRadiusScale = 1.75f;
+    const float kSkillOrbitHeightOffsetScale = 0.45f;
+    const float kSkillOrbitDamageScale = 1.0f;
+    const float kSkillOrbitContactCooldown = 0.35f;
+    const float kSkillOrbitBillboardScale = 0.75f;
 
     /**
      * @brief カメラモード値を有効な 2 値へ正規化します。
@@ -117,6 +136,16 @@ namespace
     bool IsPauseConfirmTriggered()
     {
         return IsKeyTrigger(VK_RETURN) || IsKeyTrigger('F') || IsKeyTrigger(VK_SPACE);
+    }
+
+    bool IsPauseTabPrevTriggered()
+    {
+        return IsPadLeftShoulderTrigger();
+    }
+
+    bool IsPauseTabNextTriggered()
+    {
+        return IsPadRightShoulderTrigger();
     }
 
     /**
@@ -259,6 +288,11 @@ namespace
         return v;
     }
 
+    float MaxFloat(float a, float b)
+    {
+        return (a > b) ? a : b;
+    }
+
     /**
      * @brief 難易度による基準敵数補正を返します。
      * @param preset 難易度です。
@@ -345,6 +379,136 @@ namespace
         box.center = center;
         box.size = size;
         return box;
+    }
+
+    bool IsPointInsideUiRect(const POINT& point, const DirectX::XMFLOAT2& center, const DirectX::XMFLOAT2& size)
+    {
+        const float halfW = size.x * 0.5f;
+        const float halfH = size.y * 0.5f;
+        const float minX = center.x - halfW;
+        const float maxX = center.x + halfW;
+        const float minY = center.y - halfH;
+        const float maxY = center.y + halfH;
+        return
+            static_cast<float>(point.x) >= minX &&
+            static_cast<float>(point.x) <= maxX &&
+            static_cast<float>(point.y) >= minY &&
+            static_cast<float>(point.y) <= maxY;
+    }
+
+    bool IntersectRayAabb(const DirectX::XMFLOAT3& origin,
+                          const DirectX::XMFLOAT3& dir,
+                          const Collision::Box& box,
+                          float& outT)
+    {
+        const DirectX::XMFLOAT3 half = { box.size.x * 0.5f, box.size.y * 0.5f, box.size.z * 0.5f };
+        const DirectX::XMFLOAT3 minP = { box.center.x - half.x, box.center.y - half.y, box.center.z - half.z };
+        const DirectX::XMFLOAT3 maxP = { box.center.x + half.x, box.center.y + half.y, box.center.z + half.z };
+
+        float tMin = 0.0f;
+        float tMax = 1.0e9f;
+        const float originAxis[3] = { origin.x, origin.y, origin.z };
+        const float dirAxis[3] = { dir.x, dir.y, dir.z };
+        const float minAxis[3] = { minP.x, minP.y, minP.z };
+        const float maxAxis[3] = { maxP.x, maxP.y, maxP.z };
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            if (std::fabs(dirAxis[axis]) <= 1.0e-6f)
+            {
+                if (originAxis[axis] < minAxis[axis] || originAxis[axis] > maxAxis[axis])
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            const float invDir = 1.0f / dirAxis[axis];
+            float t1 = (minAxis[axis] - originAxis[axis]) * invDir;
+            float t2 = (maxAxis[axis] - originAxis[axis]) * invDir;
+            if (t1 > t2)
+            {
+                const float tmp = t1;
+                t1 = t2;
+                t2 = tmp;
+            }
+            if (t1 > tMin) tMin = t1;
+            if (t2 < tMax) tMax = t2;
+            if (tMin > tMax)
+            {
+                return false;
+            }
+        }
+
+        outT = (tMin >= 0.0f) ? tMin : tMax;
+        return outT >= 0.0f;
+    }
+
+    void BuildCursorRay(Camera* camera, const POINT& mousePos, DirectX::XMFLOAT3& outOrigin, DirectX::XMFLOAT3& outDir)
+    {
+        DirectX::XMFLOAT4X4 viewF = camera->GetViewMatrix(false);
+        DirectX::XMFLOAT4X4 projF = camera->GetProjectionMatrix(false);
+        const DirectX::XMMATRIX view = DirectX::XMLoadFloat4x4(&viewF);
+        const DirectX::XMMATRIX proj = DirectX::XMLoadFloat4x4(&projF);
+        const DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
+
+        const DirectX::XMVECTOR nearPoint = DirectX::XMVector3Unproject(
+            DirectX::XMVectorSet(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y), 0.0f, 1.0f),
+            0.0f,
+            0.0f,
+            static_cast<float>(SCREEN_WIDTH),
+            static_cast<float>(SCREEN_HEIGHT),
+            0.0f,
+            1.0f,
+            proj,
+            view,
+            world);
+        const DirectX::XMVECTOR farPoint = DirectX::XMVector3Unproject(
+            DirectX::XMVectorSet(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y), 1.0f, 1.0f),
+            0.0f,
+            0.0f,
+            static_cast<float>(SCREEN_WIDTH),
+            static_cast<float>(SCREEN_HEIGHT),
+            0.0f,
+            1.0f,
+            proj,
+            view,
+            world);
+
+        DirectX::XMStoreFloat3(&outOrigin, nearPoint);
+        DirectX::XMVECTOR dirVec = DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(farPoint, nearPoint));
+        DirectX::XMStoreFloat3(&outDir, dirVec);
+    }
+
+    int GetSkillCooldownUpgradeLevel(const Transfer::RoguelikeUpgrade& roguelike, int skillType)
+    {
+        switch (skillType)
+        {
+        case Transfer::RoguelikeUpgrade::SkillShot:
+            return roguelike.skillShotCooldownLevel;
+        case Transfer::RoguelikeUpgrade::SkillNova:
+            return roguelike.skillNovaCooldownLevel;
+        case Transfer::RoguelikeUpgrade::SkillOrbit:
+            return roguelike.skillOrbitCooldownLevel;
+        default:
+            return 0;
+        }
+    }
+
+    DirectX::XMFLOAT3 CalcOrbitSatellitePos(float baseAngle,
+                                            float radius,
+                                            int count,
+                                            const DirectX::XMFLOAT3& playerPos,
+                                            float playerHeight,
+                                            int index)
+    {
+        const int safeCount = (count > 0) ? count : 1;
+        const float angle = baseAngle + (2.0f * kPi * static_cast<float>(index) / static_cast<float>(safeCount));
+        return {
+            playerPos.x + std::cos(angle) * radius,
+            playerPos.y + playerHeight * kSkillOrbitHeightOffsetScale,
+            playerPos.z + std::sin(angle) * radius
+        };
     }
 
     /**
@@ -574,6 +738,54 @@ namespace
     }
 
     /**
+     * @brief 指定色付きスプライトをビルボードで描画します。
+     * @param texture マーカー画像です。
+     * @param camera 向きを合わせる対象カメラです。
+     * @param pos 描画位置の基準です。
+     * @param size 描画サイズです。
+     * @param color 表示色です。
+     */
+    void DrawBillboardMarkerTint(Texture* texture,
+                                 Camera* camera,
+                                 const DirectX::XMFLOAT3& pos,
+                                 const DirectX::XMFLOAT3& size,
+                                 const DirectX::XMFLOAT4& color)
+    {
+        if (!texture) return;
+        using namespace DirectX;
+
+        XMMATRIX billboard = XMMatrixIdentity();
+        if (camera)
+        {
+            XMFLOAT4X4 viewFloat = camera->GetViewMatrix(false);
+            XMMATRIX viewMat = XMLoadFloat4x4(&viewFloat);
+            XMMATRIX invView = XMMatrixInverse(nullptr, viewMat);
+            XMFLOAT4X4 invViewFloat{};
+            XMStoreFloat4x4(&invViewFloat, invView);
+            invViewFloat._41 = 0.0f;
+            invViewFloat._42 = 0.0f;
+            invViewFloat._43 = 0.0f;
+            billboard = XMLoadFloat4x4(&invViewFloat);
+        }
+
+        const XMMATRIX t = billboard * XMMatrixTranslation(
+            pos.x,
+            pos.y + size.y * 0.5f,
+            pos.z);
+        XMFLOAT4X4 world{};
+        XMStoreFloat4x4(&world, XMMatrixTranspose(t));
+
+        Sprite::SetWorld(world);
+        Sprite::SetSize({ size.x, size.y });
+        Sprite::SetOffset({ 0.0f, 0.0f });
+        Sprite::SetUVPos({ 0.0f, 0.0f });
+        Sprite::SetUVScale({ 1.0f, 1.0f });
+        Sprite::SetColor(color);
+        Sprite::SetTexture(texture);
+        Sprite::Draw();
+    }
+
+    /**
      * @brief 既定色の攻撃マーカーを描画します。
      * @param texture マーカー画像です。
      * @param pos 描画位置です。
@@ -597,9 +809,11 @@ SceneGame::SceneGame()
     , m_enemies()
     , m_markerEffects()
     , m_enemyProjectiles()
+    , m_skillProjectiles()
     , m_boss()
     , m_pShadow(nullptr)
     , m_pAttackMarker(nullptr)
+    , m_pSkillTexture(nullptr)
     , m_pBossAttackRangeMarker(nullptr)
     , m_pGroundTexture(nullptr)
     , m_pAttackSe(nullptr)
@@ -639,6 +853,7 @@ SceneGame::SceneGame()
     , m_skill1CooldownDuration(0.0f)
     , m_skill2CooldownDuration(0.0f)
     , m_attackSwingId(0)
+    , m_skillProjectileSerial(0)
     , m_attackHitCountThisSwing(0)
     , m_hitStopTimer(0.0f)
     , m_attackTrailSpawnTimer(0.0f)
@@ -651,10 +866,14 @@ SceneGame::SceneGame()
     , m_screenShakePhase(0.0f)
     , m_enemyAttackSeGateTimer(0.0f)
     , m_enemyPerfPhase(0)
+    , m_bossSkillContactCooldownTimer(0.0f)
     , m_lastMoveDir(0.0f, 0.0f, 1.0f)
     , m_attackCenter(0.0f, 0.0f, 0.0f)
     , m_attackSize(0.0f, 0.0f, 0.0f)
+    , m_orbitSkill()
+    , m_lastBossSkillProjectileId(-1)
     , m_isPaused(false)
+    , m_pauseTabIndex(kPauseTabGame)
     , m_pauseMenuSelection(kPauseMenuContinue)
     , m_isPauseOptionOpen(false)
     , m_pauseOptionSelection(kPauseOptionMaster)
@@ -687,6 +906,7 @@ SceneGame::SceneGame()
     // シーン開始時にリザルトやポーズ状態が残らないよう初期化します。
     SceneManager::ChangeResult(SceneManager::ResultType::None);
     tran.gameplayDebug.pauseMenuOpen = 0;
+    tran.gameplayDebug.pauseTabIndex = kPauseTabGame;
     tran.gameplayDebug.pauseMenuSelection = kPauseMenuContinue;
     tran.gameplayDebug.pauseMenuRequest = 0;
     tran.gameplayDebug.pauseOptionOpen = 0;
@@ -821,6 +1041,11 @@ SceneGame::SceneGame()
     if (FAILED(m_pAttackMarker->Create("Assets/Texture/Star.png")))
     {
         MessageBox(NULL, "Texture load failed.\nStar.png", "Error", MB_OK);
+    }
+    m_pSkillTexture = new Texture();
+    if (FAILED(m_pSkillTexture->Create("Assets/Texture/Chracter/skill.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nChracter/skill.png", "Error", MB_OK);
     }
     m_pBossAttackRangeMarker = new Texture();
     if (FAILED(m_pBossAttackRangeMarker->Create("Assets/Texture/Game/AttackRange.png")))
@@ -968,6 +1193,11 @@ SceneGame::~SceneGame()
     {
         delete m_pAttackMarker;
         m_pAttackMarker = nullptr;
+    }
+    if (m_pSkillTexture)
+    {
+        delete m_pSkillTexture;
+        m_pSkillTexture = nullptr;
     }
     if (m_pBossAttackRangeMarker)
     {
@@ -1149,6 +1379,511 @@ void SceneGame::EnsureEnemyCount(int targetCount, float stageSize)
     }
 }
 
+int SceneGame::GetSkillTypeForSlot(int slotIndex) const
+{
+    const auto& tran = Transfer::GetInstance();
+    switch (slotIndex)
+    {
+    case 0:
+        return tran.roguelike.skillSlot1;
+    case 1:
+        return tran.roguelike.skillSlot2;
+    default:
+        return Transfer::RoguelikeUpgrade::SkillNone;
+    }
+}
+
+bool SceneGame::ActivateSkillSlot(int slotIndex, int playerAttackDamage, float stageSize)
+{
+    if (!m_pPlayer) return false;
+
+    auto& tran = Transfer::GetInstance();
+    const int skillType = GetSkillTypeForSlot(slotIndex);
+    if (skillType == Transfer::RoguelikeUpgrade::SkillNone)
+    {
+        return false;
+    }
+
+    const DirectX::XMFLOAT3 forward = NormalizeXZ(m_lastMoveDir, { 0.0f, 0.0f, 1.0f });
+    const DirectX::XMFLOAT3 playerPos = {
+        tran.player.pos.x,
+        tran.player.pos.y + tran.player.size.y * 0.5f,
+        tran.player.pos.z
+    };
+    const float stageHalf = stageSize * 0.5f;
+
+    switch (skillType)
+    {
+    case Transfer::RoguelikeUpgrade::SkillShot:
+    {
+        const float shotRangeScale = tran.GetSkillRangeScaleByLevel(tran.roguelike.skillShotRangeLevel);
+        const float shotDamageScale = tran.GetSkillDamageScaleByLevel(tran.roguelike.skillShotPowerLevel);
+        float maxDistance = stageHalf * 2.0f;
+        if (std::fabs(forward.x) > 1.0e-4f)
+        {
+            const float edgeX = (forward.x >= 0.0f) ? stageHalf : -stageHalf;
+            const float distX = (edgeX - tran.player.pos.x) / forward.x;
+            if (distX > 0.0f && distX < maxDistance) maxDistance = distX;
+        }
+        if (std::fabs(forward.z) > 1.0e-4f)
+        {
+            const float edgeZ = (forward.z >= 0.0f) ? stageHalf : -stageHalf;
+            const float distZ = (edgeZ - tran.player.pos.z) / forward.z;
+            if (distZ > 0.0f && distZ < maxDistance) maxDistance = distZ;
+        }
+        if (maxDistance < 0.5f) maxDistance = 0.5f;
+
+        SkillProjectile shot{};
+        shot.dir = forward;
+        shot.radius = kSkillShotRadius * shotRangeScale;
+        shot.speed = kSkillShotSpeed;
+        shot.remainDistance = maxDistance;
+        shot.damage = ClampInt(
+            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * shotDamageScale)),
+            1,
+            999);
+        shot.projectileId = m_skillProjectileSerial++;
+        if (m_skillProjectileSerial < 0) m_skillProjectileSerial = 0;
+        shot.pos = {
+            playerPos.x + forward.x * (tran.player.size.x * 0.9f),
+            playerPos.y,
+            playerPos.z + forward.z * (tran.player.size.z * 0.9f)
+        };
+        m_skillProjectiles.push_back(shot);
+
+        MarkerEffect fx{};
+        fx.pos = shot.pos;
+        fx.size = {
+            tran.player.size.x * 0.9f * shotRangeScale,
+            tran.player.size.y * 0.9f * shotRangeScale,
+            tran.player.size.z * 0.9f * shotRangeScale
+        };
+        fx.color = { 0.45f, 0.95f, 1.0f, 0.90f };
+        fx.timer = kSkillShotMarkerLife;
+        fx.duration = kSkillShotMarkerLife;
+        fx.growScale = 1.2f;
+        fx.billboard = true;
+        fx.texture = m_pSkillTexture;
+        if (m_markerEffects.size() < 96)
+        {
+            m_markerEffects.push_back(fx);
+        }
+        return true;
+    }
+    case Transfer::RoguelikeUpgrade::SkillNova:
+    {
+        const float novaRangeScale = tran.GetSkillRangeScaleByLevel(tran.roguelike.skillNovaRangeLevel);
+        const float novaDamageScale = tran.GetSkillDamageScaleByLevel(tran.roguelike.skillNovaPowerLevel);
+        const int skillDamage = ClampInt(
+            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * kSkillNovaDamageScale * novaDamageScale)),
+            1,
+            999);
+        const DirectX::XMFLOAT3 hitSize = {
+            tran.player.size.x * kSkillNovaRadiusScale * novaRangeScale,
+            tran.player.size.y * kSkillNovaHeightScale,
+            tran.player.size.z * kSkillNovaRadiusScale * novaRangeScale
+        };
+        const Collision::Box hitBox = MakeAabb(playerPos, hitSize);
+        bool hitSomething = false;
+
+        for (auto& slot : m_enemies)
+        {
+            if (!slot.enemy) continue;
+            const Collision::Box enemyBox = slot.enemy->GetCollision();
+            if (!HitAabb(hitBox, enemyBox)) continue;
+            slot.enemy->Damage(skillDamage);
+            slot.hitFlashTimer = MaxFloat(slot.hitFlashTimer, tran.gameplay.attackHitFlash);
+            const DirectX::XMFLOAT3 knockDir = NormalizeXZ({
+                enemyBox.center.x - playerPos.x,
+                0.0f,
+                enemyBox.center.z - playerPos.z
+            }, forward);
+            DirectX::XMFLOAT3 nextPos = {
+                enemyBox.center.x + knockDir.x * tran.gameplay.attackKnockback * 1.2f,
+                0.0f,
+                enemyBox.center.z + knockDir.z * tran.gameplay.attackKnockback * 1.2f
+            };
+            const float halfX = enemyBox.size.x * 0.5f;
+            const float halfZ = enemyBox.size.z * 0.5f;
+            nextPos.x = ClampRange(nextPos.x, -stageHalf + halfX, stageHalf - halfX);
+            nextPos.z = ClampRange(nextPos.z, -stageHalf + halfZ, stageHalf - halfZ);
+            slot.enemy->SetPos(nextPos);
+            hitSomething = true;
+        }
+
+        if (m_isBossBattleDebug && m_boss.hp > 0)
+        {
+            const Collision::Box bossBox = MakeAabb({
+                m_boss.pos.x,
+                m_boss.pos.y + m_boss.size.y * 0.5f,
+                m_boss.pos.z
+            }, m_boss.size);
+            if (HitAabb(hitBox, bossBox))
+            {
+                hitSomething = true;
+                if (ApplySkillDamageToBoss(skillDamage))
+                {
+                    return true;
+                }
+            }
+        }
+
+        MarkerEffect fx{};
+        fx.pos = { tran.player.pos.x, 0.0f, tran.player.pos.z };
+        fx.size = { hitSize.x, hitSize.y, hitSize.z };
+        fx.color = { 1.0f, 0.48f, 0.22f, 0.88f };
+        fx.timer = 0.18f;
+        fx.duration = 0.18f;
+        fx.growScale = 1.3f;
+        if (m_markerEffects.size() < 96)
+        {
+            m_markerEffects.push_back(fx);
+        }
+
+        if (hitSomething)
+        {
+            if (m_pAttackSe) PlaySound(m_pAttackSe);
+            if (m_hitStopTimer < tran.gameplay.attackHitStop)
+            {
+                m_hitStopTimer = tran.gameplay.attackHitStop;
+            }
+        }
+        return true;
+    }
+    case Transfer::RoguelikeUpgrade::SkillOrbit:
+    {
+        const float orbitRangeScale = tran.GetSkillRangeScaleByLevel(tran.roguelike.skillOrbitRangeLevel);
+        const float orbitDamageScale = tran.GetOrbitDamageScaleByCountLevel(tran.roguelike.skillOrbitCountLevel);
+        m_orbitSkill.active = true;
+        m_orbitSkill.duration = kSkillOrbitDuration;
+        m_orbitSkill.timer = kSkillOrbitDuration;
+        m_orbitSkill.angle = 0.0f;
+        m_orbitSkill.angularSpeed = kSkillOrbitAngularSpeed;
+        m_orbitSkill.radius = ((tran.player.size.x > tran.player.size.z) ? tran.player.size.x : tran.player.size.z) * kSkillOrbitRadiusScale;
+        m_orbitSkill.count = tran.GetOrbitCountByLevel(tran.roguelike.skillOrbitCountLevel);
+        m_orbitSkill.damage = ClampInt(
+            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * kSkillOrbitDamageScale * orbitDamageScale)),
+            1,
+            999);
+        m_orbitSkill.size = {
+            tran.player.size.x * kSkillOrbitBillboardScale * orbitRangeScale,
+            tran.player.size.y * kSkillOrbitBillboardScale * orbitRangeScale,
+            tran.player.size.z * kSkillOrbitBillboardScale * orbitRangeScale
+        };
+        m_orbitSkill.pos = CalcOrbitSatellitePos(
+            m_orbitSkill.angle,
+            m_orbitSkill.radius,
+            m_orbitSkill.count,
+            tran.player.pos,
+            tran.player.size.y,
+            0);
+        m_bossSkillContactCooldownTimer = 0.0f;
+        for (auto& slot : m_enemies)
+        {
+            slot.skillContactCooldownTimer = 0.0f;
+        }
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
+void SceneGame::UpdateSkillActors(float dt, float stageSize)
+{
+    const float safeDt = (dt > 0.0f) ? dt : 0.0f;
+    const float stageHalf = stageSize * 0.5f;
+
+    if (m_bossSkillContactCooldownTimer > 0.0f)
+    {
+        m_bossSkillContactCooldownTimer -= safeDt;
+        if (m_bossSkillContactCooldownTimer < 0.0f) m_bossSkillContactCooldownTimer = 0.0f;
+    }
+
+    for (auto& slot : m_enemies)
+    {
+        if (slot.skillContactCooldownTimer > 0.0f)
+        {
+            slot.skillContactCooldownTimer -= safeDt;
+            if (slot.skillContactCooldownTimer < 0.0f) slot.skillContactCooldownTimer = 0.0f;
+        }
+    }
+
+    for (auto& shot : m_skillProjectiles)
+    {
+        if (shot.remainDistance <= 0.0f) continue;
+        const float step = shot.speed * safeDt;
+        shot.pos.x += shot.dir.x * step;
+        shot.pos.z += shot.dir.z * step;
+        shot.remainDistance -= step;
+        if (shot.remainDistance <= 0.0f ||
+            std::fabs(shot.pos.x) > stageHalf + 0.5f ||
+            std::fabs(shot.pos.z) > stageHalf + 0.5f)
+        {
+            shot.remainDistance = 0.0f;
+        }
+    }
+
+    m_skillProjectiles.erase(
+        std::remove_if(
+            m_skillProjectiles.begin(),
+            m_skillProjectiles.end(),
+            [](const SkillProjectile& shot) { return shot.remainDistance <= 0.0f; }),
+        m_skillProjectiles.end());
+
+    if (!m_orbitSkill.active)
+    {
+        return;
+    }
+
+    if (m_orbitSkill.timer > 0.0f)
+    {
+        m_orbitSkill.timer -= safeDt;
+        if (m_orbitSkill.timer < 0.0f) m_orbitSkill.timer = 0.0f;
+    }
+    if (m_orbitSkill.timer <= 0.0f)
+    {
+        m_orbitSkill.active = false;
+        return;
+    }
+
+    auto& tran = Transfer::GetInstance();
+    m_orbitSkill.angle += m_orbitSkill.angularSpeed * safeDt;
+    m_orbitSkill.pos = CalcOrbitSatellitePos(
+        m_orbitSkill.angle,
+        m_orbitSkill.radius,
+        m_orbitSkill.count,
+        tran.player.pos,
+        tran.player.size.y,
+        0);
+}
+
+void SceneGame::UpdateCursorHoverDebug(float stageSize)
+{
+    auto& tran = Transfer::GetInstance();
+    sprintf_s(tran.gameplayDebug.cursorHoverTarget, sizeof(tran.gameplayDebug.cursorHoverTarget), "%s", "-");
+
+    const POINT mousePos = GetMousePosition();
+    if (mousePos.x < 0 || mousePos.y < 0 || mousePos.x >= SCREEN_WIDTH || mousePos.y >= SCREEN_HEIGHT)
+    {
+        return;
+    }
+
+    if (m_pHpFrame && IsPointInsideUiRect(mousePos, m_pHpFrame->GetPosition(), m_pHpFrame->GetSize()))
+    {
+        sprintf_s(tran.gameplayDebug.cursorHoverTarget, sizeof(tran.gameplayDebug.cursorHoverTarget), "%s", "UI:HPBar");
+        return;
+    }
+
+    for (int i = 0; i < CooldownSlotCount; ++i)
+    {
+        if (!m_pCooldownFrame[i]) continue;
+        if (!IsPointInsideUiRect(mousePos, m_pCooldownFrame[i]->GetPosition(), m_pCooldownFrame[i]->GetSize())) continue;
+
+        const char* label = "UI:Cooldown";
+        switch (i)
+        {
+        case 0: label = "UI:AttackGauge"; break;
+        case 1: label = "UI:EvadeGauge"; break;
+        case 2: label = "UI:Skill1Gauge"; break;
+        case 3: label = "UI:Skill2Gauge"; break;
+        default: break;
+        }
+        sprintf_s(tran.gameplayDebug.cursorHoverTarget, sizeof(tran.gameplayDebug.cursorHoverTarget), "%s", label);
+        return;
+    }
+
+    if (m_isBossBattleDebug && m_boss.maxHp > 0)
+    {
+        const float widthRate = ClampRange(tran.gameplay.bossHpBarWidthRate, 0.20f, 0.90f);
+        const float heightRate = ClampRange(tran.gameplay.bossHpBarHeightRate, 0.01f, 0.20f);
+        const float barW = static_cast<float>(SCREEN_WIDTH) * widthRate;
+        const float barH = static_cast<float>(SCREEN_HEIGHT) * heightRate;
+        const float x = (static_cast<float>(SCREEN_WIDTH) - barW) * 0.5f;
+        const float y = 12.0f;
+        const DirectX::XMFLOAT2 hpCenter = { x + barW * 0.5f, y + barH * 0.5f };
+        const DirectX::XMFLOAT2 hpSize = { barW, barH };
+        if (IsPointInsideUiRect(mousePos, hpCenter, hpSize))
+        {
+            sprintf_s(tran.gameplayDebug.cursorHoverTarget, sizeof(tran.gameplayDebug.cursorHoverTarget), "%s", "UI:BossHPBar");
+            return;
+        }
+
+        const float guardWidth = static_cast<float>(SCREEN_WIDTH) * ClampRange(tran.gameplay.bossGuardBarWidthRate, 0.10f, 0.90f);
+        const float guardHeight = static_cast<float>(SCREEN_HEIGHT) * ClampRange(tran.gameplay.bossGuardBarHeightRate, 0.005f, 0.10f);
+        const float guardX = ((static_cast<float>(SCREEN_WIDTH) - guardWidth) * 0.5f) + tran.gameplay.bossGuardBarOffsetX;
+        const float guardY = y + barH + tran.gameplay.bossGuardBarOffsetY;
+        const float guardBarH = MaxFloat(6.0f, guardHeight);
+        const DirectX::XMFLOAT2 guardCenter = { guardX + guardWidth * 0.5f, guardY + guardBarH * 0.5f };
+        const DirectX::XMFLOAT2 guardSize = { guardWidth, guardBarH };
+        if (IsPointInsideUiRect(mousePos, guardCenter, guardSize))
+        {
+            sprintf_s(tran.gameplayDebug.cursorHoverTarget, sizeof(tran.gameplayDebug.cursorHoverTarget), "%s", "UI:BossGuardBar");
+            return;
+        }
+    }
+
+    if (!m_pCamera)
+    {
+        return;
+    }
+
+    DirectX::XMFLOAT3 rayOrigin{};
+    DirectX::XMFLOAT3 rayDir{};
+    BuildCursorRay(m_pCamera, mousePos, rayOrigin, rayDir);
+
+    float closestT = 1.0e9f;
+    auto recordHit = [&](float t, const char* label)
+    {
+        if (t < 0.0f || t >= closestT) return;
+        closestT = t;
+        sprintf_s(tran.gameplayDebug.cursorHoverTarget, sizeof(tran.gameplayDebug.cursorHoverTarget), "%s", label);
+    };
+
+    Collision::Box playerBox = MakeAabb(
+        {
+            tran.player.pos.x,
+            tran.player.pos.y + tran.player.size.y * 0.5f,
+            tran.player.pos.z
+        },
+        tran.player.size);
+    float hitT = 0.0f;
+    if (IntersectRayAabb(rayOrigin, rayDir, playerBox, hitT))
+    {
+        recordHit(hitT, "Player");
+    }
+
+    for (const auto& slot : m_enemies)
+    {
+        if (!slot.enemy) continue;
+        if (IntersectRayAabb(rayOrigin, rayDir, slot.enemy->GetCollision(), hitT))
+        {
+            recordHit(hitT, "Enemy");
+        }
+    }
+
+    if (m_isBossBattleDebug && m_boss.hp > 0)
+    {
+        const Collision::Box bossBox = MakeAabb(
+            {
+                m_boss.pos.x,
+                m_boss.pos.y + m_boss.size.y * 0.5f,
+                m_boss.pos.z
+            },
+            m_boss.size);
+        if (IntersectRayAabb(rayOrigin, rayDir, bossBox, hitT))
+        {
+            recordHit(hitT, "Boss");
+        }
+    }
+
+    if (std::fabs(rayDir.y) > 1.0e-6f)
+    {
+        const float floorT = -rayOrigin.y / rayDir.y;
+        if (floorT >= 0.0f && floorT < closestT)
+        {
+            const float hitX = rayOrigin.x + rayDir.x * floorT;
+            const float hitZ = rayOrigin.z + rayDir.z * floorT;
+            const float stageHalf = stageSize * 0.5f;
+            if (hitX >= -stageHalf && hitX <= stageHalf && hitZ >= -stageHalf && hitZ <= stageHalf)
+            {
+                recordHit(floorT, "Floor");
+            }
+        }
+    }
+}
+
+bool SceneGame::ApplySkillDamageToBoss(int damage)
+{
+    if (!m_isBossBattleDebug || !m_pPlayer || m_boss.hp <= 0 || damage <= 0)
+    {
+        return false;
+    }
+
+    auto& tran = Transfer::GetInstance();
+    const float normalDamageScale = ClampRange(tran.gameplay.bossDamageScaleNormal, 0.0f, 5.0f);
+    const float brokenDamageScale = ClampRange(tran.gameplay.bossDamageScaleBroken, 0.0f, 10.0f);
+    const float breakRecoverDurationSec = ClampRange(tran.gameplay.bossBreakRecoverSec, 1.0f, 30.0f);
+    const float guardDamagePerHit = 1.0f;
+    const float playerDamage = MaxFloat(static_cast<float>(damage), 0.0f);
+
+    if (!m_boss.isBroken)
+    {
+        m_boss.guard -= guardDamagePerHit;
+        if (m_boss.guard <= 0.0f)
+        {
+            m_boss.guard = 0.0f;
+            m_boss.isBroken = true;
+            m_boss.breakRecoverTimer = breakRecoverDurationSec;
+            if (m_boss.attackState == BossController::AttackIdle &&
+                m_boss.attackCooldownTimer < 1.10f)
+            {
+                m_boss.attackCooldownTimer = 1.10f;
+            }
+        }
+    }
+
+    const float appliedDamageScale = m_boss.isBroken ? brokenDamageScale : normalDamageScale;
+    m_boss.hpDamageCarry += playerDamage * appliedDamageScale;
+    const int hpDamage = static_cast<int>(std::floor(m_boss.hpDamageCarry + 0.0001f));
+    if (hpDamage > 0)
+    {
+        m_boss.hpDamageCarry -= static_cast<float>(hpDamage);
+        m_boss.hp -= hpDamage;
+    }
+    if (m_boss.hp < 0) m_boss.hp = 0;
+
+    if (m_boss.maxHp > 0)
+    {
+        const float hpRate = Clamp01(static_cast<float>(m_boss.hp) / static_cast<float>(m_boss.maxHp));
+        if (m_boss.phase < 2 && hpRate <= 0.50f)
+        {
+            m_boss.phase = 2;
+            m_boss.specialUnlocked = true;
+            m_boss.forceUltimatePending = true;
+            if (m_boss.attackState == BossController::AttackIdle)
+            {
+                m_boss.attackCooldownTimer = 0.0f;
+            }
+        }
+        if (m_boss.phase < 3 && hpRate <= 0.25f)
+        {
+            m_boss.phase = 3;
+            if (m_boss.attackState == BossController::AttackIdle &&
+                m_boss.attackCooldownTimer > 0.25f)
+            {
+                m_boss.attackCooldownTimer = 0.25f;
+            }
+        }
+    }
+
+    tran.gameplayDebug.bossHp = static_cast<float>(m_boss.hp);
+    tran.gameplayDebug.bossMaxHp = static_cast<float>(m_boss.maxHp);
+    tran.gameplayDebug.bossGuard = m_boss.guard;
+    tran.gameplayDebug.bossGuardMax = m_boss.guardMax;
+    tran.gameplayDebug.bossBroken = m_boss.isBroken ? 1 : 0;
+
+    if (m_boss.hp <= 0)
+    {
+        m_boss.attackZones.clear();
+        m_boss.fallingRocks.clear();
+        tran.gameplayDebug.runTimerRunning = 0;
+        tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+        tran.gameplayDebug.bossBattleActive = 0;
+        tran.gameplayDebug.showBossResultTimer = 1;
+        tran.gameplayDebug.upgradeSelectionPending = 0;
+        tran.gameplayDebug.upgradeRerollRemain = 0;
+        tran.roguelike.selectionPending = 0;
+        tran.roguelike.rerollRemain = 0;
+        if (m_pClearSe) PlaySound(m_pClearSe);
+        SceneManager::ChangeResult(SceneManager::ResultType::Win);
+        SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+        return true;
+    }
+
+    return false;
+}
+
 /**
  * @brief Wave 番号から出現敵数を計算します。
  * @param baseCount 基本敵数です。
@@ -1205,6 +1940,7 @@ void SceneGame::Update()
         if (!m_isPaused)
         {
             m_isPaused = true;
+            m_pauseTabIndex = kPauseTabGame;
             m_isPauseOptionOpen = false;
             m_pauseMenuSelection = kPauseMenuContinue;
         }
@@ -1215,6 +1951,10 @@ void SceneGame::Update()
         else
         {
             m_isPaused = false;
+        }
+        if (!m_isPaused)
+        {
+            m_pauseTabIndex = kPauseTabGame;
         }
         tran.gameplayDebug.pauseMenuRequest = 0;
     }
@@ -1271,64 +2011,88 @@ void SceneGame::Update()
         }
         else
         {
-            if (IsKeyTrigger(VK_UP) || IsKeyTrigger('W') || IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A'))
+            if (IsPauseTabPrevTriggered())
             {
-                m_pauseMenuSelection = WrapIndex(m_pauseMenuSelection - 1, 3);
+                m_pauseTabIndex = WrapIndex(m_pauseTabIndex - 1, kPauseTabCount);
             }
-            if (IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S') || IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D'))
+            if (IsPauseTabNextTriggered())
             {
-                m_pauseMenuSelection = WrapIndex(m_pauseMenuSelection + 1, 3);
+                m_pauseTabIndex = WrapIndex(m_pauseTabIndex + 1, kPauseTabCount);
             }
+            if (IsKeyTrigger('1')) m_pauseTabIndex = kPauseTabGame;
+            if (IsKeyTrigger('2')) m_pauseTabIndex = kPauseTabUpgrade;
+            if (IsKeyTrigger('3')) m_pauseTabIndex = kPauseTabSettings;
 
-            int actionRequest = tran.gameplayDebug.pauseMenuRequest;
-            if (actionRequest < 0 || actionRequest > 3) actionRequest = 0;
-            const bool confirmByKey = IsPauseConfirmTriggered();
-            if (confirmByKey || actionRequest != 0)
+            if (m_pauseTabIndex == kPauseTabSettings)
             {
-                const int action = (actionRequest != 0)
-                    ? actionRequest
-                    : ((m_pauseMenuSelection == kPauseMenuContinue) ? 1
-                        : (m_pauseMenuSelection == kPauseMenuOption ? 3 : 2));
+                if (IsKeyTrigger(VK_UP) || IsKeyTrigger('W') || IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A'))
+                {
+                    m_pauseMenuSelection = WrapIndex(m_pauseMenuSelection - 1, 3);
+                }
+                if (IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S') || IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D'))
+                {
+                    m_pauseMenuSelection = WrapIndex(m_pauseMenuSelection + 1, 3);
+                }
+
+                int actionRequest = tran.gameplayDebug.pauseMenuRequest;
+                if (actionRequest < 0 || actionRequest > 3) actionRequest = 0;
+                const bool confirmByKey = IsPauseConfirmTriggered();
+                if (confirmByKey || actionRequest != 0)
+                {
+                    const int action = (actionRequest != 0)
+                        ? actionRequest
+                        : ((m_pauseMenuSelection == kPauseMenuContinue) ? 1
+                            : (m_pauseMenuSelection == kPauseMenuOption ? 3 : 2));
+                    tran.gameplayDebug.pauseMenuRequest = 0;
+
+                    if (action == 1)
+                    {
+                        // Continue closes pause and resumes gameplay immediately.
+                        m_isPaused = false;
+                        m_pauseTabIndex = kPauseTabGame;
+                        m_isPauseOptionOpen = false;
+                    }
+                    else if (action == 2)
+                    {
+                        // Returning to title also resets transient run/boss state.
+                        m_isPaused = false;
+                        m_pauseTabIndex = kPauseTabGame;
+                        m_isPauseOptionOpen = false;
+                        tran.gameplayDebug.pauseMenuOpen = 0;
+                        tran.gameplayDebug.pauseTabIndex = kPauseTabGame;
+                        tran.gameplayDebug.pauseMenuSelection = kPauseMenuContinue;
+                        tran.gameplayDebug.pauseOptionOpen = 0;
+                        tran.gameplayDebug.pauseOptionSelection = kPauseOptionMaster;
+                        tran.gameplayDebug.pauseOptionRequestClose = 0;
+                        tran.gameplayDebug.runTimerRunning = 0;
+                        tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+                        tran.gameplayDebug.requestBossBattle = 0;
+                        tran.gameplayDebug.bossBattleActive = 0;
+                        tran.gameplayDebug.showBossResultTimer = 0;
+                        tran.ResetRoguelikeUpgrade();
+                        SceneManager::ChangeResult(SceneManager::ResultType::None);
+                        SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
+                        return;
+                    }
+                    else if (action == 3)
+                    {
+                        // Option opens the nested pause option menu.
+                        m_pauseTabIndex = kPauseTabSettings;
+                        m_isPauseOptionOpen = true;
+                        m_pauseOptionSelection = kPauseOptionMaster;
+                        tran.gameplayDebug.pauseOptionRequestClose = 0;
+                    }
+                }
+            }
+            else
+            {
                 tran.gameplayDebug.pauseMenuRequest = 0;
-
-                if (action == 1)
-                {
-                    // Continue closes pause and resumes gameplay immediately.
-                    m_isPaused = false;
-                    m_isPauseOptionOpen = false;
-                }
-                else if (action == 2)
-                {
-                    // Returning to title also resets transient run/boss state.
-                    m_isPaused = false;
-                    m_isPauseOptionOpen = false;
-                    tran.gameplayDebug.pauseMenuOpen = 0;
-                    tran.gameplayDebug.pauseMenuSelection = kPauseMenuContinue;
-                    tran.gameplayDebug.pauseOptionOpen = 0;
-                    tran.gameplayDebug.pauseOptionSelection = kPauseOptionMaster;
-                    tran.gameplayDebug.pauseOptionRequestClose = 0;
-                    tran.gameplayDebug.runTimerRunning = 0;
-                    tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
-                    tran.gameplayDebug.requestBossBattle = 0;
-                    tran.gameplayDebug.bossBattleActive = 0;
-                    tran.gameplayDebug.showBossResultTimer = 0;
-                    tran.ResetRoguelikeUpgrade();
-                    SceneManager::ChangeResult(SceneManager::ResultType::None);
-                    SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
-                    return;
-                }
-                else if (action == 3)
-                {
-                    // Option opens the nested pause option menu.
-                    m_isPauseOptionOpen = true;
-                    m_pauseOptionSelection = kPauseOptionMaster;
-                    tran.gameplayDebug.pauseOptionRequestClose = 0;
-                }
             }
         }
     }
 
     tran.gameplayDebug.pauseMenuOpen = m_isPaused ? 1 : 0;
+    tran.gameplayDebug.pauseTabIndex = m_pauseTabIndex;
     tran.gameplayDebug.pauseMenuSelection = m_pauseMenuSelection;
     tran.gameplayDebug.pauseOptionOpen = m_isPauseOptionOpen ? 1 : 0;
     tran.gameplayDebug.pauseOptionSelection = m_pauseOptionSelection;
@@ -1455,8 +2219,28 @@ void SceneGame::Update()
     tran.roguelike.attackPowerLevel = tran.ClampUpgradeLevel(tran.roguelike.attackPowerLevel);
     tran.roguelike.attackSpeedLevel = tran.ClampUpgradeLevel(tran.roguelike.attackSpeedLevel);
     tran.roguelike.evadeCooldownLevel = tran.ClampUpgradeLevel(tran.roguelike.evadeCooldownLevel);
-    m_skill1CooldownDuration = skill1Cooldown;
-    m_skill2CooldownDuration = skill2Cooldown;
+    const int skill1Type = GetSkillTypeForSlot(0);
+    const int skill2Type = GetSkillTypeForSlot(1);
+    if (skill1Type != Transfer::RoguelikeUpgrade::SkillNone)
+    {
+        const float cooldownReduction = tran.GetSkillCooldownReductionByLevel(
+            GetSkillCooldownUpgradeLevel(tran.roguelike, skill1Type));
+        m_skill1CooldownDuration = MaxFloat(skill1Cooldown - cooldownReduction, 0.2f);
+    }
+    else
+    {
+        m_skill1CooldownDuration = 0.0f;
+    }
+    if (skill2Type != Transfer::RoguelikeUpgrade::SkillNone)
+    {
+        const float cooldownReduction = tran.GetSkillCooldownReductionByLevel(
+            GetSkillCooldownUpgradeLevel(tran.roguelike, skill2Type));
+        m_skill2CooldownDuration = MaxFloat(skill2Cooldown - cooldownReduction, 0.2f);
+    }
+    else
+    {
+        m_skill2CooldownDuration = 0.0f;
+    }
 
     tran.gameplayDebug.effectiveEnemyBaseCount = effectiveBaseEnemyCount;
     tran.gameplayDebug.effectiveEnemyAddPerWave = effectiveWaveEnemyAdd;
@@ -1605,6 +2389,7 @@ void SceneGame::Update()
         UpdateHpGauge();
         UpdateCooldownGauges();
         m_uiManager.Update(UIObjectManager::Layer::Game);
+        UpdateCursorHoverDebug(stageSize);
         // During the intro, gameplay itself stays frozen after UI state is refreshed.
         return;
     }
@@ -1620,6 +2405,24 @@ void SceneGame::Update()
 
     if (UpdateBossDebugSetup(stageSize))
     {
+        return;
+    }
+
+    if (m_hitStopTimer > 0.0f)
+    {
+        m_hitStopTimer -= kFixedDt;
+        if (m_hitStopTimer < 0.0f) m_hitStopTimer = 0.0f;
+        tran.gameplayDebug.attackSwingId = m_attackSwingId;
+        tran.gameplayDebug.swingHitCount = m_attackHitCountThisSwing;
+        tran.gameplayDebug.attackActive = m_attackActive ? 1 : 0;
+        tran.gameplayDebug.currentWave = m_currentWave;
+        tran.gameplayDebug.maxWave = m_waveMax;
+        tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
+        tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+        UpdateHpGauge();
+        UpdateCooldownGauges();
+        m_uiManager.Update(UIObjectManager::Layer::Game);
+        UpdateCursorHoverDebug(stageSize);
         return;
     }
 
@@ -1687,23 +2490,6 @@ void SceneGame::Update()
                        [](const MarkerEffect& fx) { return fx.timer <= 0.0f || fx.duration <= 0.0f; }),
         m_markerEffects.end());
 
-    if (m_hitStopTimer > 0.0f)
-    {
-        m_hitStopTimer -= kFixedDt;
-        if (m_hitStopTimer < 0.0f) m_hitStopTimer = 0.0f;
-        tran.gameplayDebug.attackSwingId = m_attackSwingId;
-        tran.gameplayDebug.swingHitCount = m_attackHitCountThisSwing;
-        tran.gameplayDebug.attackActive = m_attackActive ? 1 : 0;
-        tran.gameplayDebug.currentWave = m_currentWave;
-        tran.gameplayDebug.maxWave = m_waveMax;
-        tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
-        tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
-        UpdateHpGauge();
-        UpdateCooldownGauges();
-        m_uiManager.Update(UIObjectManager::Layer::Game);
-        return;
-    }
-
     if (m_attackCooldownUiTimer > 0.0f)
     {
         m_attackCooldownUiTimer -= kFixedDt;
@@ -1727,18 +2513,29 @@ void SceneGame::Update()
     {
         m_skill2CooldownTimer = 0.0f;
     }
-    if (m_skill1CooldownDuration > 0.0f && IsKeyTrigger('Q') && m_skill1CooldownTimer <= 0.0f)
-    {
-        // Skill body is not implemented yet; reserve cooldown behavior only.
-        m_skill1CooldownTimer = m_skill1CooldownDuration;
-    }
-    if (m_skill2CooldownDuration > 0.0f && IsKeyTrigger('E') && m_skill2CooldownTimer <= 0.0f)
-    {
-        // Skill body is not implemented yet; reserve cooldown behavior only.
-        m_skill2CooldownTimer = m_skill2CooldownDuration;
-    }
+    const bool requestSkill1 =
+        (GetSkillTypeForSlot(0) != Transfer::RoguelikeUpgrade::SkillNone) &&
+        m_skill1CooldownDuration > 0.0f &&
+        IsKeyTrigger('O') &&
+        m_skill1CooldownTimer <= 0.0f;
+    const bool requestSkill2 =
+        (GetSkillTypeForSlot(1) != Transfer::RoguelikeUpgrade::SkillNone) &&
+        m_skill2CooldownDuration > 0.0f &&
+        IsKeyTrigger('P') &&
+        m_skill2CooldownTimer <= 0.0f;
 
     if (m_pPlayer) m_pPlayer->Update();
+    UpdateSkillActors(kFixedDt, stageSize);
+    if (requestSkill1 && ActivateSkillSlot(0, playerAttackDamage, stageSize))
+    {
+        m_skill1CooldownTimer = m_skill1CooldownDuration;
+        if (SceneManager::GetCurrent() != SceneManager::SCENE_GAME) return;
+    }
+    if (requestSkill2 && ActivateSkillSlot(1, playerAttackDamage, stageSize))
+    {
+        m_skill2CooldownTimer = m_skill2CooldownDuration;
+        if (SceneManager::GetCurrent() != SceneManager::SCENE_GAME) return;
+    }
     const bool isPlayerEvading = (tran.gameplayDebug.playerEvading != 0);
     const auto commitLose = [&]()
     {
@@ -1771,6 +2568,38 @@ void SceneGame::Update()
         if (m_playerDamageFlashTimer < playerDamageFlash)
         {
             m_playerDamageFlashTimer = playerDamageFlash;
+        }
+        if (m_markerEffects.size() + 3 <= 96)
+        {
+            const DirectX::XMFLOAT3 burstOffsets[3] =
+            {
+                { -tran.player.size.x * 0.24f, tran.player.size.y * 0.72f, 0.0f },
+                { 0.0f, tran.player.size.y * 0.92f, tran.player.size.z * 0.10f },
+                { tran.player.size.x * 0.24f, tran.player.size.y * 0.80f, 0.0f }
+            };
+            const DirectX::XMFLOAT4 burstColors[3] =
+            {
+                { 1.0f, 0.92f, 0.45f, 0.95f },
+                { 1.0f, 0.76f, 0.30f, 0.95f },
+                { 1.0f, 0.88f, 0.55f, 0.95f }
+            };
+            const float burstSize = ((tran.player.size.x > tran.player.size.z) ? tran.player.size.x : tran.player.size.z) * kPlayerDamageBurstScale;
+            for (int i = 0; i < 3; ++i)
+            {
+                MarkerEffect fx{};
+                fx.pos = {
+                    tran.player.pos.x + burstOffsets[i].x,
+                    tran.player.pos.y + burstOffsets[i].y,
+                    tran.player.pos.z + burstOffsets[i].z
+                };
+                fx.size = { burstSize, burstSize, burstSize };
+                fx.color = burstColors[i];
+                fx.timer = kPlayerDamageBurstDuration;
+                fx.duration = kPlayerDamageBurstDuration;
+                fx.growScale = 1.18f;
+                fx.billboard = true;
+                m_markerEffects.push_back(fx);
+            }
         }
         if (tran.player.hp < 0.0f) tran.player.hp = 0.0f;
         if (tran.player.hp <= 0.0f)
@@ -2051,6 +2880,90 @@ void SceneGame::Update()
         m_attackTrailSpawnTimer = 0.0f;
     }
 
+    if (m_isBossBattleDebug && m_pPlayer && m_boss.hp > 0)
+    {
+        const Collision::Box bossBox = MakeAabb({
+            m_boss.pos.x,
+            m_boss.pos.y + m_boss.size.y * 0.5f,
+            m_boss.pos.z
+        }, m_boss.size);
+
+        for (auto& shot : m_skillProjectiles)
+        {
+            if (shot.remainDistance <= 0.0f || shot.projectileId == m_lastBossSkillProjectileId) continue;
+            const Collision::Box shotBox = MakeAabb(
+                { shot.pos.x, shot.pos.y, shot.pos.z },
+                { shot.radius * 2.0f, shot.radius * 2.0f, shot.radius * 2.0f });
+            if (!HitAabb(shotBox, bossBox)) continue;
+
+            m_lastBossSkillProjectileId = shot.projectileId;
+            MarkerEffect fx{};
+            fx.pos = shot.pos;
+            fx.size = { m_boss.size.x * 0.5f, m_boss.size.y * 0.5f, m_boss.size.z * 0.5f };
+            fx.color = { 0.45f, 0.95f, 1.0f, 0.85f };
+            fx.timer = 0.15f;
+            fx.duration = 0.15f;
+            fx.growScale = 1.18f;
+            fx.billboard = true;
+            fx.texture = m_pSkillTexture;
+            if (m_markerEffects.size() < 96)
+            {
+                m_markerEffects.push_back(fx);
+            }
+            if (ApplySkillDamageToBoss(shot.damage))
+            {
+                return;
+            }
+            if (m_pAttackSe) PlaySound(m_pAttackSe);
+            if (m_hitStopTimer < attackHitStop)
+            {
+                m_hitStopTimer = attackHitStop;
+            }
+        }
+
+        if (m_orbitSkill.active && m_bossSkillContactCooldownTimer <= 0.0f)
+        {
+            TRAN_INS;
+            for (int orbitIndex = 0; orbitIndex < m_orbitSkill.count; ++orbitIndex)
+            {
+                const DirectX::XMFLOAT3 orbitPos = CalcOrbitSatellitePos(
+                    m_orbitSkill.angle,
+                    m_orbitSkill.radius,
+                    m_orbitSkill.count,
+                    tran.player.pos,
+                    tran.player.size.y,
+                    orbitIndex);
+                const Collision::Box orbitBox = MakeAabb(orbitPos, m_orbitSkill.size);
+                if (!HitAabb(orbitBox, bossBox)) continue;
+
+                m_bossSkillContactCooldownTimer = kSkillOrbitContactCooldown;
+                MarkerEffect fx{};
+                fx.pos = orbitPos;
+                fx.size = m_orbitSkill.size;
+                fx.color = { 1.0f, 0.90f, 0.35f, 0.90f };
+                fx.timer = 0.12f;
+                fx.duration = 0.12f;
+                fx.growScale = 1.15f;
+                fx.billboard = true;
+                fx.texture = m_pSkillTexture;
+                if (m_markerEffects.size() < 96)
+                {
+                    m_markerEffects.push_back(fx);
+                }
+                if (ApplySkillDamageToBoss(m_orbitSkill.damage))
+                {
+                    return;
+                }
+                if (m_pAttackSe) PlaySound(m_pAttackSe);
+                if (m_hitStopTimer < attackHitStop * 0.75f)
+                {
+                    m_hitStopTimer = attackHitStop * 0.75f;
+                }
+                break;
+            }
+        }
+    }
+
     if (m_pPlayer && !m_enemies.empty())
     {
         TRAN_INS;
@@ -2313,6 +3226,98 @@ void SceneGame::Update()
                 }
             }
 
+            for (auto& skillShot : m_skillProjectiles)
+            {
+                if (skillShot.remainDistance <= 0.0f || slot.lastSkillProjectileId == skillShot.projectileId) continue;
+                const Collision::Box shotBox = MakeAabb(
+                    { skillShot.pos.x, skillShot.pos.y, skillShot.pos.z },
+                    { skillShot.radius * 2.0f, skillShot.radius * 2.0f, skillShot.radius * 2.0f });
+                if (!HitAabb(shotBox, enemyBox)) continue;
+
+                slot.lastSkillProjectileId = skillShot.projectileId;
+                slot.enemy->Damage(skillShot.damage);
+                slot.hitFlashTimer = MaxFloat(slot.hitFlashTimer, attackHitFlash);
+                const DirectX::XMFLOAT3 knockDir = NormalizeXZ(skillShot.dir, m_lastMoveDir);
+                enemyBox.center.x += knockDir.x * attackKnockback * 0.8f;
+                enemyBox.center.z += knockDir.z * attackKnockback * 0.8f;
+                clampCenterToStage(enemyBox.center, enemyBox.size);
+                slot.enemy->SetPos({ enemyBox.center.x, 0.0f, enemyBox.center.z });
+                if (m_pAttackSe) PlaySound(m_pAttackSe);
+                if (m_hitStopTimer < attackHitStop * 0.7f)
+                {
+                    m_hitStopTimer = attackHitStop * 0.7f;
+                }
+
+                MarkerEffect fx{};
+                fx.pos = skillShot.pos;
+                fx.size = { enemyBox.size.x * 0.75f, enemyBox.size.y * 0.75f, enemyBox.size.z * 0.75f };
+                fx.color = { 0.45f, 0.95f, 1.0f, 0.90f };
+                fx.timer = 0.12f;
+                fx.duration = 0.12f;
+                fx.growScale = 1.16f;
+                fx.billboard = true;
+                fx.texture = m_pSkillTexture;
+                if (m_markerEffects.size() < 96)
+                {
+                    m_markerEffects.push_back(fx);
+                }
+            }
+
+            if (m_orbitSkill.active && slot.skillContactCooldownTimer <= 0.0f)
+            {
+                bool orbitHit = false;
+                DirectX::XMFLOAT3 orbitHitPos = m_orbitSkill.pos;
+                for (int orbitIndex = 0; orbitIndex < m_orbitSkill.count; ++orbitIndex)
+                {
+                    const DirectX::XMFLOAT3 orbitPos = CalcOrbitSatellitePos(
+                        m_orbitSkill.angle,
+                        m_orbitSkill.radius,
+                        m_orbitSkill.count,
+                        tran.player.pos,
+                        tran.player.size.y,
+                        orbitIndex);
+                    const Collision::Box orbitBox = MakeAabb(orbitPos, m_orbitSkill.size);
+                    if (!HitAabb(orbitBox, enemyBox)) continue;
+                    orbitHit = true;
+                    orbitHitPos = orbitPos;
+                    break;
+                }
+                if (orbitHit)
+                {
+                    slot.skillContactCooldownTimer = kSkillOrbitContactCooldown;
+                    slot.enemy->Damage(m_orbitSkill.damage);
+                    slot.hitFlashTimer = MaxFloat(slot.hitFlashTimer, attackHitFlash);
+                    const DirectX::XMFLOAT3 knockDir = NormalizeXZ({
+                        enemyBox.center.x - orbitHitPos.x,
+                        0.0f,
+                        enemyBox.center.z - orbitHitPos.z
+                    }, m_lastMoveDir);
+                    enemyBox.center.x += knockDir.x * attackKnockback * 0.5f;
+                    enemyBox.center.z += knockDir.z * attackKnockback * 0.5f;
+                    clampCenterToStage(enemyBox.center, enemyBox.size);
+                    slot.enemy->SetPos({ enemyBox.center.x, 0.0f, enemyBox.center.z });
+                    if (m_pAttackSe) PlaySound(m_pAttackSe);
+                    if (m_hitStopTimer < attackHitStop * 0.5f)
+                    {
+                        m_hitStopTimer = attackHitStop * 0.5f;
+                    }
+
+                    MarkerEffect fx{};
+                    fx.pos = orbitHitPos;
+                    fx.size = m_orbitSkill.size;
+                    fx.color = { 1.0f, 0.90f, 0.35f, 0.90f };
+                    fx.timer = 0.10f;
+                    fx.duration = 0.10f;
+                    fx.growScale = 1.12f;
+                    fx.billboard = true;
+                    fx.texture = m_pSkillTexture;
+                    if (m_markerEffects.size() < 96)
+                    {
+                        m_markerEffects.push_back(fx);
+                    }
+                }
+            }
+
             if (!slot.enemy->IsAlive())
             {
                 if (enemyDefeatFlash > 0.0f)
@@ -2442,6 +3447,7 @@ void SceneGame::Update()
     UpdateHpGauge();
     UpdateCooldownGauges();
     m_uiManager.Update(UIObjectManager::Layer::Game);
+    UpdateCursorHoverDebug(stageSize);
 }
 
 /**
@@ -2543,6 +3549,40 @@ void SceneGame::Draw()
                 kEnemyProjectileColor);
         }
     }
+    if (m_pSkillTexture)
+    {
+        for (const auto& shot : m_skillProjectiles)
+        {
+            if (shot.remainDistance <= 0.0f) continue;
+            const float size = shot.radius * 2.6f;
+            DrawBillboardMarkerTint(
+                m_pSkillTexture,
+                m_pCamera,
+                shot.pos,
+                { size, size, size },
+                { 0.55f, 0.95f, 1.0f, 0.92f });
+        }
+        if (m_orbitSkill.active)
+        {
+            TRAN_INS;
+            for (int orbitIndex = 0; orbitIndex < m_orbitSkill.count; ++orbitIndex)
+            {
+                const DirectX::XMFLOAT3 orbitPos = CalcOrbitSatellitePos(
+                    m_orbitSkill.angle,
+                    m_orbitSkill.radius,
+                    m_orbitSkill.count,
+                    tran.player.pos,
+                    tran.player.size.y,
+                    orbitIndex);
+                DrawBillboardMarkerTint(
+                    m_pSkillTexture,
+                    m_pCamera,
+                    orbitPos,
+                    m_orbitSkill.size,
+                    { 1.0f, 0.92f, 0.40f, 0.95f });
+            }
+        }
+    }
     DrawBossTelegraphMarker();
 
     static std::vector<DrawEntry> drawEntries;
@@ -2618,7 +3658,7 @@ void SceneGame::Draw()
     if (m_pAttackMarker)
     {
         TRAN_INS;
-        // Marker effects cover temporary hit flashes, defeat flashes, and player damage flashes.
+        // Marker effects cover floor flashes and small billboard bursts for hits.
         for (const auto& fx : m_markerEffects)
         {
             if (fx.timer <= 0.0f || fx.duration <= 0.0f) continue;
@@ -2626,11 +3666,24 @@ void SceneGame::Draw()
             const float growT = 1.0f + (1.0f - t) * (fx.growScale - 1.0f);
             DirectX::XMFLOAT4 color = fx.color;
             color.w *= t;
-            DrawAttackMarkerTint(
-                m_pAttackMarker,
-                fx.pos,
-                { fx.size.x * growT, fx.size.y, fx.size.z * growT },
-                color);
+            Texture* effectTexture = fx.texture ? fx.texture : m_pAttackMarker;
+            if (fx.billboard)
+            {
+                DrawBillboardMarkerTint(
+                    effectTexture,
+                    m_pCamera,
+                    fx.pos,
+                    { fx.size.x * growT, fx.size.y * growT, fx.size.z },
+                    color);
+            }
+            else
+            {
+                DrawAttackMarkerTint(
+                    effectTexture,
+                    fx.pos,
+                    { fx.size.x * growT, fx.size.y, fx.size.z * growT },
+                    color);
+            }
         }
 
         const float flashDuration = (tran.gameplay.attackHitFlash > 0.0f) ? tran.gameplay.attackHitFlash : 0.001f;
@@ -2764,6 +3817,7 @@ void SceneGame::Draw()
         {
             const auto& slot = m_enemies[i];
             if (!slot.enemy) continue;
+            if (slot.enemy->GetType() != static_cast<int>(Enemy::Type::Tank)) continue;
             const Collision::Box enemyBox = slot.enemy->GetCollision();
             const DirectX::XMFLOAT3 headPos = {
                 enemyBox.center.x,
@@ -2834,14 +3888,16 @@ void SceneGame::UpdateCooldownGauges()
         }
     }
 
-    float skill1Rate = 1.0f;
-    if (m_skill1CooldownDuration > 0.0f)
+    const bool hasSkill1 = (GetSkillTypeForSlot(0) != Transfer::RoguelikeUpgrade::SkillNone);
+    float skill1Rate = hasSkill1 ? 1.0f : 0.0f;
+    if (hasSkill1 && m_skill1CooldownDuration > 0.0f)
     {
         skill1Rate = Clamp01(1.0f - (m_skill1CooldownTimer / m_skill1CooldownDuration));
     }
 
-    float skill2Rate = 1.0f;
-    if (m_skill2CooldownDuration > 0.0f)
+    const bool hasSkill2 = (GetSkillTypeForSlot(1) != Transfer::RoguelikeUpgrade::SkillNone);
+    float skill2Rate = hasSkill2 ? 1.0f : 0.0f;
+    if (hasSkill2 && m_skill2CooldownDuration > 0.0f)
     {
         skill2Rate = Clamp01(1.0f - (m_skill2CooldownTimer / m_skill2CooldownDuration));
     }

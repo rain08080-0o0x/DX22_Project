@@ -58,6 +58,10 @@ private:
         int lastHitSwingId = -1;
         /** @brief 被弾フラッシュ演出の残り時間です。 */
         float hitFlashTimer = 0.0f;
+        /** @brief 衛星スキルの再ヒット待ち時間です。 */
+        float skillContactCooldownTimer = 0.0f;
+        /** @brief 貫通弾スキルが最後に当てた識別 ID です。 */
+        int lastSkillProjectileId = -1;
         /** @brief デバッグ表示上、攻撃レンジ内かどうかです。 */
         bool debugInAttackRange = false;
         /** @brief デバッグ表示用の攻撃レンジ半径です。 */
@@ -81,6 +85,10 @@ private:
         float duration = 0.0f;
         /** @brief 時間経過で広げる拡大倍率です。 */
         float growScale = 1.0f;
+        /** @brief true の場合は地面ではなくビルボードで描画します。 */
+        bool billboard = false;
+        /** @brief 指定時は既定以外のテクスチャで描画します。 */
+        Texture* texture = nullptr;
     };
 
     /**
@@ -98,6 +106,37 @@ private:
         float life = 0.0f;
         /** @brief プレイヤーへ与えるダメージです。 */
         float damage = 0.0f;
+    };
+
+    /**
+     * @brief プレイヤースキルの貫通弾です。
+     */
+    struct SkillProjectile
+    {
+        DirectX::XMFLOAT3 pos = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 dir = { 0.0f, 0.0f, 1.0f };
+        float radius = 0.25f;
+        float speed = 0.0f;
+        float remainDistance = 0.0f;
+        int damage = 0;
+        int projectileId = -1;
+    };
+
+    /**
+     * @brief プレイヤー周囲を回る衛星スキル状態です。
+     */
+    struct OrbitSkillState
+    {
+        bool active = false;
+        float timer = 0.0f;
+        float duration = 0.0f;
+        float angle = 0.0f;
+        float angularSpeed = 0.0f;
+        float radius = 0.0f;
+        int count = 1;
+        int damage = 0;
+        DirectX::XMFLOAT3 pos = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 size = { 0.0f, 0.0f, 0.0f };
     };
 
     /**
@@ -241,6 +280,42 @@ private:
      */
     void DrawBossHpUi() const;
 
+    /**
+     * @brief 指定スロットへ装備中のスキル種別を返します。
+     * @param slotIndex 0 が Q、1 が E です。
+     * @return RoguelikeUpgrade::SkillType の値です。
+     */
+    int GetSkillTypeForSlot(int slotIndex) const;
+
+    /**
+     * @brief 入力されたスキルスロットを発動します。
+     * @param slotIndex 0 が Q、1 が E です。
+     * @param playerAttackDamage 現在のプレイヤー攻撃力です。
+     * @param stageSize 現在のステージサイズです。
+     * @return 発動に成功した場合は true です。
+     */
+    bool ActivateSkillSlot(int slotIndex, int playerAttackDamage, float stageSize);
+
+    /**
+     * @brief 発射体と衛星の位置・寿命を更新します。
+     * @param dt 更新秒数です。
+     * @param stageSize 現在のステージサイズです。
+     */
+    void UpdateSkillActors(float dt, float stageSize);
+
+    /**
+     * @brief カーソル位置から Ray を飛ばし、現在指している対象名をデバッグ共有へ反映します。
+     * @param stageSize 現在のステージサイズです。
+     */
+    void UpdateCursorHoverDebug(float stageSize);
+
+    /**
+     * @brief スキル攻撃をボスへ適用します。
+     * @param damage ボスへ与えるダメージです。
+     * @return 撃破でシーン遷移した場合は true です。
+     */
+    bool ApplySkillDamageToBoss(int damage);
+
     /** @brief 現在アクティブとして扱うカメラです。 */
     Camera* m_pCamera;
     /** @brief ゲーム用カメラです。 */
@@ -257,12 +332,16 @@ private:
     std::vector<MarkerEffect> m_markerEffects;
     /** @brief 敵弾一覧です。 */
     std::vector<EnemyProjectile> m_enemyProjectiles;
+    /** @brief スキル弾一覧です。 */
+    std::vector<SkillProjectile> m_skillProjectiles;
     /** @brief ボス戦専用の状態コントローラです。 */
     BossController m_boss;
     /** @brief キャラ足元の影描画に使うテクスチャです。 */
     Texture* m_pShadow;
     /** @brief プレイヤー攻撃範囲可視化用テクスチャです。 */
     Texture* m_pAttackMarker;
+    /** @brief スキル描画用テクスチャです。 */
+    Texture* m_pSkillTexture;
     /** @brief ボス攻撃予兆用テクスチャです。 */
     Texture* m_pBossAttackRangeMarker;
     /** @brief 床タイル描画に使うテクスチャです。 */
@@ -344,6 +423,8 @@ private:
     float m_skill2CooldownDuration;
     /** @brief 現在スイングの識別 ID です。 */
     int m_attackSwingId;
+    /** @brief 次に発行するスキル弾識別 ID です。 */
+    int m_skillProjectileSerial;
     /** @brief 今回スイングで当てた敵数です。 */
     int m_attackHitCountThisSwing;
     /** @brief ヒットストップ残り時間です。 */
@@ -368,14 +449,22 @@ private:
     float m_enemyAttackSeGateTimer;
     /** @brief 敵パフォーマンスタイミング分散用の位相です。 */
     unsigned int m_enemyPerfPhase;
+    /** @brief ボスへの衛星スキル再ヒット待ち時間です。 */
+    float m_bossSkillContactCooldownTimer;
     /** @brief 直近の有効移動方向です。 */
     DirectX::XMFLOAT3 m_lastMoveDir;
     /** @brief 現在攻撃判定の中心です。 */
     DirectX::XMFLOAT3 m_attackCenter;
     /** @brief 現在攻撃判定のサイズです。 */
     DirectX::XMFLOAT3 m_attackSize;
+    /** @brief 現在の衛星スキル状態です。 */
+    OrbitSkillState m_orbitSkill;
+    /** @brief 最後にボスへ当てたスキル弾識別 ID です。 */
+    int m_lastBossSkillProjectileId;
     /** @brief ポーズ中かどうかです。 */
     bool m_isPaused;
+    /** @brief ポーズ画面の現在タブです。 */
+    int m_pauseTabIndex;
     /** @brief ポーズメニュー選択番号です。 */
     int m_pauseMenuSelection;
     /** @brief ポーズ中のオプション画面を開いているかどうかです。 */

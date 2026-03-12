@@ -1,6 +1,7 @@
 ﻿#include "Transfer.h"
 #include <fstream>
 #include <string>
+#include <unordered_set>
 #include <cstdlib>
 
 namespace
@@ -147,6 +148,137 @@ namespace
 		}
 	}
 
+	template <typename GameplayTuningT, typename RoguelikeT>
+	void ApplyGameplayTuningFileDefaults(GameplayTuningT& gameplay,
+										 int& difficultyPreset,
+										 RoguelikeT& roguelike)
+	{
+		gameplay = GameplayTuningT{};
+		gameplay.enemyCount = 3;
+		gameplay.waveMax = 3;
+		gameplay.waveEnemyAddPerWave = 1;
+		gameplay.groundTileSize = 1.0f;
+		gameplay.cameraIntroDuration = 3.0f;
+		gameplay.cameraIntroFocusDistance = 0.5f;
+		gameplay.attackWindup = 0.04f;
+		gameplay.attackDuration = 0.12f;
+		gameplay.attackRecovery = 0.10f;
+		gameplay.attackCooldown = 0.24f;
+		gameplay.skill1Cooldown = 4.0f;
+		gameplay.skill2Cooldown = 9.0f;
+		gameplay.screenShakeHitThreshold = 3;
+		gameplay.screenShakeDuration = 0.18f;
+		gameplay.screenShakeAmplitude = 0.20f;
+		gameplay.attackSweepDegrees = 120.0f;
+		gameplay.attackSweepRadiusScale = 2.0f;
+		gameplay.attackWidthScale = 2.0f;
+		gameplay.attackDepthScale = 2.0f;
+		gameplay.attackHitStop = 0.08f;
+		gameplay.attackKnockback = 1.5f;
+		gameplay.attackHitFlash = 0.405f;
+		gameplay.attackTrailInterval = 0.02f;
+		gameplay.attackTrailLife = 0.16f;
+		gameplay.attackTrailScale = 0.75f;
+		gameplay.playerDamageFlash = 0.20f;
+		gameplay.playerDamageInvincible = 0.35f;
+		gameplay.playerDamageFlashScale = 1.65f;
+		gameplay.enemyDefeatFlash = 0.28f;
+		gameplay.enemyDefeatFlashScale = 1.60f;
+		gameplay.volumeMaster = 0.52f;
+		gameplay.volumeBgm = 0.0f;
+		gameplay.volumeSe = 0.67f;
+		gameplay.directionMarkerAlpha = 0.92f;
+		gameplay.directionMarkerOverlapAlpha = 0.45f;
+		gameplay.bossHpBarWidthRate = 0.42f;
+		gameplay.bossHpBarHeightRate = 0.045f;
+		gameplay.bossGuardBarOffsetX = 0.0f;
+		gameplay.bossGuardBarOffsetY = 6.0f;
+		gameplay.bossGuardBarWidthRate = 0.42f;
+		gameplay.bossGuardBarHeightRate = 0.018f;
+		gameplay.bossSizeAreaScale = 6.0f;
+		gameplay.bossMaxHp = 300;
+		gameplay.bossAttackTelegraph = 1.0f;
+		gameplay.bossAttackJumpOutTime = 0.5f;
+		gameplay.bossAttackDashDuration = 0.35f;
+		gameplay.bossAttackCooldown = 1.15f;
+		gameplay.bossAttackLanePlayerScale = 3.0f;
+		gameplay.bossAttackDamage = 20.0f;
+		gameplay.bossAttackHitStop = 0.3f;
+		gameplay.bossHitShakeDuration = 0.18f;
+		gameplay.bossHitShakeAmplitude = 0.23f;
+		gameplay.bossGuardInitialMax = 14.0f;
+		gameplay.bossGuardFinalMax = 24.0f;
+		gameplay.bossGuardRecoverStep = 2.0f;
+		gameplay.bossDamageScaleNormal = 0.2f;
+		gameplay.bossDamageScaleBroken = 2.2f;
+		gameplay.bossBreakRecoverSec = 8.0f;
+		gameplay.bossDashNarrowTelegraph = 1.0f;
+		gameplay.bossDashWideTelegraph = 2.0f;
+		gameplay.bossDashWideWidthRate = 0.5f;
+		gameplay.bossRandomRainCount = 5;
+		gameplay.bossRandomRainTelegraph = 1.0f;
+		gameplay.bossRandomRainRadiusScale = 1.6f;
+		gameplay.bossSummonMin = 5;
+		gameplay.bossSummonMax = 10;
+		gameplay.bossSummonTelegraph = 1.0f;
+		gameplay.bossTrackingDropCount = 5;
+		gameplay.bossTrackingDropTelegraph = 1.0f;
+		gameplay.bossTrackingDropRadiusScale = 3.0f;
+		gameplay.bossUltimateCrossTelegraph = 1.0f;
+		gameplay.bossUltimateCrossLaneScale = 1.0f;
+		gameplay.bossUltimateStompCount = 5;
+		gameplay.bossUltimateStompTelegraph = 3.0f;
+		gameplay.bossUltimateStompRepeatTelegraph = 1.0f;
+		gameplay.bossUltimateStompRadiusScale = 3.0f;
+		gameplay.bossUltimateFieldTelegraph = 7.0f;
+		gameplay.bossUltimateFieldSafeScale = 2.0f;
+		gameplay.enemyAttackWindup = 0.55f;
+		gameplay.enemyAttackCooldown = 1.0f;
+		gameplay.enemyAttackRangeMin = 0.8f;
+		gameplay.enemyAttackRangeScale = 1.35f;
+		gameplay.enemyAttackDamage = 1.0f;
+		gameplay.enemyMoveSpeed = 1.2f;
+		gameplay.waveEnemyMoveSpeedAdd = 0.15f;
+		gameplay.waveEnemyAttackDamageScalePerWave = 0.2f;
+		gameplay.enemyProjectileSpeed = 6.5f;
+		gameplay.enemyProjectileLife = 1.4f;
+		gameplay.enemyProjectileRadius = 0.22f;
+		gameplay.enemyProjectileDamageScale = 0.85f;
+		gameplay.enemySeparationRadius = 1.1f;
+		gameplay.enemySeparationWeight = 0.8f;
+		gameplay.enemySeparationMaxOffset = 0.8f;
+		gameplay.enemySpawnRingScale = 0.35f;
+		gameplay.enemySpawnJitterScale = 0.1f;
+		gameplay.enemySpawnMinPlayerDist = 1.5f;
+		gameplay.enemySpawnMinEnemyDist = 0.9f;
+		gameplay.pushSlop = 0.01f;
+		gameplay.playerPushShare = 0.55f;
+		gameplay.enemyPushShare = 0.45f;
+
+		difficultyPreset = 1;
+
+		roguelike = RoguelikeT{};
+		roguelike.stageClearCount = 37;
+		roguelike.attackPowerLevel = 10;
+		roguelike.attackSpeedLevel = 10;
+		roguelike.evadeCooldownLevel = 10;
+		roguelike.lastUpgradeType = 17;
+		roguelike.skillSlot1 = Transfer::RoguelikeUpgrade::SkillOrbit;
+		roguelike.skillSlot2 = Transfer::RoguelikeUpgrade::SkillNova;
+		roguelike.skillShotRangeLevel = 0;
+		roguelike.skillShotPowerLevel = 0;
+		roguelike.skillShotCooldownLevel = 0;
+		roguelike.skillNovaRangeLevel = 9;
+		roguelike.skillNovaPowerLevel = 0;
+		roguelike.skillNovaCooldownLevel = 10;
+		roguelike.skillOrbitRangeLevel = 0;
+		roguelike.skillOrbitCooldownLevel = 10;
+		roguelike.skillOrbitCountLevel = 5;
+		roguelike.rerollMaxPerStage = 2;
+	}
+
+	const int kGameplayTuningRequiredKeyCount = 118;
+
 	const int kUpgradeTierMax = 10;
 
 	/**
@@ -183,8 +315,51 @@ namespace
 	}
 
 	const int kUpgradeOfferCount = 3;
-	const int kUpgradeTypeCount = 6;
+	const int kUpgradeTypeCount = Transfer::RoguelikeUpgrade::UpgradeTypeCount;
 	const int kUpgradeOfferNone = -1;
+	const int kSkillUpgradeTierMax = Transfer::RoguelikeUpgrade::kLevelMax;
+
+	int NormalizeSkillTypeValue(int skillType)
+	{
+		return ClampInt(
+			skillType,
+			Transfer::RoguelikeUpgrade::SkillNone,
+			Transfer::RoguelikeUpgrade::SkillTypeCount - 1);
+	}
+
+	int NormalizeSelectionPhaseValue(int selectionPhase)
+	{
+		return ClampInt(
+			selectionPhase,
+			Transfer::RoguelikeUpgrade::SelectionNone,
+			Transfer::RoguelikeUpgrade::SelectionSkill);
+	}
+
+	bool HasSkillType(int skillSlot1, int skillSlot2, int skillType)
+	{
+		return skillSlot1 == skillType || skillSlot2 == skillType;
+	}
+
+	bool HasEmptySkillSlot(int skillSlot1, int skillSlot2)
+	{
+		return skillSlot1 == Transfer::RoguelikeUpgrade::SkillNone ||
+			   skillSlot2 == Transfer::RoguelikeUpgrade::SkillNone;
+	}
+
+	int UpgradeTypeToSkillType(int upgradeType)
+	{
+		switch (upgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShot:
+			return Transfer::RoguelikeUpgrade::SkillShot;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNova:
+			return Transfer::RoguelikeUpgrade::SkillNova;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbit:
+			return Transfer::RoguelikeUpgrade::SkillOrbit;
+		default:
+			return Transfer::RoguelikeUpgrade::SkillNone;
+		}
+	}
 
 	/**
 	 * @brief 指定強化タイプがまだ提示可能かどうかを返します。
@@ -194,7 +369,12 @@ namespace
 	 * @param evadeCooldownLevel 現在の回避短縮レベルです。
 	 * @return 上限未到達なら true です。
 	 */
-	bool IsUpgradeTypeAvailable(int upgradeType, int attackPowerLevel, int attackSpeedLevel, int evadeCooldownLevel)
+	bool IsUpgradeTypeAvailable(int upgradeType,
+								int attackPowerLevel,
+								int attackSpeedLevel,
+								int evadeCooldownLevel,
+								int skillSlot1,
+								int skillSlot2)
 	{
 		switch (upgradeType)
 		{
@@ -207,6 +387,15 @@ namespace
 		case 2:
 		case 5:
 			return evadeCooldownLevel < kUpgradeTierMax;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShot:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNova:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbit:
+		{
+			const int skillType = UpgradeTypeToSkillType(upgradeType);
+			return skillType != Transfer::RoguelikeUpgrade::SkillNone &&
+				   HasEmptySkillSlot(skillSlot1, skillSlot2) &&
+				   !HasSkillType(skillSlot1, skillSlot2, skillType);
+		}
 		default:
 			return false;
 		}
@@ -219,14 +408,19 @@ namespace
 	 * @param attackSpeedLevel 現在の攻撃速度レベルです。
 	 * @param evadeCooldownLevel 現在の回避短縮レベルです。
 	 */
-	void GenerateUpgradeOffers(int offers[kUpgradeOfferCount], int attackPowerLevel, int attackSpeedLevel, int evadeCooldownLevel)
+	void GenerateUpgradeOffers(int offers[kUpgradeOfferCount],
+							   int attackPowerLevel,
+							   int attackSpeedLevel,
+							   int evadeCooldownLevel,
+							   int skillSlot1,
+							   int skillSlot2)
 	{
 		int available[kUpgradeTypeCount]{};
 		int availableCount = 0;
 		for (int t = 0; t < kUpgradeTypeCount; ++t)
 		{
 			// 上限に達していない候補だけ抽出します。
-			if (IsUpgradeTypeAvailable(t, attackPowerLevel, attackSpeedLevel, evadeCooldownLevel))
+			if (IsUpgradeTypeAvailable(t, attackPowerLevel, attackSpeedLevel, evadeCooldownLevel, skillSlot1, skillSlot2))
 			{
 				available[availableCount++] = t;
 			}
@@ -277,6 +471,8 @@ namespace
 	void ApplyUpgradeType(int& attackPowerLevel,
 						  int& attackSpeedLevel,
 						  int& evadeCooldownLevel,
+						  int& skillSlot1,
+						  int& skillSlot2,
 						  int upgradeType,
 						  int smallStep,
 						  int largeStep)
@@ -301,6 +497,322 @@ namespace
 		case 5:
 			evadeCooldownLevel = ClampUpgradeTier(evadeCooldownLevel + largeStep);
 			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShot:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNova:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbit:
+		{
+			const int skillType = UpgradeTypeToSkillType(upgradeType);
+			if (skillType == Transfer::RoguelikeUpgrade::SkillNone ||
+				HasSkillType(skillSlot1, skillSlot2, skillType))
+			{
+				break;
+			}
+			if (skillSlot1 == Transfer::RoguelikeUpgrade::SkillNone)
+			{
+				skillSlot1 = skillType;
+			}
+			else if (skillSlot2 == Transfer::RoguelikeUpgrade::SkillNone)
+			{
+				skillSlot2 = skillType;
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	void ResetOffers(int offers[kUpgradeOfferCount])
+	{
+		for (int i = 0; i < kUpgradeOfferCount; ++i)
+		{
+			offers[i] = kUpgradeOfferNone;
+		}
+	}
+
+	bool HasAnyOffer(const int offers[kUpgradeOfferCount])
+	{
+		for (int i = 0; i < kUpgradeOfferCount; ++i)
+		{
+			if (offers[i] != kUpgradeOfferNone)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	int GetTotalUpgradeProgressValue(const Transfer::RoguelikeUpgrade& roguelike)
+	{
+		int total = 0;
+		total += ClampUpgradeTier(roguelike.attackPowerLevel);
+		total += ClampUpgradeTier(roguelike.attackSpeedLevel);
+		total += ClampUpgradeTier(roguelike.evadeCooldownLevel);
+		total += (roguelike.skillSlot1 != Transfer::RoguelikeUpgrade::SkillNone) ? 1 : 0;
+		total += (roguelike.skillSlot2 != Transfer::RoguelikeUpgrade::SkillNone) ? 1 : 0;
+		total += ClampInt(roguelike.skillShotRangeLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillShotPowerLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillShotCooldownLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillNovaRangeLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillNovaPowerLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillNovaCooldownLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillOrbitRangeLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillOrbitCooldownLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		total += ClampInt(roguelike.skillOrbitCountLevel, 0, Transfer::RoguelikeUpgrade::kLevelMax);
+		return total;
+	}
+
+	float EvaluateUpgradeProgressScale(int progressValue,
+									   float scaleAt20,
+									   float scaleAt40,
+									   float scaleAt60)
+	{
+		const float progress = static_cast<float>((progressValue < 0) ? 0 : progressValue);
+		if (progress <= 20.0f)
+		{
+			return 1.0f + (scaleAt20 - 1.0f) * (progress / 20.0f);
+		}
+		if (progress <= 40.0f)
+		{
+			return scaleAt20 + (scaleAt40 - scaleAt20) * ((progress - 20.0f) / 20.0f);
+		}
+		if (progress <= 60.0f)
+		{
+			return scaleAt40 + (scaleAt60 - scaleAt40) * ((progress - 40.0f) / 20.0f);
+		}
+
+		return scaleAt60 + (scaleAt60 - scaleAt40) * ((progress - 60.0f) / 20.0f);
+	}
+
+	int* GetSkillUpgradeLevelPtr(Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		switch (upgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotRange: return &roguelike.skillShotRangeLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotPower: return &roguelike.skillShotPowerLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotCooldown: return &roguelike.skillShotCooldownLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaRange: return &roguelike.skillNovaRangeLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaPower: return &roguelike.skillNovaPowerLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaCooldown: return &roguelike.skillNovaCooldownLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitRange: return &roguelike.skillOrbitRangeLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCooldown: return &roguelike.skillOrbitCooldownLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCount: return &roguelike.skillOrbitCountLevel;
+		default: return nullptr;
+		}
+	}
+
+	const int* GetSkillUpgradeLevelPtr(const Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		switch (upgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotRange: return &roguelike.skillShotRangeLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotPower: return &roguelike.skillShotPowerLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotCooldown: return &roguelike.skillShotCooldownLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaRange: return &roguelike.skillNovaRangeLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaPower: return &roguelike.skillNovaPowerLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaCooldown: return &roguelike.skillNovaCooldownLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitRange: return &roguelike.skillOrbitRangeLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCooldown: return &roguelike.skillOrbitCooldownLevel;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCount: return &roguelike.skillOrbitCountLevel;
+		default: return nullptr;
+		}
+	}
+
+	bool IsStatusUpgradeTypeAvailable(const Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		switch (upgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::UpgradeAttackPower:
+		case Transfer::RoguelikeUpgrade::UpgradeAttackPowerLarge:
+			return roguelike.attackPowerLevel < kUpgradeTierMax;
+		case Transfer::RoguelikeUpgrade::UpgradeAttackSpeed:
+		case Transfer::RoguelikeUpgrade::UpgradeAttackSpeedLarge:
+			return roguelike.attackSpeedLevel < kUpgradeTierMax;
+		case Transfer::RoguelikeUpgrade::UpgradeEvadeCooldown:
+		case Transfer::RoguelikeUpgrade::UpgradeEvadeCooldownLarge:
+			return roguelike.evadeCooldownLevel < kUpgradeTierMax;
+		default:
+			return false;
+		}
+	}
+
+	bool IsSkillRewardTypeAvailable(const Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		switch (upgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShot:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNova:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbit:
+		{
+			const int skillType = UpgradeTypeToSkillType(upgradeType);
+			return skillType != Transfer::RoguelikeUpgrade::SkillNone &&
+				   HasEmptySkillSlot(roguelike.skillSlot1, roguelike.skillSlot2) &&
+				   !HasSkillType(roguelike.skillSlot1, roguelike.skillSlot2, skillType);
+		}
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotRange:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotPower:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotCooldown:
+			return HasSkillType(roguelike.skillSlot1, roguelike.skillSlot2, Transfer::RoguelikeUpgrade::SkillShot) &&
+				   GetSkillUpgradeLevelPtr(roguelike, upgradeType) &&
+				   *GetSkillUpgradeLevelPtr(roguelike, upgradeType) < kSkillUpgradeTierMax;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaRange:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaPower:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaCooldown:
+			return HasSkillType(roguelike.skillSlot1, roguelike.skillSlot2, Transfer::RoguelikeUpgrade::SkillNova) &&
+				   GetSkillUpgradeLevelPtr(roguelike, upgradeType) &&
+				   *GetSkillUpgradeLevelPtr(roguelike, upgradeType) < kSkillUpgradeTierMax;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitRange:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCooldown:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCount:
+			return HasSkillType(roguelike.skillSlot1, roguelike.skillSlot2, Transfer::RoguelikeUpgrade::SkillOrbit) &&
+				   GetSkillUpgradeLevelPtr(roguelike, upgradeType) &&
+				   *GetSkillUpgradeLevelPtr(roguelike, upgradeType) < kSkillUpgradeTierMax;
+		default:
+			return false;
+		}
+	}
+
+	void FillOfferArrayFromAvailable(int offers[kUpgradeOfferCount], int available[kUpgradeTypeCount], int availableCount)
+	{
+		if (availableCount <= 0)
+		{
+			ResetOffers(offers);
+			return;
+		}
+
+		for (int i = 0; i < availableCount; ++i)
+		{
+			const int j = RandRangeInt(i, availableCount - 1);
+			const int tmp = available[i];
+			available[i] = available[j];
+			available[j] = tmp;
+		}
+
+		for (int i = 0; i < kUpgradeOfferCount; ++i)
+		{
+			if (i < availableCount)
+			{
+				offers[i] = available[i];
+			}
+			else
+			{
+				offers[i] = available[RandRangeInt(0, availableCount - 1)];
+			}
+		}
+	}
+
+	void GenerateStatusOffers(int offers[kUpgradeOfferCount], const Transfer::RoguelikeUpgrade& roguelike)
+	{
+		int available[kUpgradeTypeCount]{};
+		int availableCount = 0;
+		for (int t = Transfer::RoguelikeUpgrade::UpgradeAttackPower;
+			 t <= Transfer::RoguelikeUpgrade::UpgradeEvadeCooldownLarge;
+			 ++t)
+		{
+			if (IsStatusUpgradeTypeAvailable(roguelike, t))
+			{
+				available[availableCount++] = t;
+			}
+		}
+		FillOfferArrayFromAvailable(offers, available, availableCount);
+	}
+
+	void GenerateSkillOffers(int offers[kUpgradeOfferCount], const Transfer::RoguelikeUpgrade& roguelike)
+	{
+		int available[kUpgradeTypeCount]{};
+		int availableCount = 0;
+		for (int t = Transfer::RoguelikeUpgrade::UpgradeSkillShot;
+			 t < Transfer::RoguelikeUpgrade::UpgradeTypeCount;
+			 ++t)
+		{
+			if (IsSkillRewardTypeAvailable(roguelike, t))
+			{
+				available[availableCount++] = t;
+			}
+		}
+		FillOfferArrayFromAvailable(offers, available, availableCount);
+	}
+
+	void GenerateUpgradeOffers(int offers[kUpgradeOfferCount],
+							   const Transfer::RoguelikeUpgrade& roguelike,
+							   int selectionPhase)
+	{
+		switch (NormalizeSelectionPhaseValue(selectionPhase))
+		{
+		case Transfer::RoguelikeUpgrade::SelectionStatus:
+			GenerateStatusOffers(offers, roguelike);
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionSkill:
+			GenerateSkillOffers(offers, roguelike);
+			break;
+		default:
+			ResetOffers(offers);
+			break;
+		}
+	}
+
+	void ApplyUpgradeType(Transfer::RoguelikeUpgrade& roguelike,
+						  int upgradeType,
+						  int smallStep,
+						  int largeStep)
+	{
+		switch (upgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::UpgradeAttackPower:
+			roguelike.attackPowerLevel = ClampUpgradeTier(roguelike.attackPowerLevel + smallStep);
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeAttackSpeed:
+			roguelike.attackSpeedLevel = ClampUpgradeTier(roguelike.attackSpeedLevel + smallStep);
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeEvadeCooldown:
+			roguelike.evadeCooldownLevel = ClampUpgradeTier(roguelike.evadeCooldownLevel + smallStep);
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeAttackPowerLarge:
+			roguelike.attackPowerLevel = ClampUpgradeTier(roguelike.attackPowerLevel + largeStep);
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeAttackSpeedLarge:
+			roguelike.attackSpeedLevel = ClampUpgradeTier(roguelike.attackSpeedLevel + largeStep);
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeEvadeCooldownLarge:
+			roguelike.evadeCooldownLevel = ClampUpgradeTier(roguelike.evadeCooldownLevel + largeStep);
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShot:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNova:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbit:
+		{
+			const int skillType = UpgradeTypeToSkillType(upgradeType);
+			if (skillType == Transfer::RoguelikeUpgrade::SkillNone ||
+				HasSkillType(roguelike.skillSlot1, roguelike.skillSlot2, skillType))
+			{
+				break;
+			}
+			if (roguelike.skillSlot1 == Transfer::RoguelikeUpgrade::SkillNone)
+			{
+				roguelike.skillSlot1 = skillType;
+			}
+			else if (roguelike.skillSlot2 == Transfer::RoguelikeUpgrade::SkillNone)
+			{
+				roguelike.skillSlot2 = skillType;
+			}
+			break;
+		}
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotRange:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotPower:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotCooldown:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaRange:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaPower:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaCooldown:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitRange:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCooldown:
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCount:
+		{
+			int* levelPtr = GetSkillUpgradeLevelPtr(roguelike, upgradeType);
+			if (levelPtr)
+			{
+				*levelPtr = ClampInt(*levelPtr + 1, 0, kSkillUpgradeTierMax);
+			}
+			break;
+		}
 		default:
 			break;
 		}
@@ -394,13 +906,7 @@ void Transfer::ApplyStageClearUpgrade()
 	const int nextType = roguelike.stageClearCount % 3;
 	++roguelike.stageClearCount;
 	roguelike.lastUpgradeType = nextType;
-	ApplyUpgradeType(
-		roguelike.attackPowerLevel,
-		roguelike.attackSpeedLevel,
-		roguelike.evadeCooldownLevel,
-		nextType,
-		smallStep,
-		largeStep);
+	ApplyUpgradeType(roguelike, nextType, smallStep, largeStep);
 }
 
 /**
@@ -408,10 +914,13 @@ void Transfer::ApplyStageClearUpgrade()
  */
 void Transfer::BeginUpgradeSelection()
 {
-	// 選択待ちへ入り、現在の上限設定からリロール残数を初期化します。
+	++roguelike.stageClearCount;
 	roguelike.selectionPending = 1;
+	roguelike.selectionPhase = RoguelikeUpgrade::SelectionStatus;
 	roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
-	GenerateUpgradeOffers(roguelike.offers, roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel);
+	ResetOffers(roguelike.offers);
+	gameplayDebug.rewardSelectionIndex = 0;
+	RefreshUpgradeSelectionState();
 }
 
 /**
@@ -422,10 +931,32 @@ bool Transfer::RerollUpgradeSelection()
 {
 	// 選択待ちでなければ、そもそも再抽選する候補がありません。
 	if (roguelike.selectionPending == 0) return false;
+	RefreshUpgradeSelectionState();
+	if (!HasAnyOffer(roguelike.offers)) return false;
 	// 残回数が無い場合も再抽選できません。
 	if (roguelike.rerollRemain <= 0) return false;
 	--roguelike.rerollRemain;
-	GenerateUpgradeOffers(roguelike.offers, roguelike.attackPowerLevel, roguelike.attackSpeedLevel, roguelike.evadeCooldownLevel);
+	ResetOffers(roguelike.offers);
+	gameplayDebug.rewardSelectionIndex = 0;
+	RefreshUpgradeSelectionState();
+	return true;
+}
+
+bool Transfer::AdvanceUpgradeSelectionPhase()
+{
+	if (roguelike.selectionPending == 0) return false;
+
+	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
+	{
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionSkill;
+		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		RefreshUpgradeSelectionState();
+		return true;
+	}
+
+	FinishUpgradeSelection();
 	return true;
 }
 
@@ -438,6 +969,8 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 {
 	// 選択待ちでない状態では適用しません。
 	if (roguelike.selectionPending == 0) return false;
+	RefreshUpgradeSelectionState();
+	if (!HasAnyOffer(roguelike.offers)) return false;
 	// 候補範囲外の番号は無効です。
 	if (offerIndex < 0 || offerIndex >= RoguelikeUpgrade::kOfferCount) return false;
 
@@ -447,18 +980,77 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 	int smallStep = 1;
 	int largeStep = 2;
 	GetUpgradeStepsForDifficulty(gameplayDebug.difficultyPreset, smallStep, largeStep);
-	ApplyUpgradeType(
-		roguelike.attackPowerLevel,
-		roguelike.attackSpeedLevel,
-		roguelike.evadeCooldownLevel,
-		selectedType,
-		smallStep,
-		largeStep);
-	++roguelike.stageClearCount;
+	ApplyUpgradeType(roguelike, selectedType, smallStep, largeStep);
 	roguelike.lastUpgradeType = selectedType;
-	roguelike.selectionPending = 0;
-	roguelike.rerollRemain = 0;
+	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
+	{
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionSkill;
+		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		RefreshUpgradeSelectionState();
+	}
+	else
+	{
+		FinishUpgradeSelection();
+	}
 	return true;
+}
+
+bool Transfer::RefreshUpgradeSelectionState()
+{
+	if (roguelike.selectionPending == 0)
+	{
+		return false;
+	}
+
+	roguelike.selectionPhase = NormalizeSelectionPhaseValue(roguelike.selectionPhase);
+	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionNone)
+	{
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionStatus;
+		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+	}
+
+	if (HasAnyOffer(roguelike.offers))
+	{
+		return true;
+	}
+
+	GenerateUpgradeOffers(roguelike.offers, roguelike, roguelike.selectionPhase);
+	if (HasAnyOffer(roguelike.offers))
+	{
+		return true;
+	}
+
+	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
+	{
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionSkill;
+		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		GenerateUpgradeOffers(roguelike.offers, roguelike, roguelike.selectionPhase);
+	}
+
+	if (!HasAnyOffer(roguelike.offers))
+	{
+		roguelike.rerollRemain = 0;
+	}
+
+	return true;
+}
+
+bool Transfer::HasAnyUpgradeOffer() const
+{
+	return HasAnyOffer(roguelike.offers);
+}
+
+void Transfer::FinishUpgradeSelection()
+{
+	roguelike.selectionPending = 0;
+	roguelike.selectionPhase = RoguelikeUpgrade::SelectionNone;
+	roguelike.rerollRemain = 0;
+	ResetOffers(roguelike.offers);
+	gameplayDebug.rewardSelectionIndex = 0;
 }
 
 /**
@@ -490,6 +1082,11 @@ int Transfer::GetUpgradeLevelMax() const
 	return RoguelikeUpgrade::kLevelMax;
 }
 
+int Transfer::GetSkillUpgradeLevelMax() const
+{
+	return RoguelikeUpgrade::kLevelMax;
+}
+
 /**
  * @brief 強化タイプと難易度から実際の増加量を返します。
  * @param upgradeType 強化種別です。
@@ -516,6 +1113,43 @@ int Transfer::GetUpgradeStepForType(int upgradeType, int difficultyPreset) const
 	default:
 		return 0;
 	}
+}
+
+float Transfer::GetSkillRangeScaleByLevel(int level) const
+{
+	const float t = static_cast<float>(ClampInt(level, 0, GetSkillUpgradeLevelMax())) /
+		static_cast<float>(GetSkillUpgradeLevelMax());
+	return 1.0f + 2.0f * t;
+}
+
+float Transfer::GetSkillDamageScaleByLevel(int level) const
+{
+	const float t = static_cast<float>(ClampInt(level, 0, GetSkillUpgradeLevelMax())) /
+		static_cast<float>(GetSkillUpgradeLevelMax());
+	return 1.0f + t;
+}
+
+float Transfer::GetOrbitDamageScaleByCountLevel(int level) const
+{
+	const int clampedLevel = ClampInt(level, 0, GetSkillUpgradeLevelMax());
+	if (clampedLevel <= 5)
+	{
+		return 1.0f;
+	}
+	const float overflowT = static_cast<float>(clampedLevel - 5) / 5.0f;
+	return 1.0f + 0.5f * overflowT;
+}
+
+float Transfer::GetSkillCooldownReductionByLevel(int level) const
+{
+	const float t = static_cast<float>(ClampInt(level, 0, GetSkillUpgradeLevelMax())) /
+		static_cast<float>(GetSkillUpgradeLevelMax());
+	return 4.0f * t;
+}
+
+int Transfer::GetOrbitCountByLevel(int level) const
+{
+	return 1 + ClampInt(level, 0, 5);
 }
 
 /**
@@ -566,9 +1200,24 @@ float Transfer::GetEvadeCooldownScaleByLevel(int level) const
  */
 float Transfer::GetEnemyHpScaleByUpgradeProgress() const
 {
-	// 合計強化 10 ごとに 1 段階だけ上げ、極端な伸びを抑えます。
-	const int progressTier = ClampInt(GetTotalUpgradeLevels() / 10, 0, 3);
-	return 1.0f + 0.20f * static_cast<float>(progressTier);
+	return EvaluateUpgradeProgressScale(
+		GetTotalUpgradeProgressValue(roguelike),
+		5.0f,
+		10.0f,
+		20.0f);
+}
+
+/**
+ * @brief 強化進行度に応じたボス HP 倍率を返します。
+ * @return ボス HP 倍率です。
+ */
+float Transfer::GetBossHpScaleByUpgradeProgress() const
+{
+	return EvaluateUpgradeProgressScale(
+		GetTotalUpgradeProgressValue(roguelike),
+		10.0f,
+		20.0f,
+		40.0f);
 }
 
 /**
@@ -659,8 +1308,11 @@ bool Transfer::LoadGameplayTuning(const char* path)
 
 	// 読み込み途中で失敗しても既存値を壊さないよう、一旦ローカルへ集めます。
 	GameplayTuning loaded{};
-	int loadedPreset = gameplayDebug.difficultyPreset;
-	RoguelikeUpgrade loadedRogue = roguelike;
+	int loadedPreset = 1;
+	RoguelikeUpgrade loadedRogue{};
+	ApplyGameplayTuningFileDefaults(loaded, loadedPreset, loadedRogue);
+	std::unordered_set<std::string> loadedKeys;
+	loadedKeys.reserve(kGameplayTuningRequiredKeyCount);
 
 	std::string line;
 	while (std::getline(ifs, line))
@@ -680,6 +1332,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		if (key.empty() || value.empty()) continue;
 
 		// キー名に応じて、対象項目だけを個別に復元します。
+		bool matchedKey = true;
 		if (key == "enemyCount") loaded.enemyCount = ToInt(value, loaded.enemyCount);
 		else if (key == "waveMax") loaded.waveMax = ToInt(value, loaded.waveMax);
 		else if (key == "waveEnemyAddPerWave") loaded.waveEnemyAddPerWave = ToInt(value, loaded.waveEnemyAddPerWave);
@@ -729,6 +1382,9 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "bossAttackCooldown") loaded.bossAttackCooldown = ToFloat(value, loaded.bossAttackCooldown);
 		else if (key == "bossAttackLanePlayerScale") loaded.bossAttackLanePlayerScale = ToFloat(value, loaded.bossAttackLanePlayerScale);
 		else if (key == "bossAttackDamage") loaded.bossAttackDamage = ToFloat(value, loaded.bossAttackDamage);
+		else if (key == "bossAttackHitStop") loaded.bossAttackHitStop = ToFloat(value, loaded.bossAttackHitStop);
+		else if (key == "bossHitShakeDuration") loaded.bossHitShakeDuration = ToFloat(value, loaded.bossHitShakeDuration);
+		else if (key == "bossHitShakeAmplitude") loaded.bossHitShakeAmplitude = ToFloat(value, loaded.bossHitShakeAmplitude);
 		else if (key == "bossGuardInitialMax") loaded.bossGuardInitialMax = ToFloat(value, loaded.bossGuardInitialMax);
 		else if (key == "bossGuardFinalMax") loaded.bossGuardFinalMax = ToFloat(value, loaded.bossGuardFinalMax);
 		else if (key == "bossGuardRecoverStep") loaded.bossGuardRecoverStep = ToFloat(value, loaded.bossGuardRecoverStep);
@@ -783,7 +1439,30 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		else if (key == "attackSpeedLevel") loadedRogue.attackSpeedLevel = ToInt(value, loadedRogue.attackSpeedLevel);
 		else if (key == "evadeCooldownLevel") loadedRogue.evadeCooldownLevel = ToInt(value, loadedRogue.evadeCooldownLevel);
 		else if (key == "lastUpgradeType") loadedRogue.lastUpgradeType = ToInt(value, loadedRogue.lastUpgradeType);
+		else if (key == "skillSlot1") loadedRogue.skillSlot1 = ToInt(value, loadedRogue.skillSlot1);
+		else if (key == "skillSlot2") loadedRogue.skillSlot2 = ToInt(value, loadedRogue.skillSlot2);
+		else if (key == "skillShotRangeLevel") loadedRogue.skillShotRangeLevel = ToInt(value, loadedRogue.skillShotRangeLevel);
+		else if (key == "skillShotPowerLevel") loadedRogue.skillShotPowerLevel = ToInt(value, loadedRogue.skillShotPowerLevel);
+		else if (key == "skillShotCooldownLevel") loadedRogue.skillShotCooldownLevel = ToInt(value, loadedRogue.skillShotCooldownLevel);
+		else if (key == "skillNovaRangeLevel") loadedRogue.skillNovaRangeLevel = ToInt(value, loadedRogue.skillNovaRangeLevel);
+		else if (key == "skillNovaPowerLevel") loadedRogue.skillNovaPowerLevel = ToInt(value, loadedRogue.skillNovaPowerLevel);
+		else if (key == "skillNovaCooldownLevel") loadedRogue.skillNovaCooldownLevel = ToInt(value, loadedRogue.skillNovaCooldownLevel);
+		else if (key == "skillOrbitRangeLevel") loadedRogue.skillOrbitRangeLevel = ToInt(value, loadedRogue.skillOrbitRangeLevel);
+		else if (key == "skillOrbitCooldownLevel") loadedRogue.skillOrbitCooldownLevel = ToInt(value, loadedRogue.skillOrbitCooldownLevel);
+		else if (key == "skillOrbitCountLevel") loadedRogue.skillOrbitCountLevel = ToInt(value, loadedRogue.skillOrbitCountLevel);
 		else if (key == "upgradeRerollMax") loadedRogue.rerollMaxPerStage = ToInt(value, loadedRogue.rerollMaxPerStage);
+		else matchedKey = false;
+
+		if (matchedKey)
+		{
+			loadedKeys.insert(key);
+		}
+	}
+
+	if (static_cast<int>(loadedKeys.size()) != kGameplayTuningRequiredKeyCount)
+	{
+		// 1項目でも欠けている場合は、部分適用せずファイル既定値へ全体を戻します。
+		ApplyGameplayTuningFileDefaults(loaded, loadedPreset, loadedRogue);
 	}
 
 	// 読み込んだ値はここで全体的にクランプし、壊れた設定を防ぎます。
@@ -814,6 +1493,10 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	if (loaded.bossSizeAreaScale < 4.0f) loaded.bossSizeAreaScale = 4.0f;
 	if (loaded.bossSizeAreaScale > 12.0f) loaded.bossSizeAreaScale = 12.0f;
 	loaded.bossMaxHp = ClampInt(loaded.bossMaxHp, 1, 9999);
+	if (loaded.bossHitShakeDuration < 0.0f) loaded.bossHitShakeDuration = 0.0f;
+	if (loaded.bossHitShakeDuration > 1.0f) loaded.bossHitShakeDuration = 1.0f;
+	if (loaded.bossHitShakeAmplitude < 0.0f) loaded.bossHitShakeAmplitude = 0.0f;
+	if (loaded.bossHitShakeAmplitude > 1.0f) loaded.bossHitShakeAmplitude = 1.0f;
 	if (loaded.bossAttackTelegraph < 0.10f) loaded.bossAttackTelegraph = 0.10f;
 	if (loaded.bossAttackJumpOutTime < 0.0f) loaded.bossAttackJumpOutTime = 0.0f;
 	if (loaded.bossAttackDashDuration < 0.05f) loaded.bossAttackDashDuration = 0.05f;
@@ -867,10 +1550,27 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	loadedRogue.attackSpeedLevel = ClampUpgradeTier(loadedRogue.attackSpeedLevel);
 	loadedRogue.evadeCooldownLevel = ClampUpgradeTier(loadedRogue.evadeCooldownLevel);
 	loadedRogue.lastUpgradeType = ClampInt(loadedRogue.lastUpgradeType, -1, RoguelikeUpgrade::UpgradeTypeCount - 1);
+	loadedRogue.skillSlot1 = NormalizeSkillTypeValue(loadedRogue.skillSlot1);
+	loadedRogue.skillSlot2 = NormalizeSkillTypeValue(loadedRogue.skillSlot2);
+	loadedRogue.skillShotRangeLevel = ClampInt(loadedRogue.skillShotRangeLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillShotPowerLevel = ClampInt(loadedRogue.skillShotPowerLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillShotCooldownLevel = ClampInt(loadedRogue.skillShotCooldownLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillNovaRangeLevel = ClampInt(loadedRogue.skillNovaRangeLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillNovaPowerLevel = ClampInt(loadedRogue.skillNovaPowerLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillNovaCooldownLevel = ClampInt(loadedRogue.skillNovaCooldownLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillOrbitRangeLevel = ClampInt(loadedRogue.skillOrbitRangeLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillOrbitCooldownLevel = ClampInt(loadedRogue.skillOrbitCooldownLevel, 0, RoguelikeUpgrade::kLevelMax);
+	loadedRogue.skillOrbitCountLevel = ClampInt(loadedRogue.skillOrbitCountLevel, 0, RoguelikeUpgrade::kLevelMax);
+	if (loadedRogue.skillSlot2 != RoguelikeUpgrade::SkillNone &&
+		loadedRogue.skillSlot2 == loadedRogue.skillSlot1)
+	{
+		loadedRogue.skillSlot2 = RoguelikeUpgrade::SkillNone;
+	}
 	loadedRogue.rerollMaxPerStage = ClampInt(loadedRogue.rerollMaxPerStage, 0, 9);
 	loadedRogue.rerollRemain = 0;
 	loadedRogue.selectionPending = 0;
-	GenerateUpgradeOffers(loadedRogue.offers, loadedRogue.attackPowerLevel, loadedRogue.attackSpeedLevel, loadedRogue.evadeCooldownLevel);
+	loadedRogue.selectionPhase = RoguelikeUpgrade::SelectionNone;
+	ResetOffers(loadedRogue.offers);
 	roguelike = loadedRogue;
 
 	if (IsDefaultPathArgument(path))
@@ -949,6 +1649,9 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "bossAttackCooldown=" << gameplay.bossAttackCooldown << "\n";
 		ofs << "bossAttackLanePlayerScale=" << gameplay.bossAttackLanePlayerScale << "\n";
 		ofs << "bossAttackDamage=" << gameplay.bossAttackDamage << "\n";
+		ofs << "bossAttackHitStop=" << gameplay.bossAttackHitStop << "\n";
+		ofs << "bossHitShakeDuration=" << gameplay.bossHitShakeDuration << "\n";
+		ofs << "bossHitShakeAmplitude=" << gameplay.bossHitShakeAmplitude << "\n";
 		ofs << "bossGuardInitialMax=" << gameplay.bossGuardInitialMax << "\n";
 		ofs << "bossGuardFinalMax=" << gameplay.bossGuardFinalMax << "\n";
 		ofs << "bossGuardRecoverStep=" << gameplay.bossGuardRecoverStep << "\n";
@@ -1003,6 +1706,17 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "attackSpeedLevel=" << roguelike.attackSpeedLevel << "\n";
 		ofs << "evadeCooldownLevel=" << roguelike.evadeCooldownLevel << "\n";
 		ofs << "lastUpgradeType=" << roguelike.lastUpgradeType << "\n";
+		ofs << "skillSlot1=" << roguelike.skillSlot1 << "\n";
+		ofs << "skillSlot2=" << roguelike.skillSlot2 << "\n";
+		ofs << "skillShotRangeLevel=" << roguelike.skillShotRangeLevel << "\n";
+		ofs << "skillShotPowerLevel=" << roguelike.skillShotPowerLevel << "\n";
+		ofs << "skillShotCooldownLevel=" << roguelike.skillShotCooldownLevel << "\n";
+		ofs << "skillNovaRangeLevel=" << roguelike.skillNovaRangeLevel << "\n";
+		ofs << "skillNovaPowerLevel=" << roguelike.skillNovaPowerLevel << "\n";
+		ofs << "skillNovaCooldownLevel=" << roguelike.skillNovaCooldownLevel << "\n";
+		ofs << "skillOrbitRangeLevel=" << roguelike.skillOrbitRangeLevel << "\n";
+		ofs << "skillOrbitCooldownLevel=" << roguelike.skillOrbitCooldownLevel << "\n";
+		ofs << "skillOrbitCountLevel=" << roguelike.skillOrbitCountLevel << "\n";
 		ofs << "upgradeRerollMax=" << roguelike.rerollMaxPerStage << "\n";
 		return ofs.good();
 	};

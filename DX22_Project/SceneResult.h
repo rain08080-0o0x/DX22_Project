@@ -22,5 +22,6 @@ private:
 	IXAudio2SourceVoice* m_pResultBgmVoice;
 	SceneManager::ResultType m_current;
 	int m_menuSelection;
+	int m_rewardSelection;
 };
 

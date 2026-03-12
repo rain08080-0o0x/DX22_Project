@@ -189,6 +189,9 @@ private:
 		float bossAttackCooldown = 1.15f;
 		float bossAttackLanePlayerScale = 3.0f;
 		float bossAttackDamage = 20.0f;
+		float bossAttackHitStop = 0.08f;
+		float bossHitShakeDuration = 0.18f;
+		float bossHitShakeAmplitude = 0.23f;
 		float bossGuardInitialMax = 14.0f;
 		float bossGuardFinalMax = 24.0f;
 		float bossGuardRecoverStep = 2.0f;
@@ -284,6 +287,7 @@ private:
 		int upgradeOffer0 = -1;
 		int upgradeOffer1 = -1;
 		int upgradeOffer2 = -1;
+		int rewardSelectionIndex = 0;
 
 		// Run timer / boss request state.
 		float runElapsedSec = 0.0f;
@@ -296,10 +300,15 @@ private:
 		float bossGuard = 0.0f;
 		float bossGuardMax = 0.0f;
 		int bossBroken = 0;
+		int bossHpEditRequest = 0;
+		int bossHpEditValue = 0;
+		int bossMaxHpEditValue = 0;
 		int showBossResultTimer = 0;
+		char cursorHoverTarget[64] = "-";
 
 		// Pause / title UI runtime state.
 		int pauseMenuOpen = 0;
+		int pauseTabIndex = 0;      // 0:Game 1:Upgrades 2:Settings
 		int pauseMenuSelection = 0; // 0: Continue, 1: Option, 2: Title
 		int pauseMenuRequest = 0;   // 0: None, 1: Continue, 2: Title, 3: Option
 		int pauseOptionOpen = 0;
@@ -315,6 +324,7 @@ private:
 		float pauseMenuButtonScale = 1.0f;
 	};
 
+public:
 	/**
 	 * @brief ローグライク強化の進行状況と選択候補を保持します。
 	 */
@@ -336,7 +346,41 @@ private:
 			UpgradeAttackPowerLarge = 3,
 			UpgradeAttackSpeedLarge = 4,
 			UpgradeEvadeCooldownLarge = 5,
-			UpgradeTypeCount = 6
+			UpgradeSkillShot = 6,
+			UpgradeSkillNova = 7,
+			UpgradeSkillOrbit = 8,
+			UpgradeSkillShotRange = 9,
+			UpgradeSkillShotPower = 10,
+			UpgradeSkillShotCooldown = 11,
+			UpgradeSkillNovaRange = 12,
+			UpgradeSkillNovaPower = 13,
+			UpgradeSkillNovaCooldown = 14,
+			UpgradeSkillOrbitRange = 15,
+			UpgradeSkillOrbitCooldown = 16,
+			UpgradeSkillOrbitCount = 17,
+			UpgradeTypeCount = 18
+		};
+
+		/**
+		 * @brief 装備スロットへ入るスキル種別です。
+		 */
+		enum SkillType
+		{
+			SkillNone = 0,
+			SkillShot = 1,
+			SkillNova = 2,
+			SkillOrbit = 3,
+			SkillTypeCount = 4
+		};
+
+		/**
+		 * @brief 現在進行中の報酬フェーズです。
+		 */
+		enum SelectionPhase
+		{
+			SelectionNone = 0,
+			SelectionStatus = 1,
+			SelectionSkill = 2
 		};
 
 		/** @brief クリア済みステージ数です。 */
@@ -349,12 +393,36 @@ private:
 		int evadeCooldownLevel = 0;
 		/** @brief 最後に取得した強化種別です。 */
 		int lastUpgradeType = -1; // UpgradeType
+		/** @brief スキルスロット1に装備しているスキルです。 */
+		int skillSlot1 = SkillNone;
+		/** @brief スキルスロット2に装備しているスキルです。 */
+		int skillSlot2 = SkillNone;
+		/** @brief 遠距離スキルの攻撃範囲レベルです。 */
+		int skillShotRangeLevel = 0;
+		/** @brief 遠距離スキルの攻撃倍率レベルです。 */
+		int skillShotPowerLevel = 0;
+		/** @brief 遠距離スキルのクールタイム短縮レベルです。 */
+		int skillShotCooldownLevel = 0;
+		/** @brief 近接スキルの攻撃範囲レベルです。 */
+		int skillNovaRangeLevel = 0;
+		/** @brief 近接スキルの攻撃倍率レベルです。 */
+		int skillNovaPowerLevel = 0;
+		/** @brief 近接スキルのクールタイム短縮レベルです。 */
+		int skillNovaCooldownLevel = 0;
+		/** @brief 衛星スキルの攻撃範囲レベルです。 */
+		int skillOrbitRangeLevel = 0;
+		/** @brief 衛星スキルのクールタイム短縮レベルです。 */
+		int skillOrbitCooldownLevel = 0;
+		/** @brief 衛星スキルの生成数レベルです。 */
+		int skillOrbitCountLevel = 0;
 		/** @brief 1 ステージあたりの最大リロール回数です。 */
 		int rerollMaxPerStage = 2;
 		/** @brief 現在残っているリロール回数です。 */
 		int rerollRemain = 0;
 		/** @brief 強化選択待ちかどうかです。 */
 		int selectionPending = 0;
+		/** @brief 現在の報酬フェーズです。 */
+		int selectionPhase = SelectionNone;
 		/** @brief 現在提示中の強化候補です。 */
 		int offers[kOfferCount] =
 		{
@@ -407,11 +475,34 @@ public:
 	bool RerollUpgradeSelection();
 
 	/**
+	 * @brief 報酬フェーズを次段階へ進めます。
+	 * @return フェーズ遷移または終了処理を行えた場合は true です。
+	 */
+	bool AdvanceUpgradeSelectionPhase();
+
+	/**
 	 * @brief 指定した候補番号の強化を適用します。
 	 * @param offerIndex 選択した候補の添字です。
 	 * @return 適用に成功した場合は true です。
 	 */
 	bool ApplyUpgradeSelection(int offerIndex);
+
+	/**
+	 * @brief 現在の報酬状態を正規化し、必要なら次フェーズ候補を生成します。
+	 * @return 強化選択待ち状態なら true です。
+	 */
+	bool RefreshUpgradeSelectionState();
+
+	/**
+	 * @brief 現在フェーズに有効な候補があるか返します。
+	 * @return 1件以上候補があれば true です。
+	 */
+	bool HasAnyUpgradeOffer() const;
+
+	/**
+	 * @brief 強化選択状態を終了し、候補と選択位置を初期化します。
+	 */
+	void FinishUpgradeSelection();
 
 	/**
 	 * @brief 難易度値を有効範囲へ丸めます。
@@ -432,6 +523,12 @@ public:
 	 * @return 強化レベル上限です。
 	 */
 	int GetUpgradeLevelMax() const;
+
+	/**
+	 * @brief スキル強化レベル上限を返します。
+	 * @return スキル強化レベル上限です。
+	 */
+	int GetSkillUpgradeLevelMax() const;
 
 	/**
 	 * @brief 強化種別と難易度から増加段階数を返します。
@@ -469,10 +566,51 @@ public:
 	float GetEvadeCooldownScaleByLevel(int level) const;
 
 	/**
+	 * @brief スキル攻撃範囲レベルから範囲倍率を返します。
+	 * @param level スキル攻撃範囲レベルです。
+	 * @return 1.0 から 3.0 の範囲倍率です。
+	 */
+	float GetSkillRangeScaleByLevel(int level) const;
+
+	/**
+	 * @brief スキル攻撃倍率レベルから倍率を返します。
+	 * @param level スキル攻撃倍率レベルです。
+	 * @return 1.0 から 2.0 の倍率です。
+	 */
+	float GetSkillDamageScaleByLevel(int level) const;
+
+	/**
+	 * @brief 衛星生成数レベルから追加ダメージ倍率を返します。
+	 * @param level 衛星生成数レベルです。
+	 * @return 1.0 から 1.5 の倍率です。
+	 */
+	float GetOrbitDamageScaleByCountLevel(int level) const;
+
+	/**
+	 * @brief スキルCT短縮レベルから減少秒数を返します。
+	 * @param level スキルCT短縮レベルです。
+	 * @return 0.0 から 4.0 秒の減少量です。
+	 */
+	float GetSkillCooldownReductionByLevel(int level) const;
+
+	/**
+	 * @brief 衛星生成数レベルから生成数を返します。
+	 * @param level 衛星生成数レベルです。
+	 * @return 1 から 6 の生成数です。
+	 */
+	int GetOrbitCountByLevel(int level) const;
+
+	/**
 	 * @brief 強化進行度から通常敵 HP 補正倍率を返します。
 	 * @return 敵 HP 倍率です。
 	 */
 	float GetEnemyHpScaleByUpgradeProgress() const;
+
+	/**
+	 * @brief 強化進行度からボス HP 補正倍率を返します。
+	 * @return ボス HP 倍率です。
+	 */
+	float GetBossHpScaleByUpgradeProgress() const;
 
 	/**
 	 * @brief 強化進行度から通常敵攻撃補正倍率を返します。

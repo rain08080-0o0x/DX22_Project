@@ -9,10 +9,12 @@
 #include "ShaderList.h"
 #include "Transfer.h"
 #include "Sound.h"
+#include "Texture.h"
 // rand初期化用
 #include <cstdlib>
 #include <ctime>
 #include <cstdio> // 追加
+#include <cmath>
 
 // ImGui
 #include "imgui.h"
@@ -25,6 +27,34 @@
 
 namespace
 {
+	const char* GetSkillNameByType(int skillType)
+	{
+		switch (skillType)
+		{
+		case Transfer::RoguelikeUpgrade::SkillShot:
+			return u8"遠距離攻撃";
+		case Transfer::RoguelikeUpgrade::SkillNova:
+			return u8"近接攻撃";
+		case Transfer::RoguelikeUpgrade::SkillOrbit:
+			return u8"衛星攻撃";
+		default:
+			return u8"未取得";
+		}
+	}
+
+	const char* GetDifficultyName(int difficultyPreset)
+	{
+		switch (difficultyPreset)
+		{
+		case 0:
+			return u8"Easy";
+		case 2:
+			return u8"Hard";
+		default:
+			return u8"Normal";
+		}
+	}
+
 	void FormatUpgradeLabel(const Transfer& tran, int upgradeType, char* out, size_t outSize)
 	{
 		if (!out || outSize == 0) return;
@@ -46,12 +76,60 @@ namespace
 		case 5:
 			name = u8"回避CT段階";
 			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShot:
+			name = u8"スキル:遠距離攻撃";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNova:
+			name = u8"スキル:近接攻撃";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbit:
+			name = u8"スキル:衛星攻撃";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotRange:
+			name = u8"遠距離 範囲";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotPower:
+			name = u8"遠距離 威力";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotCooldown:
+			name = u8"遠距離 CT";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaRange:
+			name = u8"近接 範囲";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaPower:
+			name = u8"近接 威力";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaCooldown:
+			name = u8"近接 CT";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitRange:
+			name = u8"衛星 範囲";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCooldown:
+			name = u8"衛星 CT";
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCount:
+			name = u8"衛星 数";
+			break;
 		default:
 			name = nullptr;
 			break;
 		}
 
-		if (!name || amount <= 0)
+		if (!name)
+		{
+			sprintf_s(out, outSize, "%s", u8"ここには何もないようだ");
+			return;
+		}
+
+		if (upgradeType >= Transfer::RoguelikeUpgrade::UpgradeSkillShot)
+		{
+			sprintf_s(out, outSize, "%s", name);
+			return;
+		}
+
+		if (amount <= 0)
 		{
 			sprintf_s(out, outSize, "%s", u8"ここには何もないようだ");
 			return;
@@ -80,6 +158,42 @@ namespace
 		case 5:
 			sprintf_s(out, outSize, u8"段階テーブルに沿って回避CTを%d段階短縮", amount);
 			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShot:
+			sprintf_s(out, outSize, u8"向いている方向へ端まで飛ぶ弾を解放");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNova:
+			sprintf_s(out, outSize, u8"通常攻撃より広い全方向攻撃を解放");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbit:
+			sprintf_s(out, outSize, u8"プレイヤー周囲を周遊する衛星攻撃を解放");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotRange:
+			sprintf_s(out, outSize, u8"遠距離攻撃の当たり範囲を最大3倍まで拡大");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotPower:
+			sprintf_s(out, outSize, u8"遠距離攻撃の威力倍率を最大2倍まで上昇");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillShotCooldown:
+			sprintf_s(out, outSize, u8"遠距離攻撃のCTを最大4秒短縮");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaRange:
+			sprintf_s(out, outSize, u8"近接攻撃の範囲を最大3倍まで拡大");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaPower:
+			sprintf_s(out, outSize, u8"近接攻撃の威力倍率を最大2倍まで上昇");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillNovaCooldown:
+			sprintf_s(out, outSize, u8"近接攻撃のCTを最大4秒短縮");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitRange:
+			sprintf_s(out, outSize, u8"衛星の接触範囲を最大3倍まで拡大");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCooldown:
+			sprintf_s(out, outSize, u8"衛星スキルのCTを最大4秒短縮");
+			break;
+		case Transfer::RoguelikeUpgrade::UpgradeSkillOrbitCount:
+			sprintf_s(out, outSize, u8"衛星数を最大6まで増加 以降は威力を最大1.5倍");
+			break;
 		default:
 			out[0] = '\0';
 			break;
@@ -106,6 +220,175 @@ namespace
 		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), text);
 	}
 
+	void FormatUpgradeTableValue(float value, const char* suffix, char* out, size_t outSize)
+	{
+		if (!out || outSize == 0) return;
+		const float roundedInt = std::round(value);
+		const float rounded1 = std::round(value * 10.0f) / 10.0f;
+		if (std::fabs(value - roundedInt) < 0.001f)
+		{
+			sprintf_s(out, outSize, "%.0f%s", roundedInt, suffix);
+		}
+		else if (std::fabs(value - rounded1) < 0.001f)
+		{
+			sprintf_s(out, outSize, "%.1f%s", rounded1, suffix);
+		}
+		else
+		{
+			sprintf_s(out, outSize, "%.2f%s", value, suffix);
+		}
+	}
+
+	void FormatUpgradePercentValue(float scale, char* out, size_t outSize)
+	{
+		if (!out || outSize == 0) return;
+		const float percent = scale * 100.0f;
+		const float roundedInt = std::round(percent);
+		const float rounded1 = std::round(percent * 10.0f) / 10.0f;
+		if (std::fabs(percent - roundedInt) < 0.001f)
+		{
+			sprintf_s(out, outSize, "%.0f%%", roundedInt);
+		}
+		else if (std::fabs(percent - rounded1) < 0.001f)
+		{
+			sprintf_s(out, outSize, "%.1f%%", rounded1);
+		}
+		else
+		{
+			sprintf_s(out, outSize, "%.2f%%", percent);
+		}
+	}
+
+	void SetupUpgradeMatrixColumns()
+	{
+		ImGui::TableSetupColumn(u8"名称", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+		ImGui::TableSetupColumn(u8"種類", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+		for (int level = 1; level <= 10; ++level)
+		{
+			char header[16]{};
+			sprintf_s(header, "Lv%d", level);
+			ImGui::TableSetupColumn(header, ImGuiTableColumnFlags_WidthFixed, 72.0f);
+		}
+		ImGui::TableSetupScrollFreeze(2, 1);
+		ImGui::TableHeadersRow();
+	}
+
+	template <typename Formatter>
+	void DrawUpgradeMatrixRow(const char* name, const char* kind, Formatter formatter)
+	{
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::TextUnformatted(name);
+		ImGui::TableSetColumnIndex(1);
+		ImGui::TextUnformatted(kind);
+		for (int level = 1; level <= 10; ++level)
+		{
+			char cell[32]{};
+			formatter(level, cell, sizeof(cell));
+			ImGui::TableSetColumnIndex(level + 1);
+			ImGui::TextUnformatted(cell);
+		}
+	}
+
+	void DrawStatusUpgradeValueTable(const Transfer& tran)
+	{
+		const ImGuiTableFlags flags =
+			ImGuiTableFlags_Borders |
+			ImGuiTableFlags_RowBg |
+			ImGuiTableFlags_SizingFixedFit |
+			ImGuiTableFlags_ScrollX |
+			ImGuiTableFlags_ScrollY;
+		const ImVec2 outerSize(ImGui::GetContentRegionAvail().x, 160.0f);
+		if (!ImGui::BeginTable("##status_upgrade_table", 12, flags, outerSize))
+		{
+			return;
+		}
+
+		SetupUpgradeMatrixColumns();
+		DrawUpgradeMatrixRow(u8"プレイヤー", u8"攻撃ダメージ", [&](int level, char* out, size_t outSize)
+		{
+			sprintf_s(out, outSize, "%d", tran.GetPlayerAttackDamageByLevel(level));
+		});
+		DrawUpgradeMatrixRow(u8"プレイヤー", u8"攻撃CT倍率", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetAttackCooldownScaleByLevel(level), out, outSize);
+		});
+		DrawUpgradeMatrixRow(u8"プレイヤー", u8"回避CT倍率", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetEvadeCooldownScaleByLevel(level), out, outSize);
+		});
+
+		ImGui::EndTable();
+	}
+
+	void DrawSkillUpgradeValueTable(const Transfer& tran)
+	{
+		const ImGuiTableFlags flags =
+			ImGuiTableFlags_Borders |
+			ImGuiTableFlags_RowBg |
+			ImGuiTableFlags_SizingFixedFit |
+			ImGuiTableFlags_ScrollX |
+			ImGuiTableFlags_ScrollY;
+		const ImVec2 outerSize(ImGui::GetContentRegionAvail().x, 260.0f);
+		if (!ImGui::BeginTable("##skill_upgrade_table", 12, flags, outerSize))
+		{
+			return;
+		}
+
+		SetupUpgradeMatrixColumns();
+		DrawUpgradeMatrixRow(u8"近接攻撃", u8"ダメージ倍率", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetSkillDamageScaleByLevel(level), out, outSize);
+		});
+		DrawUpgradeMatrixRow(u8"近接攻撃", u8"攻撃範囲", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetSkillRangeScaleByLevel(level), out, outSize);
+		});
+		DrawUpgradeMatrixRow(u8"近接攻撃", u8"CT短縮", [&](int level, char* out, size_t outSize)
+		{
+			const float seconds = tran.GetSkillCooldownReductionByLevel(level);
+			char value[32]{};
+			FormatUpgradeTableValue(seconds, u8"", value, sizeof(value));
+			sprintf_s(out, outSize, u8"-%s秒", value);
+		});
+		DrawUpgradeMatrixRow(u8"遠距離攻撃", u8"ダメージ倍率", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetSkillDamageScaleByLevel(level), out, outSize);
+		});
+		DrawUpgradeMatrixRow(u8"遠距離攻撃", u8"攻撃範囲", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetSkillRangeScaleByLevel(level), out, outSize);
+		});
+		DrawUpgradeMatrixRow(u8"遠距離攻撃", u8"CT短縮", [&](int level, char* out, size_t outSize)
+		{
+			const float seconds = tran.GetSkillCooldownReductionByLevel(level);
+			char value[32]{};
+			FormatUpgradeTableValue(seconds, u8"", value, sizeof(value));
+			sprintf_s(out, outSize, u8"-%s秒", value);
+		});
+		DrawUpgradeMatrixRow(u8"衛星攻撃", u8"攻撃範囲", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetSkillRangeScaleByLevel(level), out, outSize);
+		});
+		DrawUpgradeMatrixRow(u8"衛星攻撃", u8"CT短縮", [&](int level, char* out, size_t outSize)
+		{
+			const float seconds = tran.GetSkillCooldownReductionByLevel(level);
+			char value[32]{};
+			FormatUpgradeTableValue(seconds, u8"", value, sizeof(value));
+			sprintf_s(out, outSize, u8"-%s秒", value);
+		});
+		DrawUpgradeMatrixRow(u8"衛星攻撃", u8"生成数", [&](int level, char* out, size_t outSize)
+		{
+			sprintf_s(out, outSize, u8"%d個", tran.GetOrbitCountByLevel(level));
+		});
+		DrawUpgradeMatrixRow(u8"衛星攻撃", u8"威力倍率", [&](int level, char* out, size_t outSize)
+		{
+			FormatUpgradePercentValue(tran.GetOrbitDamageScaleByCountLevel(level), out, outSize);
+		});
+
+		ImGui::EndTable();
+	}
+
 	void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 	{
 		if (SceneManager::GetCurrent() != SceneManager::SceneType::SCENE_RESULT) return;
@@ -116,6 +399,11 @@ namespace
 			(tran.roguelike.offers[0] >= 0) ||
 			(tran.roguelike.offers[1] >= 0) ||
 			(tran.roguelike.offers[2] >= 0);
+		int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
+		if (optionIndex < 0) optionIndex = 0;
+		const bool isStatusPhase = (tran.roguelike.selectionPhase == Transfer::RoguelikeUpgrade::SelectionStatus);
+		const char* overlayTitle = isStatusPhase ? u8"ステータス強化" : u8"スキル獲得 / 強化";
+		const char* continueLabel = isStatusPhase ? u8"スキル強化フェーズへ" : u8"結果へ進む";
 
 		char upgradeHud[1024]{};
 		if (!hasAnyOffer)
@@ -124,13 +412,20 @@ namespace
 			{
 				sprintf_s(
 					upgradeHud,
-					u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ\n[B] ボス戦へ（デバッグ）");
+					u8"%s\n\nなにもない\n\n%s %s\n%s ボス戦へ（デバッグ）\n\n[方向キー / 左スティック] 選択  [A / Enter / Space] 決定",
+					overlayTitle,
+					(optionIndex == 0) ? u8">" : u8" ",
+					continueLabel,
+					(optionIndex == 1) ? u8">" : u8" ");
 			}
 			else
 			{
 				sprintf_s(
 					upgradeHud,
-					u8"ステージクリア報酬\n\nなにもない\n\n[Enter / F / Space] でリザルトへ");
+					u8"%s\n\nなにもない\n\n%s %s\n\n[方向キー / 左スティック] 選択  [A / Enter / Space] 決定",
+					overlayTitle,
+					(optionIndex == 0) ? u8">" : u8" ",
+					continueLabel);
 			}
 		}
 		else
@@ -148,10 +443,12 @@ namespace
 			{
 				sprintf_s(
 					upgradeHud,
-					u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d\n[B] ボス戦へ（デバッグ）",
-					l0, d0,
-					l1, d1,
-					l2, d2,
+					u8"%s: 1つ選択\n\n%s %s\n    %s\n%s %s\n    %s\n%s %s\n    %s\n%s ボス戦へ（デバッグ）\n\n[方向キー / 左スティック] 選択  [A / Enter / Space] 決定\n[R / Y] リロール: 残り %d / %d",
+					overlayTitle,
+					(optionIndex == 0) ? u8">" : u8" ", l0, d0,
+					(optionIndex == 1) ? u8">" : u8" ", l1, d1,
+					(optionIndex == 2) ? u8">" : u8" ", l2, d2,
+					(optionIndex == 3) ? u8">" : u8" ",
 					tran.roguelike.rerollRemain,
 					tran.roguelike.rerollMaxPerStage);
 			}
@@ -159,16 +456,341 @@ namespace
 			{
 				sprintf_s(
 					upgradeHud,
-					u8"ステージクリア報酬: 1つ選択\n\n[1] %s\n    %s\n[2] %s\n    %s\n[3] %s\n    %s\n\n[R] リロール: 残り %d / %d",
-					l0, d0,
-					l1, d1,
-					l2, d2,
+					u8"%s: 1つ選択\n\n%s %s\n    %s\n%s %s\n    %s\n%s %s\n    %s\n\n[方向キー / 左スティック] 選択  [A / Enter / Space] 決定\n[R / Y] リロール: 残り %d / %d",
+					overlayTitle,
+					(optionIndex == 0) ? u8">" : u8" ", l0, d0,
+					(optionIndex == 1) ? u8">" : u8" ", l1, d1,
+					(optionIndex == 2) ? u8">" : u8" ", l2, d2,
 					tran.roguelike.rerollRemain,
 					tran.roguelike.rerollMaxPerStage);
 			}
 		}
 
 		DrawCenteredOverlayText(upgradeHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+	}
+
+	enum EngineEditorNode
+	{
+		EngineEditorNode_None = -1,
+		EngineEditorNode_Body = 0,
+		EngineEditorNode_ArmRight1,
+		EngineEditorNode_ArmRight2,
+		EngineEditorNode_ArmLeft1,
+		EngineEditorNode_ArmLeft2,
+		EngineEditorNode_LegRight1,
+		EngineEditorNode_LegRight2,
+		EngineEditorNode_LegLeft1,
+		EngineEditorNode_LegLeft2,
+	};
+
+	bool IsEngineEditorScene(SceneManager::SceneType sceneType)
+	{
+		return sceneType == SceneManager::SceneType::SCENE_ENGINE_EDITOR;
+	}
+
+	RenderTarget* g_pEngineEditorRT = nullptr;
+	DepthStencil* g_pEngineEditorDS = nullptr;
+	UINT g_engineEditorRTWidth = 0;
+	UINT g_engineEditorRTHeight = 0;
+	UINT g_engineEditorRequestWidth = 640;
+	UINT g_engineEditorRequestHeight = 360;
+
+	void ReleaseEngineEditorRenderTargets()
+	{
+		SAFE_DELETE(g_pEngineEditorDS);
+		SAFE_DELETE(g_pEngineEditorRT);
+		g_engineEditorRTWidth = 0;
+		g_engineEditorRTHeight = 0;
+	}
+
+	bool EnsureEngineEditorRenderTarget(UINT width, UINT height)
+	{
+		if (width < 16 || height < 16) return false;
+		if (g_pEngineEditorRT &&
+			g_pEngineEditorDS &&
+			g_engineEditorRTWidth == width &&
+			g_engineEditorRTHeight == height)
+		{
+			return true;
+		}
+
+		ReleaseEngineEditorRenderTargets();
+		g_pEngineEditorRT = new RenderTarget();
+		if (FAILED(g_pEngineEditorRT->Create(DXGI_FORMAT_R8G8B8A8_UNORM, width, height)))
+		{
+			ReleaseEngineEditorRenderTargets();
+			return false;
+		}
+
+		g_pEngineEditorDS = new DepthStencil();
+		if (FAILED(g_pEngineEditorDS->Create(width, height, false)))
+		{
+			ReleaseEngineEditorRenderTargets();
+			return false;
+		}
+
+		g_engineEditorRTWidth = width;
+		g_engineEditorRTHeight = height;
+		return true;
+	}
+
+	const char* GetEngineEditorNodeName(int node)
+	{
+		switch (node)
+		{
+		case EngineEditorNode_Body: return u8"Body";
+		case EngineEditorNode_ArmRight1: return u8"RightArm1";
+		case EngineEditorNode_ArmRight2: return u8"RightArm2";
+		case EngineEditorNode_ArmLeft1: return u8"LeftArm1";
+		case EngineEditorNode_ArmLeft2: return u8"LeftArm2";
+		case EngineEditorNode_LegRight1: return u8"RightLeg1";
+		case EngineEditorNode_LegRight2: return u8"RightLeg2";
+		case EngineEditorNode_LegLeft1: return u8"LeftLeg1";
+		case EngineEditorNode_LegLeft2: return u8"LeftLeg2";
+		default: return u8"(None)";
+		}
+	}
+
+	void DrawEngineEditorHierarchyWindow(int& selectedNode)
+	{
+		if (!ImGui::Begin(u8"ヒエラルキー"))
+		{
+			ImGui::End();
+			return;
+		}
+
+		ImGui::TextDisabled(u8"SCENE_ENGINE_EDITOR");
+		const ImGuiTreeNodeFlags rootFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow;
+		if (ImGui::TreeNodeEx("CharacterRoot", rootFlags))
+		{
+			const ImGuiTreeNodeFlags leafBase = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+			auto drawLeaf = [&](int node, const char* label)
+			{
+				ImGuiTreeNodeFlags flags = leafBase;
+				if (selectedNode == node) flags |= ImGuiTreeNodeFlags_Selected;
+				ImGui::TreeNodeEx(label, flags);
+				if (ImGui::IsItemClicked())
+				{
+					selectedNode = node;
+				}
+			};
+
+			drawLeaf(EngineEditorNode_Body, u8"Body");
+
+			if (ImGui::TreeNode(u8"Arms"))
+			{
+				drawLeaf(EngineEditorNode_ArmRight1, u8"RightArm1");
+				drawLeaf(EngineEditorNode_ArmRight2, u8"RightArm2");
+				drawLeaf(EngineEditorNode_ArmLeft1, u8"LeftArm1");
+				drawLeaf(EngineEditorNode_ArmLeft2, u8"LeftArm2");
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNode(u8"Legs"))
+			{
+				drawLeaf(EngineEditorNode_LegRight1, u8"RightLeg1");
+				drawLeaf(EngineEditorNode_LegRight2, u8"RightLeg2");
+				drawLeaf(EngineEditorNode_LegLeft1, u8"LeftLeg1");
+				drawLeaf(EngineEditorNode_LegLeft2, u8"LeftLeg2");
+				ImGui::TreePop();
+			}
+
+			ImGui::TreePop();
+		}
+
+		ImGui::End();
+	}
+
+	void DrawEngineEditorInspectorWindow(Transfer& tran, int selectedNode)
+	{
+		if (!ImGui::Begin(u8"インスペクタ"))
+		{
+			ImGui::End();
+			return;
+		}
+
+		ImGui::Text(u8"選択中: %s", GetEngineEditorNodeName(selectedNode));
+		ImGui::Separator();
+
+		switch (selectedNode)
+		{
+		case EngineEditorNode_Body:
+			ImGui::DragFloat3(u8"位置##body_pos", reinterpret_cast<float*>(&tran.modelediter.body.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##body_size", reinterpret_cast<float*>(&tran.modelediter.body.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##body_rot", reinterpret_cast<float*>(&tran.modelediter.body.angle), 0.05f);
+			ImGui::SeparatorText(u8"ジョイント");
+			ImGui::DragFloat3(u8"右腕##joint_ra", reinterpret_cast<float*>(&tran.modelediter.body.jointRightArmPos), 0.05f);
+			ImGui::DragFloat3(u8"左腕##joint_la", reinterpret_cast<float*>(&tran.modelediter.body.jointLeftArmPos), 0.05f);
+			ImGui::DragFloat3(u8"右脚##joint_rl", reinterpret_cast<float*>(&tran.modelediter.body.jointRightLegPos), 0.05f);
+			ImGui::DragFloat3(u8"左脚##joint_ll", reinterpret_cast<float*>(&tran.modelediter.body.jointLeftLegPos), 0.05f);
+			break;
+		case EngineEditorNode_ArmRight1:
+			ImGui::DragFloat3(u8"角度##ra1_sub", reinterpret_cast<float*>(&tran.modelediter.armRight1.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##ra1_pos", reinterpret_cast<float*>(&tran.modelediter.armRight1.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##ra1_size", reinterpret_cast<float*>(&tran.modelediter.armRight1.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##ra1_rot", reinterpret_cast<float*>(&tran.modelediter.armRight1.rotate), 0.05f);
+			break;
+		case EngineEditorNode_ArmRight2:
+			ImGui::DragFloat3(u8"角度##ra2_sub", reinterpret_cast<float*>(&tran.modelediter.armRight2.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##ra2_pos", reinterpret_cast<float*>(&tran.modelediter.armRight2.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##ra2_size", reinterpret_cast<float*>(&tran.modelediter.armRight2.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##ra2_rot", reinterpret_cast<float*>(&tran.modelediter.armRight2.rotate), 0.05f);
+			break;
+		case EngineEditorNode_ArmLeft1:
+			ImGui::DragFloat3(u8"角度##la1_sub", reinterpret_cast<float*>(&tran.modelediter.armLeft1.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##la1_pos", reinterpret_cast<float*>(&tran.modelediter.armLeft1.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##la1_size", reinterpret_cast<float*>(&tran.modelediter.armLeft1.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##la1_rot", reinterpret_cast<float*>(&tran.modelediter.armLeft1.rotate), 0.05f);
+			break;
+		case EngineEditorNode_ArmLeft2:
+			ImGui::DragFloat3(u8"角度##la2_sub", reinterpret_cast<float*>(&tran.modelediter.armLeft2.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##la2_pos", reinterpret_cast<float*>(&tran.modelediter.armLeft2.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##la2_size", reinterpret_cast<float*>(&tran.modelediter.armLeft2.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##la2_rot", reinterpret_cast<float*>(&tran.modelediter.armLeft2.rotate), 0.05f);
+			break;
+		case EngineEditorNode_LegRight1:
+			ImGui::DragFloat3(u8"角度##rl1_sub", reinterpret_cast<float*>(&tran.modelediter.legRight1.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##rl1_pos", reinterpret_cast<float*>(&tran.modelediter.legRight1.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##rl1_size", reinterpret_cast<float*>(&tran.modelediter.legRight1.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##rl1_rot", reinterpret_cast<float*>(&tran.modelediter.legRight1.rotate), 0.05f);
+			break;
+		case EngineEditorNode_LegRight2:
+			ImGui::DragFloat3(u8"角度##rl2_sub", reinterpret_cast<float*>(&tran.modelediter.legRight2.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##rl2_pos", reinterpret_cast<float*>(&tran.modelediter.legRight2.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##rl2_size", reinterpret_cast<float*>(&tran.modelediter.legRight2.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##rl2_rot", reinterpret_cast<float*>(&tran.modelediter.legRight2.rotate), 0.05f);
+			break;
+		case EngineEditorNode_LegLeft1:
+			ImGui::DragFloat3(u8"角度##ll1_sub", reinterpret_cast<float*>(&tran.modelediter.legLeft1.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##ll1_pos", reinterpret_cast<float*>(&tran.modelediter.legLeft1.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##ll1_size", reinterpret_cast<float*>(&tran.modelediter.legLeft1.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##ll1_rot", reinterpret_cast<float*>(&tran.modelediter.legLeft1.rotate), 0.05f);
+			break;
+		case EngineEditorNode_LegLeft2:
+			ImGui::DragFloat3(u8"角度##ll2_sub", reinterpret_cast<float*>(&tran.modelediter.legLeft2.subAngle), 0.05f);
+			ImGui::DragFloat3(u8"位置##ll2_pos", reinterpret_cast<float*>(&tran.modelediter.legLeft2.pos), 0.05f);
+			ImGui::DragFloat3(u8"サイズ##ll2_size", reinterpret_cast<float*>(&tran.modelediter.legLeft2.size), 0.05f);
+			ImGui::DragFloat3(u8"回転##ll2_rot", reinterpret_cast<float*>(&tran.modelediter.legLeft2.rotate), 0.05f);
+			break;
+		default:
+			ImGui::TextDisabled(u8"ヒエラルキーからオブジェクトを選択してください。");
+			break;
+		}
+
+		ImGui::End();
+	}
+
+	void DrawEngineEditorCameraWindow(Transfer& tran)
+	{
+		if (!ImGui::Begin(u8"カメラ"))
+		{
+			ImGui::End();
+			return;
+		}
+
+		const char* cameraModes[] = { u8"ゲーム", u8"デバッグ" };
+		int mode = tran.cameraMode;
+		if (ImGui::Combo(u8"モード", &mode, cameraModes, IM_ARRAYSIZE(cameraModes)))
+		{
+			tran.cameraMode = mode;
+		}
+
+		const char* activeLabel = (tran.cameraMode == 1) ? u8"デバッグ" : u8"ゲーム";
+		ImGui::Text(u8"現在アクティブ: %s", activeLabel);
+		ImGui::SeparatorText(u8"ゲームカメラ");
+		ImGui::DragFloat3(u8"Eye##camera_game_eye", reinterpret_cast<float*>(&tran.cameraGame.eye), 0.05f);
+		ImGui::DragFloat3(u8"Look##camera_game_look", reinterpret_cast<float*>(&tran.cameraGame.look), 0.05f);
+		ImGui::SeparatorText(u8"デバッグカメラ");
+		ImGui::DragFloat3(u8"Eye##camera_debug_eye", reinterpret_cast<float*>(&tran.cameraDebug.eye), 0.05f);
+		ImGui::DragFloat3(u8"Look##camera_debug_look", reinterpret_cast<float*>(&tran.cameraDebug.look), 0.05f);
+
+		ImGui::End();
+	}
+
+	void DrawEngineEditorSceneViewWindow(Transfer& tran)
+	{
+		if (!ImGui::Begin(u8"シーンビュー（カメラ）"))
+		{
+			ImGui::End();
+			return;
+		}
+
+		auto drawModeButton = [&](const char* label, int mode)
+		{
+			const bool selected = (tran.cameraMode == mode);
+			if (selected)
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(56, 120, 200, 255));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(72, 140, 224, 255));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(44, 102, 178, 255));
+			}
+			if (ImGui::Button(label, ImVec2(92.0f, 0.0f)))
+			{
+				tran.cameraMode = mode;
+			}
+			if (selected)
+			{
+				ImGui::PopStyleColor(3);
+			}
+		};
+
+		drawModeButton("Game", 0);
+		ImGui::SameLine();
+		drawModeButton("Debug", 1);
+		ImGui::Separator();
+
+		ImVec2 area = ImGui::GetContentRegionAvail();
+		if (area.x < 240.0f) area.x = 240.0f;
+		if (area.y < 160.0f) area.y = 160.0f;
+		g_engineEditorRequestWidth = static_cast<UINT>(area.x);
+		g_engineEditorRequestHeight = static_cast<UINT>(area.y);
+
+		const bool targetReady = EnsureEngineEditorRenderTarget(g_engineEditorRequestWidth, g_engineEditorRequestHeight);
+		if (targetReady && g_pEngineEditorRT && g_pEngineEditorRT->GetResource())
+		{
+			ImGui::Image(reinterpret_cast<ImTextureID>(g_pEngineEditorRT->GetResource()), area);
+		}
+		else
+		{
+			const ImVec2 topLeft = ImGui::GetCursorScreenPos();
+			ImGui::InvisibleButton("##scene_view_dummy", area);
+			ImDrawList* drawList = ImGui::GetWindowDrawList();
+			const ImVec2 bottomRight(topLeft.x + area.x, topLeft.y + area.y);
+			drawList->AddRectFilled(topLeft, bottomRight, IM_COL32(16, 24, 32, 255), 4.0f);
+			drawList->AddRect(topLeft, bottomRight, IM_COL32(120, 160, 200, 255), 4.0f);
+			drawList->AddText(ImVec2(topLeft.x + 12.0f, topLeft.y + 12.0f), IM_COL32(220, 235, 255, 255), u8"Camera View");
+		}
+
+		ImGui::End();
+	}
+
+	void DrawEngineEditorWindows(Transfer& tran)
+	{
+		if (!IsEngineEditorScene(SceneManager::GetCurrent())) return;
+
+		static int selectedNode = EngineEditorNode_Body;
+		DrawEngineEditorHierarchyWindow(selectedNode);
+		DrawEngineEditorInspectorWindow(tran, selectedNode);
+		DrawEngineEditorCameraWindow(tran);
+		DrawEngineEditorSceneViewWindow(tran);
+	}
+
+	void DrawSceneToEngineEditorRenderTarget()
+	{
+		if (!IsEngineEditorScene(SceneManager::GetCurrent())) return;
+		if (!EnsureEngineEditorRenderTarget(g_engineEditorRequestWidth, g_engineEditorRequestHeight)) return;
+		if (!g_pEngineEditorRT || !g_pEngineEditorDS) return;
+
+		RenderTarget* previewTarget[1] = { g_pEngineEditorRT };
+		SetRenderTargets(1, previewTarget, g_pEngineEditorDS);
+		const float clearColor[4] = { 0.08f, 0.10f, 0.12f, 1.0f };
+		g_pEngineEditorRT->Clear(clearColor);
+		g_pEngineEditorDS->Clear();
+
+		SceneManager::Draw();
+
+		RenderTarget* defaultTarget[1] = { GetDefaultRTV() };
+		SetRenderTargets(1, defaultTarget, GetDefaultDSV());
 	}
 
 }
@@ -218,6 +840,7 @@ void Uninit()
 	UninitInput();
 	Sprite::Uninit();
 	Geometory::Uninit();
+	ReleaseEngineEditorRenderTargets();
 	UninitSound();
 	UninitDirectX();
 
@@ -309,6 +932,9 @@ void Draw()
 		case SceneManager::SceneType::SCENE_3DEDITOR:
 			sceneTxt = u8"3Dエディタ";
 			break;
+		case SceneManager::SceneType::SCENE_ENGINE_EDITOR:
+			sceneTxt = u8"エンジンエディタ";
+			break;
 		default:
 			sceneTxt = u8"不明";
 			break;
@@ -346,7 +972,7 @@ void Draw()
 				DragFloat(u8"攻撃半径倍率", &tran.gameplay.attackSweepRadiusScale, 0.01f, 0.1f, 3.0f);
 				DragFloat(u8"攻撃幅倍率", &tran.gameplay.attackWidthScale, 0.01f, 0.1f, 3.0f);
 				DragFloat(u8"攻撃奥行倍率", &tran.gameplay.attackDepthScale, 0.01f, 0.1f, 3.0f);
-				DragFloat(u8"ヒットストップ", &tran.gameplay.attackHitStop, 0.001f, 0.0f, 0.20f);
+				DragFloat(u8"プレイヤー攻撃ヒットストップ", &tran.gameplay.attackHitStop, 0.001f, 0.0f, 0.20f);
 				DragFloat(u8"ノックバック", &tran.gameplay.attackKnockback, 0.01f, 0.0f, 3.0f);
 				DragFloat(u8"ヒット発光", &tran.gameplay.attackHitFlash, 0.005f, 0.0f, 0.50f);
 				ImGui::TextDisabled(u8"初期値: 軌跡間隔0.02 / 軌跡残存0.16 / 軌跡倍率0.75");
@@ -415,6 +1041,9 @@ void Draw()
 				DragFloat(u8"ボス攻撃CT", &tran.gameplay.bossAttackCooldown, 0.01f, 0.0f, 6.0f);
 				DragFloat(u8"予兆幅(プレイヤー比)", &tran.gameplay.bossAttackLanePlayerScale, 0.05f, 0.5f, 8.0f);
 				DragFloat(u8"ボス攻撃ダメージ", &tran.gameplay.bossAttackDamage, 0.1f, 0.0f, 200.0f);
+				DragFloat(u8"ボス攻撃被弾ヒットストップ", &tran.gameplay.bossAttackHitStop, 0.001f, 0.0f, 0.20f);
+				DragFloat(u8"ボス被弾 画面揺れ時間", &tran.gameplay.bossHitShakeDuration, 0.005f, 0.0f, 1.0f);
+				DragFloat(u8"ボス被弾 画面揺れ強さ", &tran.gameplay.bossHitShakeAmplitude, 0.01f, 0.0f, 1.0f);
 				DragFloat(u8"Breakゲージ 初期最大", &tran.gameplay.bossGuardInitialMax, 0.1f, 1.0f, 200.0f);
 				DragFloat(u8"Breakゲージ 最終最大", &tran.gameplay.bossGuardFinalMax, 0.1f, 1.0f, 200.0f);
 				DragFloat(u8"Break回復毎 上限上昇量", &tran.gameplay.bossGuardRecoverStep, 0.1f, 0.0f, 50.0f);
@@ -524,10 +1153,41 @@ void Draw()
 				ImGui::Text(u8"回避CT進捗: %.2f", tran.gameplayDebug.cooldownRateEvade);
 				ImGui::Text(u8"スキル1CT進捗: %.2f", tran.gameplayDebug.cooldownRateSkill1);
 				ImGui::Text(u8"スキル2CT進捗: %.2f", tran.gameplayDebug.cooldownRateSkill2);
+				ImGui::Text(
+					u8"装備スキル: Q=%s / E=%s",
+					GetSkillNameByType(tran.roguelike.skillSlot1),
+					GetSkillNameByType(tran.roguelike.skillSlot2));
 				ImGui::Text(u8"回避中: %s", tran.gameplayDebug.playerEvading ? u8"はい" : u8"いいえ");
 				ImGui::Text(u8"強化選択待ち: %d / リロール残り: %d", tran.gameplayDebug.upgradeSelectionPending, tran.gameplayDebug.upgradeRerollRemain);
 				ImGui::Text(u8"タイマー: %.2f sec (記録 %.2f sec / 稼働 %d)", tran.gameplayDebug.runElapsedSec, tran.gameplayDebug.runRecordedSec, tran.gameplayDebug.runTimerRunning);
 				ImGui::Text(u8"ボスデバッグ戦: %s", tran.gameplayDebug.bossBattleActive ? u8"ON" : u8"OFF");
+				ImGui::SeparatorText(u8"HP直接操作");
+				DragFloat(u8"プレイヤー現在HP", &tran.player.hp, 0.1f, 0.0f, 9999.0f);
+				DragFloat(u8"プレイヤー最大HP", &tran.player.maxHp, 0.1f, 1.0f, 9999.0f);
+				if (tran.player.hp < 0.0f) tran.player.hp = 0.0f;
+				if (tran.player.maxHp < 1.0f) tran.player.maxHp = 1.0f;
+				if (tran.player.hp > tran.player.maxHp) tran.player.hp = tran.player.maxHp;
+				if (tran.gameplayDebug.bossBattleActive != 0 && tran.gameplayDebug.bossMaxHp > 0.0f)
+				{
+					int bossHpEdit = static_cast<int>(tran.gameplayDebug.bossHp);
+					int bossMaxHpEdit = static_cast<int>(tran.gameplayDebug.bossMaxHp);
+					bool bossHpEdited = false;
+					bossHpEdited |= ImGui::DragInt(u8"ボス現在HP", &bossHpEdit, 1.0f, 0, 9999);
+					bossHpEdited |= ImGui::DragInt(u8"ボス最大HP(実体)", &bossMaxHpEdit, 1.0f, 1, 9999);
+					if (bossHpEdit < 0) bossHpEdit = 0;
+					if (bossMaxHpEdit < 1) bossMaxHpEdit = 1;
+					if (bossHpEdit > bossMaxHpEdit) bossHpEdit = bossMaxHpEdit;
+					if (bossHpEdited)
+					{
+						tran.gameplayDebug.bossHpEditValue = bossHpEdit;
+						tran.gameplayDebug.bossMaxHpEditValue = bossMaxHpEdit;
+						tran.gameplayDebug.bossHpEditRequest = 1;
+					}
+				}
+				else
+				{
+					ImGui::TextDisabled(u8"ボスHP編集はボス戦中のみ有効");
+				}
 				ImGui::TextDisabled(u8"ゲーム進行: 敵全滅で次Wave、最終Wave全滅で勝利");
 				ImGui::TextDisabled(u8"敵タイプ差: 遠距離型は予兆後に敵弾を発射");
 				ImGui::TextDisabled(u8"敵AABB色: 赤=被弾 / 橙=予兆 / 黄=攻撃可能");
@@ -637,6 +1297,76 @@ void Draw()
 				ImGui::Text(u8"攻撃ダメージ: %d", tran.gameplayDebug.playerAttackDamage);
 				ImGui::Text(u8"攻撃CT倍率: %.2f", tran.gameplayDebug.playerAttackCooldownScale);
 				ImGui::Text(u8"回避CT倍率: %.2f", tran.gameplayDebug.playerEvadeCooldownScale);
+				ImGui::SeparatorText(u8"スキル強化の現在値");
+				ImGui::Text(
+					u8"遠距離: 範囲Lv.%d=%.2f倍 / 威力Lv.%d=%.2f倍 / CTLv.%d=-%.2f秒",
+					tran.roguelike.skillShotRangeLevel,
+					tran.GetSkillRangeScaleByLevel(tran.roguelike.skillShotRangeLevel),
+					tran.roguelike.skillShotPowerLevel,
+					tran.GetSkillDamageScaleByLevel(tran.roguelike.skillShotPowerLevel),
+					tran.roguelike.skillShotCooldownLevel,
+					tran.GetSkillCooldownReductionByLevel(tran.roguelike.skillShotCooldownLevel));
+				ImGui::Text(
+					u8"近接: 範囲Lv.%d=%.2f倍 / 威力Lv.%d=%.2f倍 / CTLv.%d=-%.2f秒",
+					tran.roguelike.skillNovaRangeLevel,
+					tran.GetSkillRangeScaleByLevel(tran.roguelike.skillNovaRangeLevel),
+					tran.roguelike.skillNovaPowerLevel,
+					tran.GetSkillDamageScaleByLevel(tran.roguelike.skillNovaPowerLevel),
+					tran.roguelike.skillNovaCooldownLevel,
+					tran.GetSkillCooldownReductionByLevel(tran.roguelike.skillNovaCooldownLevel));
+				ImGui::Text(
+					u8"衛星: 範囲Lv.%d=%.2f倍 / CTLv.%d=-%.2f秒 / 生成Lv.%d=%d個 / 威力%.2f倍",
+					tran.roguelike.skillOrbitRangeLevel,
+					tran.GetSkillRangeScaleByLevel(tran.roguelike.skillOrbitRangeLevel),
+					tran.roguelike.skillOrbitCooldownLevel,
+					tran.GetSkillCooldownReductionByLevel(tran.roguelike.skillOrbitCooldownLevel),
+					tran.roguelike.skillOrbitCountLevel,
+					tran.GetOrbitCountByLevel(tran.roguelike.skillOrbitCountLevel),
+					tran.GetOrbitDamageScaleByCountLevel(tran.roguelike.skillOrbitCountLevel));
+				ImGui::SeparatorText(u8"所持スキルのLv調整(Debug)");
+				const int skillLevelMax = tran.GetSkillUpgradeLevelMax();
+				bool skillUpgradeEdited = false;
+				if (tran.roguelike.skillSlot1 == Transfer::RoguelikeUpgrade::SkillShot ||
+					tran.roguelike.skillSlot2 == Transfer::RoguelikeUpgrade::SkillShot)
+				{
+					ImGui::TextDisabled(u8"遠距離スキル");
+					skillUpgradeEdited |= DragInt(u8"遠距離 範囲Lv", &tran.roguelike.skillShotRangeLevel, 1.0f, 0, skillLevelMax);
+					skillUpgradeEdited |= DragInt(u8"遠距離 威力Lv", &tran.roguelike.skillShotPowerLevel, 1.0f, 0, skillLevelMax);
+					skillUpgradeEdited |= DragInt(u8"遠距離 CTLv", &tran.roguelike.skillShotCooldownLevel, 1.0f, 0, skillLevelMax);
+				}
+				if (tran.roguelike.skillSlot1 == Transfer::RoguelikeUpgrade::SkillNova ||
+					tran.roguelike.skillSlot2 == Transfer::RoguelikeUpgrade::SkillNova)
+				{
+					ImGui::TextDisabled(u8"近接スキル");
+					skillUpgradeEdited |= DragInt(u8"近接 範囲Lv", &tran.roguelike.skillNovaRangeLevel, 1.0f, 0, skillLevelMax);
+					skillUpgradeEdited |= DragInt(u8"近接 威力Lv", &tran.roguelike.skillNovaPowerLevel, 1.0f, 0, skillLevelMax);
+					skillUpgradeEdited |= DragInt(u8"近接 CTLv", &tran.roguelike.skillNovaCooldownLevel, 1.0f, 0, skillLevelMax);
+				}
+				if (tran.roguelike.skillSlot1 == Transfer::RoguelikeUpgrade::SkillOrbit ||
+					tran.roguelike.skillSlot2 == Transfer::RoguelikeUpgrade::SkillOrbit)
+				{
+					ImGui::TextDisabled(u8"衛星スキル");
+					skillUpgradeEdited |= DragInt(u8"衛星 範囲Lv", &tran.roguelike.skillOrbitRangeLevel, 1.0f, 0, skillLevelMax);
+					skillUpgradeEdited |= DragInt(u8"衛星 CTLv", &tran.roguelike.skillOrbitCooldownLevel, 1.0f, 0, skillLevelMax);
+					skillUpgradeEdited |= DragInt(u8"衛星 生成Lv", &tran.roguelike.skillOrbitCountLevel, 1.0f, 0, skillLevelMax);
+				}
+				if (tran.roguelike.skillSlot1 == Transfer::RoguelikeUpgrade::SkillNone &&
+					tran.roguelike.skillSlot2 == Transfer::RoguelikeUpgrade::SkillNone)
+				{
+					ImGui::TextDisabled(u8"所持中のスキルがないため、ここでは調整できません");
+				}
+				if (skillUpgradeEdited)
+				{
+					tran.roguelike.skillShotRangeLevel = tran.ClampUpgradeLevel(tran.roguelike.skillShotRangeLevel);
+					tran.roguelike.skillShotPowerLevel = tran.ClampUpgradeLevel(tran.roguelike.skillShotPowerLevel);
+					tran.roguelike.skillShotCooldownLevel = tran.ClampUpgradeLevel(tran.roguelike.skillShotCooldownLevel);
+					tran.roguelike.skillNovaRangeLevel = tran.ClampUpgradeLevel(tran.roguelike.skillNovaRangeLevel);
+					tran.roguelike.skillNovaPowerLevel = tran.ClampUpgradeLevel(tran.roguelike.skillNovaPowerLevel);
+					tran.roguelike.skillNovaCooldownLevel = tran.ClampUpgradeLevel(tran.roguelike.skillNovaCooldownLevel);
+					tran.roguelike.skillOrbitRangeLevel = tran.ClampUpgradeLevel(tran.roguelike.skillOrbitRangeLevel);
+					tran.roguelike.skillOrbitCooldownLevel = tran.ClampUpgradeLevel(tran.roguelike.skillOrbitCooldownLevel);
+					tran.roguelike.skillOrbitCountLevel = tran.ClampUpgradeLevel(tran.roguelike.skillOrbitCountLevel);
+				}
 				ImGui::Text(u8"強化選択待ち: %s", tran.roguelike.selectionPending ? u8"あり" : u8"なし");
 				ImGui::Text(u8"リロール残り: %d / %d", tran.roguelike.rerollRemain, tran.roguelike.rerollMaxPerStage);
 				ImGui::SeparatorText(u8"現在の候補");
@@ -880,6 +1610,10 @@ void Draw()
 					sceneTxt = u8"3Dエディタ";
 					changeScene = SceneManager::SceneType::SCENE_3DEDITOR;
 					break;
+				case 4:
+					sceneTxt = u8"エンジンエディタ";
+					changeScene = SceneManager::SceneType::SCENE_ENGINE_EDITOR;
+					break;
 				default:
 					sceneTxt = u8"不明";
 					break;
@@ -912,6 +1646,9 @@ void Draw()
 		Text(u8"FPS: %.1f", GetIO().Framerate);
 		End();
 	}	// -----------------------------
+
+	DrawEngineEditorWindows(tran);
+
 	// Debug Tools : Tables + DrawList
 	//   - Tables : 一覧/監視用
 	//   - DrawList : 画面上への簡易オーバーレイ
@@ -970,6 +1707,12 @@ void Draw()
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(name);
 					ImGui::TableSetColumnIndex(1); ImGui::Text("%d", v);
+				};
+			auto row_s1 = [](const char* name, const char* v)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(name);
+					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(v ? v : "-");
 				};
 			// Transfer の中身を例として監視
 			row_f3(u8"プレイヤー位置", tran.player.pos);
@@ -1046,6 +1789,7 @@ void Draw()
 			row_i1(u8"ボスデバッグ戦中", tran.gameplayDebug.bossBattleActive);
 			row_f1(u8"ボスHP", tran.gameplayDebug.bossHp);
 			row_f1(u8"ボス最大HP", tran.gameplayDebug.bossMaxHp);
+			row_s1(u8"カーソル対象", tran.gameplayDebug.cursorHoverTarget);
 			char debugOffer0[64]{}, debugOffer1[64]{}, debugOffer2[64]{};
 			FormatUpgradeLabel(tran, tran.gameplayDebug.upgradeOffer0, debugOffer0, sizeof(debugOffer0));
 			FormatUpgradeLabel(tran, tran.gameplayDebug.upgradeOffer1, debugOffer1, sizeof(debugOffer1));
@@ -1065,77 +1809,24 @@ void Draw()
 
 		ImGui::Spacing();
 
-		// 2) Dice face number のテーブル（小テーブル）
-		if (ImGui::CollapsingHeader(u8"サイコロ面（表）", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader(u8"ステータス強化（表）", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGuiTableFlags f2 =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_SizingFixedFit;
-
-			if (ImGui::BeginTable("##faces", MAX_DICE, f2))
-			{
-				for (int c = 0; c < MAX_DICE; ++c)
-				{
-					char buf[32];
-					sprintf_s(buf, "D%d", c);
-					ImGui::TableSetupColumn(buf);
-				}
-				ImGui::TableHeadersRow();
-
-				ImGui::TableNextRow();
-				for (int c = 0; c < MAX_DICE; ++c)
-				{
-					ImGui::TableSetColumnIndex(c);
-					ImGui::Text("%d", tran.dice.currentFaceNumber[c]);
-				}
-
-				ImGui::EndTable();
-			}
+			ImGui::TextDisabled(u8"左2列固定。幅が足りない場合は横スクロール");
+			DrawStatusUpgradeValueTable(tran);
+		}
+		if (ImGui::CollapsingHeader(u8"スキル強化（表）", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::TextDisabled(u8"左2列固定。列は Lv1 から Lv10 の強化段階");
+			DrawSkillUpgradeValueTable(tran);
 		}
 
 		ImGui::End();
 	}
 
-	// ゲーム中は常時HUDを表示（Wave / 残り敵数 / クリア条件）
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_GAME)
 	{
 		ImGuiViewport* vp = ImGui::GetMainViewport();
 		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
-		const char* difficultyText = u8"Normal";
-		switch (tran.gameplayDebug.difficultyPreset)
-		{
-		case 0: difficultyText = u8"Easy"; break;
-		case 2: difficultyText = u8"Hard"; break;
-		default: difficultyText = u8"Normal"; break;
-		}
-
-		char timeText[32]{};
-		formatRunTime(tran.gameplayDebug.runElapsedSec, timeText, sizeof(timeText));
-		char gameplayHud[384];
-		sprintf_s(
-			gameplayHud,
-			u8"難易度: %s\nタイム: %s\n現在Wave: %d / %d\n残り敵数: %d / %d\n強化: 攻撃Lv%d / 攻撃頻度Lv%d / 回避Lv%d\nクリア条件: 最終Waveで敵を全滅%s",
-			difficultyText,
-			timeText,
-			tran.gameplayDebug.currentWave,
-			tran.gameplayDebug.maxWave,
-			tran.gameplayDebug.enemiesAlive,
-			tran.gameplayDebug.enemiesTarget,
-			tran.gameplayDebug.attackPowerLevel,
-			tran.gameplayDebug.attackSpeedLevel,
-			tran.gameplayDebug.evadeCooldownLevel,
-			tran.gameplayDebug.bossBattleActive ? u8"\nボスデバッグ戦: Enterでリザルトへ" : u8"");
-
-		const ImVec2 pad(10.0f, 8.0f);
-		const ImVec2 textSize = ImGui::CalcTextSize(gameplayHud);
-		const ImVec2 boxMin(vp->Pos.x + 12.0f, vp->Pos.y + 56.0f);
-		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
-
-		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 6.0f);
-		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 6.0f);
-		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), gameplayHud);
-
 		if (tran.gameplayDebug.bossBattleActive != 0 && tran.gameplayDebug.bossMaxHp > 0.0f)
 		{
 			float widthRate = tran.gameplay.bossHpBarWidthRate;
@@ -1222,9 +1913,11 @@ void Draw()
 			: (tran.gameplayDebug.pauseMenuButtonScale > 2.5f ? 2.5f : tran.gameplayDebug.pauseMenuButtonScale);
 		ImGuiViewport* vp = ImGui::GetMainViewport();
 		const bool pauseOptionOpen = (tran.gameplayDebug.pauseOptionOpen != 0);
+		const int selectedTab = (tran.gameplayDebug.pauseTabIndex < 0) ? 0
+			: (tran.gameplayDebug.pauseTabIndex > 2 ? 2 : tran.gameplayDebug.pauseTabIndex);
 		const ImVec2 windowSize = pauseOptionOpen
-			? ImVec2(560.0f * uiScale, 440.0f * uiScale)
-			: ImVec2(500.0f * uiScale, 390.0f * uiScale);
+			? ImVec2(700.0f * uiScale, 520.0f * uiScale)
+			: ImVec2(640.0f * uiScale, 500.0f * uiScale);
 		const ImVec2 windowPos(vp->Pos.x + (vp->Size.x - windowSize.x) * 0.5f,
 							   vp->Pos.y + (vp->Size.y - windowSize.y) * 0.5f);
 		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
@@ -1238,89 +1931,182 @@ void Draw()
 					 ImGuiWindowFlags_NoMove |
 					 ImGuiWindowFlags_NoDocking);
 		ImGui::SetWindowFontScale(fontScale);
-		if (pauseOptionOpen)
+		ImGui::TextUnformatted(u8"ポーズ");
+		ImGui::Separator();
+		if (ImGui::BeginTabBar("##pause_tabs", ImGuiTabBarFlags_FittingPolicyShrink))
 		{
-			const int selected = tran.gameplayDebug.pauseOptionSelection;
-			const bool isFullscreen = IsAppFullscreen();
-			ImGui::TextUnformatted(u8"ポーズ - Option");
-			const float closeButtonWidth = 88.0f * uiScale;
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - closeButtonWidth);
-			if (ImGui::Button("Close##pause_option_close", ImVec2(closeButtonWidth, 0.0f)))
+			if (ImGui::BeginTabItem(u8"ゲーム", nullptr, (selectedTab == 0) ? ImGuiTabItemFlags_SetSelected : 0))
 			{
-				tran.gameplayDebug.pauseOptionRequestClose = 1;
-			}
-			ImGui::Separator();
-			const char* selectedLabel = u8"Master";
-			switch (selected)
-			{
-			case 1: selectedLabel = u8"BGM"; break;
-			case 2: selectedLabel = u8"SE"; break;
-			case 3: selectedLabel = u8"表示"; break;
-			case 4: selectedLabel = u8"戻る"; break;
-			default: break;
-			}
-			ImGui::Text(u8"選択中: %s", selectedLabel);
+				tran.gameplayDebug.pauseTabIndex = 0;
+				const char* difficultyText = GetDifficultyName(tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset));
+				const int enemiesAlive = (tran.gameplayDebug.enemiesAlive < 0) ? 0 : tran.gameplayDebug.enemiesAlive;
+				const int enemiesTarget = (tran.gameplayDebug.enemiesTarget < 0) ? 0 : tran.gameplayDebug.enemiesTarget;
+				int defeated = enemiesTarget - enemiesAlive;
+				if (defeated < 0) defeated = 0;
+				if (defeated > enemiesTarget) defeated = enemiesTarget;
+				const float defeatRate = (enemiesTarget > 0)
+					? (static_cast<float>(defeated) / static_cast<float>(enemiesTarget)) * 100.0f
+					: 0.0f;
 
-			float master = tran.gameplay.volumeMaster;
-			if (ImGui::SliderFloat(u8"Master", &master, 0.0f, 2.0f, "%.2f"))
-			{
-				tran.gameplay.volumeMaster = master;
-			}
-			float bgm = tran.gameplay.volumeBgm;
-			if (ImGui::SliderFloat(u8"BGM", &bgm, 0.0f, 2.0f, "%.2f"))
-			{
-				tran.gameplay.volumeBgm = bgm;
-			}
-			float se = tran.gameplay.volumeSe;
-			if (ImGui::SliderFloat(u8"SE", &se, 0.0f, 2.0f, "%.2f"))
-			{
-				tran.gameplay.volumeSe = se;
+				ImGui::Text(u8"現在Wave: %d / %d", tran.gameplayDebug.currentWave, tran.gameplayDebug.maxWave);
+				ImGui::Text(u8"難易度: %s", difficultyText);
+				ImGui::Text(u8"敵撃破率: %.0f%%", defeatRate);
+				if (tran.gameplayDebug.bossBattleActive != 0)
+				{
+					ImGui::Spacing();
+					ImGui::TextUnformatted(u8"現在はボス戦状態です。");
+				}
+				ImGui::Spacing();
+				ImGui::Separator();
+				ImGui::TextUnformatted(u8"タブ切替: 1 / 2 / 3");
+				ImGui::TextUnformatted(u8"コントローラー: LB / RB");
+				ImGui::TextUnformatted(u8"閉じる: Esc");
+				ImGui::EndTabItem();
 			}
 
-			bool fullscreenChecked = isFullscreen;
-			bool windowChecked = !isFullscreen;
-			if (ImGui::Checkbox(u8"Fullscreen", &fullscreenChecked))
+			if (ImGui::BeginTabItem(u8"強化状態", nullptr, (selectedTab == 1) ? ImGuiTabItemFlags_SetSelected : 0))
 			{
-				SetAppFullscreen(fullscreenChecked);
+				tran.gameplayDebug.pauseTabIndex = 1;
+				ImGui::Text(u8"攻撃Lv: %d", tran.roguelike.attackPowerLevel);
+				ImGui::Text(u8"攻撃頻度Lv: %d", tran.roguelike.attackSpeedLevel);
+				ImGui::Text(u8"回避Lv: %d", tran.roguelike.evadeCooldownLevel);
+				if (tran.roguelike.lastUpgradeType >= 0)
+				{
+					char lastUpgradeText[128]{};
+					FormatUpgradeLabel(tran, tran.roguelike.lastUpgradeType, lastUpgradeText, sizeof(lastUpgradeText));
+					ImGui::Text(u8"最終取得: %s", lastUpgradeText);
+				}
+
+				const auto drawSkillStatus = [&](const char* slotLabel, int skillType)
+				{
+					char detail[128]{};
+					switch (skillType)
+					{
+					case Transfer::RoguelikeUpgrade::SkillShot:
+						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / 威力Lv%d / CTLv%d",
+								  tran.roguelike.skillShotRangeLevel,
+								  tran.roguelike.skillShotPowerLevel,
+								  tran.roguelike.skillShotCooldownLevel);
+						break;
+					case Transfer::RoguelikeUpgrade::SkillNova:
+						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / 威力Lv%d / CTLv%d",
+								  tran.roguelike.skillNovaRangeLevel,
+								  tran.roguelike.skillNovaPowerLevel,
+								  tran.roguelike.skillNovaCooldownLevel);
+						break;
+					case Transfer::RoguelikeUpgrade::SkillOrbit:
+						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / CTLv%d / 個数Lv%d",
+								  tran.roguelike.skillOrbitRangeLevel,
+								  tran.roguelike.skillOrbitCooldownLevel,
+								  tran.roguelike.skillOrbitCountLevel);
+						break;
+					default:
+						sprintf_s(detail, sizeof(detail), "%s", u8"未取得");
+						break;
+					}
+
+					ImGui::SeparatorText(slotLabel);
+					ImGui::Text(u8"スキル: %s", GetSkillNameByType(skillType));
+					ImGui::TextUnformatted(detail);
+				};
+
+				drawSkillStatus("Q", tran.roguelike.skillSlot1);
+				drawSkillStatus("E", tran.roguelike.skillSlot2);
+				ImGui::EndTabItem();
 			}
-			ImGui::SameLine();
-			if (ImGui::Checkbox(u8"Window", &windowChecked))
+
+			if (ImGui::BeginTabItem(u8"設定", nullptr, (selectedTab == 2) ? ImGuiTabItemFlags_SetSelected : 0))
 			{
-				SetAppFullscreen(!windowChecked);
+				tran.gameplayDebug.pauseTabIndex = 2;
+				if (pauseOptionOpen)
+				{
+					const int selected = tran.gameplayDebug.pauseOptionSelection;
+					const bool isFullscreen = IsAppFullscreen();
+					const float closeButtonWidth = 88.0f * uiScale;
+					ImGui::TextUnformatted(u8"Option");
+					ImGui::SameLine();
+					ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - closeButtonWidth);
+					if (ImGui::Button("Close##pause_option_close", ImVec2(closeButtonWidth, 0.0f)))
+					{
+						tran.gameplayDebug.pauseOptionRequestClose = 1;
+					}
+					ImGui::Separator();
+
+					const char* selectedLabel = u8"Master";
+					switch (selected)
+					{
+					case 1: selectedLabel = u8"BGM"; break;
+					case 2: selectedLabel = u8"SE"; break;
+					case 3: selectedLabel = u8"表示"; break;
+					case 4: selectedLabel = u8"戻る"; break;
+					default: break;
+					}
+					ImGui::Text(u8"選択中: %s", selectedLabel);
+
+					float master = tran.gameplay.volumeMaster;
+					if (ImGui::SliderFloat(u8"Master", &master, 0.0f, 2.0f, "%.2f"))
+					{
+						tran.gameplay.volumeMaster = master;
+					}
+					float bgm = tran.gameplay.volumeBgm;
+					if (ImGui::SliderFloat(u8"BGM", &bgm, 0.0f, 2.0f, "%.2f"))
+					{
+						tran.gameplay.volumeBgm = bgm;
+					}
+					float se = tran.gameplay.volumeSe;
+					if (ImGui::SliderFloat(u8"SE", &se, 0.0f, 2.0f, "%.2f"))
+					{
+						tran.gameplay.volumeSe = se;
+					}
+
+					bool fullscreenChecked = isFullscreen;
+					bool windowChecked = !isFullscreen;
+					if (ImGui::Checkbox(u8"Fullscreen", &fullscreenChecked))
+					{
+						SetAppFullscreen(fullscreenChecked);
+					}
+					ImGui::SameLine();
+					if (ImGui::Checkbox(u8"Window", &windowChecked))
+					{
+						SetAppFullscreen(!windowChecked);
+					}
+					ImGui::Separator();
+					ImGui::TextUnformatted(u8"移動: W/S or ↑/↓");
+					ImGui::TextUnformatted(u8"変更: A/D or ←/→");
+					ImGui::TextUnformatted(u8"決定: Enter / F / Space");
+					ImGui::TextUnformatted(u8"戻る: Esc");
+				}
+				else
+				{
+					const int selected = tran.gameplayDebug.pauseMenuSelection;
+					ImGui::TextUnformatted(u8"設定項目");
+					ImGui::Separator();
+					ImGui::TextUnformatted(u8"選択: A/D W/S ←→↑↓");
+					ImGui::TextUnformatted(u8"決定: Enter / F / Space");
+					ImGui::TextUnformatted(u8"タブ切替: 1 / 2 / 3 or LB / RB");
+					const ImVec2 buttonSize(300.0f * uiScale * buttonScale, 62.0f * uiScale * buttonScale);
+					const auto drawMenuButton = [&](int index, const char* label, int request)
+					{
+						if (selected == index)
+						{
+							ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 120, 210, 230));
+						}
+						if (ImGui::Button(label, buttonSize))
+						{
+							tran.gameplayDebug.pauseMenuRequest = request;
+						}
+						if (selected == index)
+						{
+							ImGui::PopStyleColor();
+						}
+					};
+					drawMenuButton(0, u8"続行", 1);
+					drawMenuButton(1, u8"Option", 3);
+					drawMenuButton(2, u8"Titleへ", 2);
+				}
+				ImGui::EndTabItem();
 			}
-			ImGui::Separator();
-			ImGui::TextUnformatted(u8"移動: W/S  or  ↑/↓");
-			ImGui::TextUnformatted(u8"変更: A/D  or  ←/→");
-			ImGui::TextUnformatted(u8"決定: Enter / F / Space");
-			ImGui::TextUnformatted(u8"戻る: Esc");
-		}
-		else
-		{
-			const int selected = tran.gameplayDebug.pauseMenuSelection;
-			ImGui::TextUnformatted(u8"ポーズ");
-			ImGui::Separator();
-			ImGui::TextUnformatted(u8"選択: A/D W/S ←→↑↓");
-			ImGui::TextUnformatted(u8"決定: Enter / F / Space");
-			const ImVec2 buttonSize(280.0f * uiScale * buttonScale, 62.0f * uiScale * buttonScale);
-			const auto drawMenuButton = [&](int index, const char* label, int request)
-			{
-				if (selected == index)
-				{
-					ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 120, 210, 230));
-				}
-				if (ImGui::Button(label, buttonSize))
-				{
-					tran.gameplayDebug.pauseMenuRequest = request;
-				}
-				if (selected == index)
-				{
-					ImGui::PopStyleColor();
-				}
-			};
-			drawMenuButton(0, u8"続行", 1);
-			drawMenuButton(1, u8"Option", 3);
-			drawMenuButton(2, u8"Titleに戻る", 2);
+			ImGui::EndTabBar();
 		}
 		ImGui::SetWindowFontScale(1.0f);
 		ImGui::End();
@@ -1530,74 +2316,84 @@ void Draw()
 	}
 
 
-	// 軸線の表示
-	// グリッド
-	DirectX::XMFLOAT4 lineColor(0.5f, 0.5f, 0.5f, 1.0f);
-	float size = DEBUG_GRID_NUM * DEBUG_GRID_MARGIN;
-	for (int i = 1; i <= DEBUG_GRID_NUM; ++i)
+	if (!IsEngineEditorScene(SceneManager::GetCurrent()))
 	{
-		float grid = i * DEBUG_GRID_MARGIN;
-		DirectX::XMFLOAT3 pos[2] = {
-			DirectX::XMFLOAT3(grid, 0.0f, size),
-			DirectX::XMFLOAT3(grid, 0.0f,-size),
-		};
-		Geometory::AddLine(pos[0], pos[1], lineColor);
-		pos[0].x = pos[1].x = -grid;
-		Geometory::AddLine(pos[0], pos[1], lineColor);
-		pos[0].x = size;
-		pos[1].x = -size;
-		pos[0].z = pos[1].z = grid;
-		Geometory::AddLine(pos[0], pos[1], lineColor);
-		pos[0].z = pos[1].z = -grid;
-		Geometory::AddLine(pos[0], pos[1], lineColor);
-	}
-	// 軸
-	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(size,0,0), DirectX::XMFLOAT4(1,0,0,1));
-	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,size,0), DirectX::XMFLOAT4(0,1,0,1));
-	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,0,size), DirectX::XMFLOAT4(0,0,1,1));
-	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(-size,0,0),  DirectX::XMFLOAT4(0,0,0,1));
-	Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,0,-size),  DirectX::XMFLOAT4(0,0,0,1));
+		// 軸線の表示
+		// グリッド
+		DirectX::XMFLOAT4 lineColor(0.5f, 0.5f, 0.5f, 1.0f);
+		float size = DEBUG_GRID_NUM * DEBUG_GRID_MARGIN;
+		for (int i = 1; i <= DEBUG_GRID_NUM; ++i)
+		{
+			float grid = i * DEBUG_GRID_MARGIN;
+			DirectX::XMFLOAT3 pos[2] = {
+				DirectX::XMFLOAT3(grid, 0.0f, size),
+				DirectX::XMFLOAT3(grid, 0.0f,-size),
+			};
+			Geometory::AddLine(pos[0], pos[1], lineColor);
+			pos[0].x = pos[1].x = -grid;
+			Geometory::AddLine(pos[0], pos[1], lineColor);
+			pos[0].x = size;
+			pos[1].x = -size;
+			pos[0].z = pos[1].z = grid;
+			Geometory::AddLine(pos[0], pos[1], lineColor);
+			pos[0].z = pos[1].z = -grid;
+			Geometory::AddLine(pos[0], pos[1], lineColor);
+		}
+		// 軸
+		Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(size,0,0), DirectX::XMFLOAT4(1,0,0,1));
+		Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,size,0), DirectX::XMFLOAT4(0,1,0,1));
+		Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,0,size), DirectX::XMFLOAT4(0,0,1,1));
+		Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(-size,0,0),  DirectX::XMFLOAT4(0,0,0,1));
+		Geometory::AddLine(DirectX::XMFLOAT3(0,0,0), DirectX::XMFLOAT3(0,0,-size),  DirectX::XMFLOAT4(0,0,0,1));
 
-	Geometory::DrawLines();
+		Geometory::DrawLines();
 
-	// カメラの値
-	static bool camAutoSwitch = false;
-	static bool camUpDownSwitch = true;
-	static float camAutoRotate = 1.0f;
-	if (IsKeyTrigger(VK_RETURN) && false) {
-		camAutoSwitch ^= true;
-	}
-	if (IsKeyTrigger(VK_SPACE)) {
-		camUpDownSwitch ^= true;
-	}
+		// カメラの値
+		static bool camAutoSwitch = false;
+		static bool camUpDownSwitch = true;
+		static float camAutoRotate = 1.0f;
+		if (IsKeyTrigger(VK_RETURN) && false) {
+			camAutoSwitch ^= true;
+		}
+		if (IsKeyTrigger(VK_SPACE)) {
+			camUpDownSwitch ^= true;
+		}
 
-	DirectX::XMVECTOR camPos;
-	if (camAutoSwitch) {
-		camAutoRotate += 0.01f;
-	}
-	camPos = DirectX::XMVectorSet(
-		cosf(camAutoRotate) * 5.0f,
-		3.5f * (camUpDownSwitch ? 1.0f : -1.0f),
-		sinf(camAutoRotate) * 5.0f,
-		0.0f);
+		DirectX::XMVECTOR camPos;
+		if (camAutoSwitch) {
+			camAutoRotate += 0.01f;
+		}
+		camPos = DirectX::XMVectorSet(
+			cosf(camAutoRotate) * 5.0f,
+			3.5f * (camUpDownSwitch ? 1.0f : -1.0f),
+			sinf(camAutoRotate) * 5.0f,
+			0.0f);
 
-	// ジオメトリ用カメラ初期化
-	DirectX::XMFLOAT4X4 mat[2];
-	DirectX::XMStoreFloat4x4(&mat[0], DirectX::XMMatrixTranspose(
-		DirectX::XMMatrixLookAtLH(
-			camPos,
-			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
-		)));
-	DirectX::XMStoreFloat4x4(&mat[1], DirectX::XMMatrixTranspose(
-		DirectX::XMMatrixPerspectiveFovLH(
-			DirectX::XMConvertToRadians(60.0f), (float)SCREEN_WIDTH / SCREEN_HEIGHT, 0.1f, 1000.0f)
-	));
-	Geometory::SetView(mat[0]);
-	Geometory::SetProjection(mat[1]);
+		// ジオメトリ用カメラ初期化
+		DirectX::XMFLOAT4X4 mat[2];
+		DirectX::XMStoreFloat4x4(&mat[0], DirectX::XMMatrixTranspose(
+			DirectX::XMMatrixLookAtLH(
+				camPos,
+				DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+				DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
+			)));
+		DirectX::XMStoreFloat4x4(&mat[1], DirectX::XMMatrixTranspose(
+			DirectX::XMMatrixPerspectiveFovLH(
+				DirectX::XMConvertToRadians(60.0f), (float)SCREEN_WIDTH / SCREEN_HEIGHT, 0.1f, 1000.0f)
+		));
+		Geometory::SetView(mat[0]);
+		Geometory::SetProjection(mat[1]);
+	}
 #endif
 
-	SceneManager::Draw();
+	if (IsEngineEditorScene(SceneManager::GetCurrent()))
+	{
+		DrawSceneToEngineEditorRenderTarget();
+	}
+	else
+	{
+		SceneManager::Draw();
+	}
 	{
 		TRAN_INS;
 #ifdef _DEBUG
