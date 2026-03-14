@@ -82,11 +82,14 @@
 | ID | 観点 | 手順（要約） | 期待結果 | 結果 | 備考 |
 |---|---|---|---|---|---|
 | T47 | Paint連続配置 | `Paint` ツールで同一平面上を左ドラッグして複数セルをなぞる。 | 通過した空きセルへ連続配置され、ドラッグ全体が `Undo` 1回で戻る。 | OK | `PlacePaint` + `FinishPaintStroke` で `AddPlacementBatch` を積む経路をコード確認。実機未確認。 |
-| T48 | Fill平面配置 | `Fill` ツールで始点と終点を同一平面上で指定し、その後 `Undo` / `Redo` を確認する。 | `XY / XZ / YZ` のいずれかの平面範囲だけが埋まり、1回の履歴で戻せる。 | OK | `DetermineFillPlane` と `ForEachFillCell`、`AddPlacementBatch` 履歴をコード確認。実機未確認。 |
+| T48 | Fill平面配置 | `Fill` ツールで始点と終点を同一平面上で指定し、その後 `Undo` / `Redo` を確認する。 | `XY / XZ / YZ` のいずれかの平面範囲だけが埋まり、1回の履歴で戻せる。 | OK | `DetermineFillPlane` と `ForEachFillCell`、`AddPlacementBatch` 履歴をコード確認。現仕様では `Shift+Wheel` による高さオフセット込み。実機未確認。 |
 | T49 | 複数選択 | `Select` ツールで `Ctrl+クリック` と `Shift+クリック` を使い、シーンビューと配置一覧の両方で複数選択を作る。 | 選択追加と解除が正しく動作し、複数選択対象すべてに選択表示が出る。 | OK | シーンビューと配置一覧の両方で `ToggleSelectedPlacementIndex` / `AddSelectedPlacementIndex` を使う経路をコード確認。実機未確認。 |
 | T50 | 複数選択一括削除 | 複数選択を作った状態で `Delete` キーまたはインスペクタの `選択中を一括削除` を使う。 | 選択中オブジェクトがまとめて削除され、`Undo / Redo` で復元と再削除ができる。 | OK | `RemovePlacementBatch` と `Delete` キー、インスペクタの一括削除ボタン接続をコード確認。実機未確認。 |
+| T51 | Select Fill 3D範囲選択 | `Select Fill` ツールで始点と終点を変えて、複数高さを含む直方体範囲を作る。 | 同一平面だけでなく、始点から終点までの 3D 範囲内にある配置物がまとめて選択される。 | OK | `ForEachBoxCell` による 3D ボックス列挙と選択プレビューをコード確認。実機未確認。 |
+| T52 | Fill高さオフセット | `Fill` ツールで始点確定後に `Shift+Wheel` で高さを上下し、`n=0` と `n!=0` の両方を確認する。 | `n=0` では水平 `XZ`、`n!=0` では高さ差付きの `XY / YZ` Fill ができる。 | OK | `Fill` 中のみ `Shift+Wheel` で `m_fillHeightOffset` を更新し、終点 `Y = 始点Y + n` へ固定する経路をコード確認。実機未確認。 |
 
 ## 直近ビルド確認
+- 2026-03-13: `Debug|x64` ビルド成功（警告0 / エラー0）。
 - 2026-03-12: `Debug|x64` ビルド成功（警告0 / エラー0）。
 - 2026-03-11: `Debug|x64` ビルド成功（確認実施）。
 - 2026-03-03: `Debug|x64` ビルド成功（警告0 / エラー0）。

@@ -112,6 +112,25 @@ namespace
 		return v;
 	}
 
+	bool IsSupportedXInputBindingValue(int value)
+	{
+		switch (value)
+		{
+		case Transfer::InputConfig::XInputBack:
+		case Transfer::InputConfig::XInputLeftThumb:
+		case Transfer::InputConfig::XInputRightThumb:
+		case Transfer::InputConfig::XInputLeftShoulder:
+		case Transfer::InputConfig::XInputRightShoulder:
+		case Transfer::InputConfig::XInputA:
+		case Transfer::InputConfig::XInputB:
+		case Transfer::InputConfig::XInputX:
+		case Transfer::InputConfig::XInputY:
+			return true;
+		default:
+			return false;
+		}
+	}
+
 	/**
 	 * @brief 難易度プリセット値を有効範囲へ補正します。
 	 * @param preset 補正対象値です。
@@ -130,20 +149,21 @@ namespace
 	 */
 	void GetUpgradeStepsForDifficulty(int preset, int& smallStep, int& largeStep)
 	{
+		const auto& gameplay = Transfer::GetInstance().gameplay;
 		// 難易度が高いほど、1回あたりの強化量を大きくします。
 		switch (NormalizeDifficultyPresetValue(preset))
 		{
 		case 0:
-			smallStep = 1;
-			largeStep = 2;
+			smallStep = gameplay.upgradeStepEasySmall;
+			largeStep = gameplay.upgradeStepEasyLarge;
 			break;
 		case 2:
-			smallStep = 3;
-			largeStep = 5;
+			smallStep = gameplay.upgradeStepHardSmall;
+			largeStep = gameplay.upgradeStepHardLarge;
 			break;
 		default:
-			smallStep = 2;
-			largeStep = 3;
+			smallStep = gameplay.upgradeStepNormalSmall;
+			largeStep = gameplay.upgradeStepNormalLarge;
 			break;
 		}
 	}
@@ -838,6 +858,14 @@ void Transfer::ResetRoguelikeUpgrade()
 }
 
 /**
+ * @brief キーコンフィグを初期値へ戻します。
+ */
+void Transfer::ResetInputConfigToDefault()
+{
+	input = InputConfig{};
+}
+
+/**
  * @brief 難易度プリセットに応じた基準値を反映します。
  * @param preset 0:Easy 1:Normal 2:Hard の難易度値です。
  */
@@ -1200,11 +1228,8 @@ float Transfer::GetEvadeCooldownScaleByLevel(int level) const
  */
 float Transfer::GetEnemyHpScaleByUpgradeProgress() const
 {
-	return EvaluateUpgradeProgressScale(
-		GetTotalUpgradeProgressValue(roguelike),
-		5.0f,
-		10.0f,
-		20.0f);
+	const int progressTier = GetTotalUpgradeProgressValue(roguelike) / 10;
+	return 1.0f + 0.20f * static_cast<float>((progressTier < 0) ? 0 : progressTier);
 }
 
 /**
@@ -1226,8 +1251,27 @@ float Transfer::GetBossHpScaleByUpgradeProgress() const
  */
 float Transfer::GetEnemyAttackScaleByUpgradeProgress() const
 {
-	const int progressTier = ClampInt(GetTotalUpgradeLevels() / 10, 0, 3);
+	const int progressTier = GetTotalUpgradeProgressValue(roguelike) / 10;
+	if (progressTier < 0)
+	{
+		return 1.0f;
+	}
 	return 1.0f + 0.10f * static_cast<float>(progressTier);
+}
+
+/**
+ * @brief 難易度に応じた通常敵 HP 倍率を返します。
+ * @param preset 難易度です。
+ * @return 通常敵 HP 倍率です。
+ */
+float Transfer::GetEnemyHpScaleByDifficulty(int preset) const
+{
+	switch (NormalizeDifficultyPresetValue(preset))
+	{
+	case 0: return 0.85f;
+	case 2: return 1.25f;
+	default: return 1.0f;
+	}
 }
 
 /**
@@ -1310,6 +1354,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	GameplayTuning loaded{};
 	int loadedPreset = 1;
 	RoguelikeUpgrade loadedRogue{};
+	InputConfig loadedInput{};
 	ApplyGameplayTuningFileDefaults(loaded, loadedPreset, loadedRogue);
 	std::unordered_set<std::string> loadedKeys;
 	loadedKeys.reserve(kGameplayTuningRequiredKeyCount);
@@ -1330,6 +1375,38 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		Trim(key);
 		Trim(value);
 		if (key.empty() || value.empty()) continue;
+
+		if (key == "bindMoveUp") { loadedInput.moveUp = ToInt(value, loadedInput.moveUp); continue; }
+		if (key == "bindMoveDown") { loadedInput.moveDown = ToInt(value, loadedInput.moveDown); continue; }
+		if (key == "bindMoveLeft") { loadedInput.moveLeft = ToInt(value, loadedInput.moveLeft); continue; }
+		if (key == "bindMoveRight") { loadedInput.moveRight = ToInt(value, loadedInput.moveRight); continue; }
+		if (key == "bindDash") { loadedInput.dash = ToInt(value, loadedInput.dash); continue; }
+		if (key == "bindAttack") { loadedInput.attack = ToInt(value, loadedInput.attack); continue; }
+		if (key == "bindSkill1") { loadedInput.skill1 = ToInt(value, loadedInput.skill1); continue; }
+		if (key == "bindSkill2") { loadedInput.skill2 = ToInt(value, loadedInput.skill2); continue; }
+		if (key == "bindReroll") { loadedInput.reroll = ToInt(value, loadedInput.reroll); continue; }
+		if (key == "upgradeStepEasySmall") { loaded.upgradeStepEasySmall = ToInt(value, loaded.upgradeStepEasySmall); continue; }
+		if (key == "upgradeStepEasyLarge") { loaded.upgradeStepEasyLarge = ToInt(value, loaded.upgradeStepEasyLarge); continue; }
+		if (key == "upgradeStepNormalSmall") { loaded.upgradeStepNormalSmall = ToInt(value, loaded.upgradeStepNormalSmall); continue; }
+		if (key == "upgradeStepNormalLarge") { loaded.upgradeStepNormalLarge = ToInt(value, loaded.upgradeStepNormalLarge); continue; }
+		if (key == "upgradeStepHardSmall") { loaded.upgradeStepHardSmall = ToInt(value, loaded.upgradeStepHardSmall); continue; }
+		if (key == "upgradeStepHardLarge") { loaded.upgradeStepHardLarge = ToInt(value, loaded.upgradeStepHardLarge); continue; }
+		if (key == "bindXInputConfirm") { loadedInput.xinputConfirm = ToInt(value, loadedInput.xinputConfirm); continue; }
+		if (key == "bindXInputDash") { loadedInput.xinputDash = ToInt(value, loadedInput.xinputDash); continue; }
+		if (key == "bindXInputAttack") { loadedInput.xinputAttack = ToInt(value, loadedInput.xinputAttack); continue; }
+		if (key == "bindXInputSkill1") { loadedInput.xinputSkill1 = ToInt(value, loadedInput.xinputSkill1); continue; }
+		if (key == "bindXInputSkill2") { loadedInput.xinputSkill2 = ToInt(value, loadedInput.xinputSkill2); continue; }
+		if (key == "bindXInputReroll") { loadedInput.xinputReroll = ToInt(value, loadedInput.xinputReroll); continue; }
+		if (key == "bindXInputTabPrev") { loadedInput.xinputTabPrev = ToInt(value, loadedInput.xinputTabPrev); continue; }
+		if (key == "bindXInputTabNext") { loadedInput.xinputTabNext = ToInt(value, loadedInput.xinputTabNext); continue; }
+		if (key == "bindDirectInputConfirm") { loadedInput.directInputConfirm = ToInt(value, loadedInput.directInputConfirm); continue; }
+		if (key == "bindDirectInputDash") { loadedInput.directInputDash = ToInt(value, loadedInput.directInputDash); continue; }
+		if (key == "bindDirectInputAttack") { loadedInput.directInputAttack = ToInt(value, loadedInput.directInputAttack); continue; }
+		if (key == "bindDirectInputSkill1") { loadedInput.directInputSkill1 = ToInt(value, loadedInput.directInputSkill1); continue; }
+		if (key == "bindDirectInputSkill2") { loadedInput.directInputSkill2 = ToInt(value, loadedInput.directInputSkill2); continue; }
+		if (key == "bindDirectInputReroll") { loadedInput.directInputReroll = ToInt(value, loadedInput.directInputReroll); continue; }
+		if (key == "bindDirectInputTabPrev") { loadedInput.directInputTabPrev = ToInt(value, loadedInput.directInputTabPrev); continue; }
+		if (key == "bindDirectInputTabNext") { loadedInput.directInputTabNext = ToInt(value, loadedInput.directInputTabNext); continue; }
 
 		// キー名に応じて、対象項目だけを個別に復元します。
 		bool matchedKey = true;
@@ -1463,6 +1540,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	{
 		// 1項目でも欠けている場合は、部分適用せずファイル既定値へ全体を戻します。
 		ApplyGameplayTuningFileDefaults(loaded, loadedPreset, loadedRogue);
+		loadedInput = InputConfig{};
 	}
 
 	// 読み込んだ値はここで全体的にクランプし、壊れた設定を防ぎます。
@@ -1539,6 +1617,12 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	if (loaded.bossUltimateStompRadiusScale < 0.5f) loaded.bossUltimateStompRadiusScale = 0.5f;
 	if (loaded.bossUltimateFieldTelegraph < 0.10f) loaded.bossUltimateFieldTelegraph = 0.10f;
 	if (loaded.bossUltimateFieldSafeScale < 0.5f) loaded.bossUltimateFieldSafeScale = 0.5f;
+	loaded.upgradeStepEasySmall = ClampInt(loaded.upgradeStepEasySmall, 0, 10);
+	loaded.upgradeStepEasyLarge = ClampInt(loaded.upgradeStepEasyLarge, loaded.upgradeStepEasySmall, 10);
+	loaded.upgradeStepNormalSmall = ClampInt(loaded.upgradeStepNormalSmall, 0, 10);
+	loaded.upgradeStepNormalLarge = ClampInt(loaded.upgradeStepNormalLarge, loaded.upgradeStepNormalSmall, 10);
+	loaded.upgradeStepHardSmall = ClampInt(loaded.upgradeStepHardSmall, 0, 10);
+	loaded.upgradeStepHardLarge = ClampInt(loaded.upgradeStepHardLarge, loaded.upgradeStepHardSmall, 10);
 
 	// 正常化済みの値だけを本体へ反映します。
 	gameplay = loaded;
@@ -1572,6 +1656,52 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	loadedRogue.selectionPhase = RoguelikeUpgrade::SelectionNone;
 	ResetOffers(loadedRogue.offers);
 	roguelike = loadedRogue;
+	auto sanitizeBinding = [](int value, int fallback) -> int
+	{
+		if (value <= 0 || value > 255 || value == VK_ESCAPE)
+		{
+			return fallback;
+		}
+		return value;
+	};
+	loadedInput.moveUp = sanitizeBinding(loadedInput.moveUp, InputConfig{}.moveUp);
+	loadedInput.moveDown = sanitizeBinding(loadedInput.moveDown, InputConfig{}.moveDown);
+	loadedInput.moveLeft = sanitizeBinding(loadedInput.moveLeft, InputConfig{}.moveLeft);
+	loadedInput.moveRight = sanitizeBinding(loadedInput.moveRight, InputConfig{}.moveRight);
+	loadedInput.dash = sanitizeBinding(loadedInput.dash, InputConfig{}.dash);
+	loadedInput.attack = sanitizeBinding(loadedInput.attack, InputConfig{}.attack);
+	loadedInput.skill1 = sanitizeBinding(loadedInput.skill1, InputConfig{}.skill1);
+	loadedInput.skill2 = sanitizeBinding(loadedInput.skill2, InputConfig{}.skill2);
+	loadedInput.reroll = sanitizeBinding(loadedInput.reroll, InputConfig{}.reroll);
+	auto sanitizeXInputBinding = [](int value, int fallback) -> int
+	{
+		return IsSupportedXInputBindingValue(value) ? value : fallback;
+	};
+	auto sanitizeDirectInputBinding = [](int value, int fallback) -> int
+	{
+		if (value < 0 || value > 31)
+		{
+			return fallback;
+		}
+		return value;
+	};
+	loadedInput.xinputConfirm = sanitizeXInputBinding(loadedInput.xinputConfirm, InputConfig{}.xinputConfirm);
+	loadedInput.xinputDash = sanitizeXInputBinding(loadedInput.xinputDash, InputConfig{}.xinputDash);
+	loadedInput.xinputAttack = sanitizeXInputBinding(loadedInput.xinputAttack, InputConfig{}.xinputAttack);
+	loadedInput.xinputSkill1 = sanitizeXInputBinding(loadedInput.xinputSkill1, InputConfig{}.xinputSkill1);
+	loadedInput.xinputSkill2 = sanitizeXInputBinding(loadedInput.xinputSkill2, InputConfig{}.xinputSkill2);
+	loadedInput.xinputReroll = sanitizeXInputBinding(loadedInput.xinputReroll, InputConfig{}.xinputReroll);
+	loadedInput.xinputTabPrev = sanitizeXInputBinding(loadedInput.xinputTabPrev, InputConfig{}.xinputTabPrev);
+	loadedInput.xinputTabNext = sanitizeXInputBinding(loadedInput.xinputTabNext, InputConfig{}.xinputTabNext);
+	loadedInput.directInputConfirm = sanitizeDirectInputBinding(loadedInput.directInputConfirm, InputConfig{}.directInputConfirm);
+	loadedInput.directInputDash = sanitizeDirectInputBinding(loadedInput.directInputDash, InputConfig{}.directInputDash);
+	loadedInput.directInputAttack = sanitizeDirectInputBinding(loadedInput.directInputAttack, InputConfig{}.directInputAttack);
+	loadedInput.directInputSkill1 = sanitizeDirectInputBinding(loadedInput.directInputSkill1, InputConfig{}.directInputSkill1);
+	loadedInput.directInputSkill2 = sanitizeDirectInputBinding(loadedInput.directInputSkill2, InputConfig{}.directInputSkill2);
+	loadedInput.directInputReroll = sanitizeDirectInputBinding(loadedInput.directInputReroll, InputConfig{}.directInputReroll);
+	loadedInput.directInputTabPrev = sanitizeDirectInputBinding(loadedInput.directInputTabPrev, InputConfig{}.directInputTabPrev);
+	loadedInput.directInputTabNext = sanitizeDirectInputBinding(loadedInput.directInputTabNext, InputConfig{}.directInputTabNext);
+	input = loadedInput;
 
 	if (IsDefaultPathArgument(path))
 	{
@@ -1603,6 +1733,12 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "enemyCount=" << gameplay.enemyCount << "\n";
 		ofs << "waveMax=" << gameplay.waveMax << "\n";
 		ofs << "waveEnemyAddPerWave=" << gameplay.waveEnemyAddPerWave << "\n";
+		ofs << "upgradeStepEasySmall=" << gameplay.upgradeStepEasySmall << "\n";
+		ofs << "upgradeStepEasyLarge=" << gameplay.upgradeStepEasyLarge << "\n";
+		ofs << "upgradeStepNormalSmall=" << gameplay.upgradeStepNormalSmall << "\n";
+		ofs << "upgradeStepNormalLarge=" << gameplay.upgradeStepNormalLarge << "\n";
+		ofs << "upgradeStepHardSmall=" << gameplay.upgradeStepHardSmall << "\n";
+		ofs << "upgradeStepHardLarge=" << gameplay.upgradeStepHardLarge << "\n";
 		ofs << "groundTileSize=" << gameplay.groundTileSize << "\n";
 		ofs << "cameraIntroDuration=" << gameplay.cameraIntroDuration << "\n";
 		ofs << "cameraIntroFocusDistance=" << gameplay.cameraIntroFocusDistance << "\n";
@@ -1700,6 +1836,31 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "pushSlop=" << gameplay.pushSlop << "\n";
 		ofs << "playerPushShare=" << gameplay.playerPushShare << "\n";
 		ofs << "enemyPushShare=" << gameplay.enemyPushShare << "\n";
+		ofs << "bindMoveUp=" << input.moveUp << "\n";
+		ofs << "bindMoveDown=" << input.moveDown << "\n";
+		ofs << "bindMoveLeft=" << input.moveLeft << "\n";
+		ofs << "bindMoveRight=" << input.moveRight << "\n";
+		ofs << "bindDash=" << input.dash << "\n";
+		ofs << "bindAttack=" << input.attack << "\n";
+		ofs << "bindSkill1=" << input.skill1 << "\n";
+		ofs << "bindSkill2=" << input.skill2 << "\n";
+		ofs << "bindReroll=" << input.reroll << "\n";
+		ofs << "bindXInputConfirm=" << input.xinputConfirm << "\n";
+		ofs << "bindXInputDash=" << input.xinputDash << "\n";
+		ofs << "bindXInputAttack=" << input.xinputAttack << "\n";
+		ofs << "bindXInputSkill1=" << input.xinputSkill1 << "\n";
+		ofs << "bindXInputSkill2=" << input.xinputSkill2 << "\n";
+		ofs << "bindXInputReroll=" << input.xinputReroll << "\n";
+		ofs << "bindXInputTabPrev=" << input.xinputTabPrev << "\n";
+		ofs << "bindXInputTabNext=" << input.xinputTabNext << "\n";
+		ofs << "bindDirectInputConfirm=" << input.directInputConfirm << "\n";
+		ofs << "bindDirectInputDash=" << input.directInputDash << "\n";
+		ofs << "bindDirectInputAttack=" << input.directInputAttack << "\n";
+		ofs << "bindDirectInputSkill1=" << input.directInputSkill1 << "\n";
+		ofs << "bindDirectInputSkill2=" << input.directInputSkill2 << "\n";
+		ofs << "bindDirectInputReroll=" << input.directInputReroll << "\n";
+		ofs << "bindDirectInputTabPrev=" << input.directInputTabPrev << "\n";
+		ofs << "bindDirectInputTabNext=" << input.directInputTabNext << "\n";
 		ofs << "difficultyPreset=" << gameplayDebug.difficultyPreset << "\n";
 		ofs << "stageClearCount=" << roguelike.stageClearCount << "\n";
 		ofs << "attackPowerLevel=" << roguelike.attackPowerLevel << "\n";

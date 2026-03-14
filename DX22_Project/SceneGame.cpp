@@ -135,7 +135,7 @@ namespace
      */
     bool IsPauseConfirmTriggered()
     {
-        return IsKeyTrigger(VK_RETURN) || IsKeyTrigger('F') || IsKeyTrigger(VK_SPACE);
+        return IsMenuConfirmTrigger();
     }
 
     bool IsPauseTabPrevTriggered()
@@ -915,6 +915,8 @@ SceneGame::SceneGame()
     tran.gameplayDebug.titleOptionOpen = 0;
     tran.gameplayDebug.titleOptionSelection = 0;
     tran.gameplayDebug.titleOptionRequestClose = 0;
+    tran.gameplayDebug.titleKeyConfigOpen = 0;
+    tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
     tran.gameplayDebug.titleDifficultyOpen = 0;
     tran.gameplayDebug.titleDifficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
     m_isBossBattleDebug = (tran.gameplayDebug.requestBossBattle != 0);
@@ -1261,7 +1263,10 @@ void SceneGame::SpawnEnemyByIndex(int index, float stageSize)
     case 1: enemy->SetType(Enemy::Type::Tank); break;
     default: enemy->SetType(Enemy::Type::Ranged); break;
     }
-    const float enemyHpScale = m_isBossBattleDebug ? 1.0f : tran.GetEnemyHpScaleByUpgradeProgress();
+    const int difficultyPreset = ClampInt(tran.gameplayDebug.difficultyPreset, 0, 2);
+    const float enemyHpScale = m_isBossBattleDebug
+        ? 1.0f
+        : (tran.GetEnemyHpScaleByDifficulty(difficultyPreset) * tran.GetEnemyHpScaleByUpgradeProgress());
     enemy->SetHpScale(enemyHpScale);
 
     // スポーン候補探索で使う値は先に丸めて、異常値でも破綻しないようにします。
@@ -1935,7 +1940,7 @@ void SceneGame::Update()
         m_isPauseOptionOpen = false;
     }
 
-    if (IsKeyTrigger(VK_ESCAPE))
+    if (IsMenuBackTrigger())
     {
         if (!m_isPaused)
         {
@@ -2019,9 +2024,9 @@ void SceneGame::Update()
             {
                 m_pauseTabIndex = WrapIndex(m_pauseTabIndex + 1, kPauseTabCount);
             }
-            if (IsKeyTrigger('1')) m_pauseTabIndex = kPauseTabGame;
-            if (IsKeyTrigger('2')) m_pauseTabIndex = kPauseTabUpgrade;
-            if (IsKeyTrigger('3')) m_pauseTabIndex = kPauseTabSettings;
+            if (IsRawKeyTrigger('1')) m_pauseTabIndex = kPauseTabGame;
+            if (IsRawKeyTrigger('2')) m_pauseTabIndex = kPauseTabUpgrade;
+            if (IsRawKeyTrigger('3')) m_pauseTabIndex = kPauseTabSettings;
 
             if (m_pauseTabIndex == kPauseTabSettings)
             {

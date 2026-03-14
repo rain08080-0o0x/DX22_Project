@@ -13,7 +13,7 @@ namespace
 
 	bool IsResultConfirmTriggered()
 	{
-		return IsKeyTrigger(VK_RETURN) || IsKeyTrigger(VK_SPACE);
+		return IsMenuConfirmTrigger();
 	}
 
 	bool IsSelectionPrevTriggered()

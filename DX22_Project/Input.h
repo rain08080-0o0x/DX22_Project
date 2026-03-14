@@ -5,7 +5,7 @@
 #undef max
 #undef min
 
-HRESULT InitInput();
+HRESULT InitInput(HWND hWnd);
 void UninitInput();
 void UpdateInput();
 
@@ -13,7 +13,16 @@ bool IsKeyPress(BYTE key);
 bool IsKeyTrigger(BYTE key);
 bool IsKeyRelease(BYTE key);
 bool IsKeyRepeat(BYTE key);
+bool IsRawKeyPress(BYTE key);
+bool IsRawKeyTrigger(BYTE key);
+bool IsMenuConfirmTrigger();
+bool IsMenuBackTrigger();
 bool IsPadConnected();
+bool IsDirectInputConnected();
+bool IsDirectInputButtonPressed(int buttonIndex);
+LONG GetDirectInputAxisX();
+LONG GetDirectInputAxisY();
+DWORD GetDirectInputPov();
 float GetPadLeftStickX();
 float GetPadLeftStickY();
 bool IsPadLeftShoulderTrigger();

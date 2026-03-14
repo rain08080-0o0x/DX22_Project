@@ -32,6 +32,7 @@ void CameraDebug::Update()
     TRAN_INS;
     if (!isLock)
     {
+#ifdef _DEBUG
         using namespace DirectX;
         // 先生のやつ
         //--- 注視点の移動
@@ -59,14 +60,14 @@ void CameraDebug::Update()
 
         XMVECTOR delta = XMVectorZero();
 
-        if (IsKeyPress(VK_UP))    delta += forward * CameraSpeed;
-        if (IsKeyPress(VK_DOWN))  delta -= forward * CameraSpeed;
-        if (IsKeyPress(VK_RIGHT)) delta += right * CameraSpeed;
-        if (IsKeyPress(VK_LEFT))  delta -= right * CameraSpeed;
+        if (IsRawKeyPress(VK_UP))    delta += forward * CameraSpeed;
+        if (IsRawKeyPress(VK_DOWN))  delta -= forward * CameraSpeed;
+        if (IsRawKeyPress(VK_RIGHT)) delta += right * CameraSpeed;
+        if (IsRawKeyPress(VK_LEFT))  delta -= right * CameraSpeed;
 
          //上下移動（ワールドY）
-        if (IsKeyPress(VK_LSHIFT))   delta += up * CameraSpeed;
-        if (IsKeyPress(VK_LCONTROL)) delta -= up * CameraSpeed;
+        if (IsRawKeyPress(VK_LSHIFT) || IsRawKeyPress(VK_RSHIFT)) delta += up * CameraSpeed;
+        if (IsRawKeyPress(VK_LCONTROL) || IsRawKeyPress(VK_RCONTROL)) delta -= up * CameraSpeed;
 
         // 視線を維持したまま平行移動：pos と look を同じだけ動かす
         pos += delta;
@@ -77,14 +78,14 @@ void CameraDebug::Update()
         XMStoreFloat3(&m_look, look);
         //--- カメラ位置の移動 
         // 回り込み
-        if (IsKeyPress('J')) { m_radXZ += CameraDebugRotate; }
-        if (IsKeyPress('L')) { m_radXZ -= CameraDebugRotate; }
-        if (IsKeyPress('I')) { m_radY -= CameraDebugRotate; }
-        if (IsKeyPress('K')) { m_radY += CameraDebugRotate; }
+        if (IsRawKeyPress('J')) { m_radXZ += CameraDebugRotate; }
+        if (IsRawKeyPress('L')) { m_radXZ -= CameraDebugRotate; }
+        if (IsRawKeyPress('I')) { m_radY -= CameraDebugRotate; }
+        if (IsRawKeyPress('K')) { m_radY += CameraDebugRotate; }
 
         // --- カメラの距離
-        if (IsKeyPress('E')) { m_radius += CameraSpeed; }
-        if (IsKeyPress('Q')) { m_radius -= CameraSpeed; }
+        if (IsRawKeyPress('E')) { m_radius += CameraSpeed; }
+        if (IsRawKeyPress('Q')) { m_radius -= CameraSpeed; }
 
         // カメラの位置の計算
         m_pos.x = m_look.x + m_radius * cosf(m_radY) * sinf(m_radXZ);
@@ -93,6 +94,12 @@ void CameraDebug::Update()
         // Transferの更新
         tran.camera.eye = m_pos;
         tran.camera.look = m_look;
+#else
+        m_pos = tran.camera.eye;
+        m_look = tran.camera.look;
+        tran.camera.eye = m_pos;
+        tran.camera.look = m_look;
+#endif
     }
     else
     {

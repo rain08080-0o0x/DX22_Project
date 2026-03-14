@@ -5,6 +5,7 @@
 #include "Scene.h"
 #include <DirectXMath.h>
 #include <functional>
+#include <string>
 #include <vector>
 
 class Model;
@@ -18,11 +19,11 @@ class SceneCastleEditor : public Scene
 public:
     struct AssetInfo
     {
-        const char* assetId;
-        const char* name;
-        const char* path;
-        float scale;
-        float yOffset;
+        std::string assetId;
+        std::string name;
+        std::string path;
+        float scale = 1.0f;
+        float yOffset = 0.0f;
     };
 
     using PlacementInfo = CastlePlacementInfo;
@@ -70,6 +71,13 @@ public:
     const AssetInfo* GetAssetInfo(int index) const;
     int GetSelectedAssetIndex() const;
     void SetSelectedAssetIndex(int index);
+    bool AddAssetFromPath(const char* displayName, const char* path);
+    bool RemoveAsset(int index);
+    bool ReloadAssetCatalog();
+    bool CanRemoveAsset(int index) const;
+    const char* GetAssetCatalogPath() const;
+    const char* GetAssetCatalogStatusMessage() const;
+    bool IsAssetCatalogStatusError() const;
     ToolMode GetToolMode() const;
     void SetToolMode(ToolMode mode);
     void* GetAssetThumbnailTextureId(int index, unsigned int size);
@@ -156,6 +164,12 @@ private:
     };
 
 private:
+    bool LoadAssetCatalogInfos(std::vector<AssetInfo>& outAssetInfos, std::string& outError) const;
+    bool SaveAssetCatalogInfos(const std::vector<AssetInfo>& assetInfos, std::string& outError) const;
+    bool ApplyAssetCatalog(const std::vector<AssetInfo>& assetInfos, std::string& outError);
+    bool IsAssetReferencedBySessionId(const std::string& assetId) const;
+    int FindAssetIndexById(const std::string& assetId) const;
+    void SetAssetCatalogStatus(const std::string& message, bool isError);
     void LoadAssets();
     void ReleaseAssets();
     bool EnsureThumbnailTargets(AssetState& asset, unsigned int size);
@@ -229,6 +243,8 @@ private:
     BuildSelection m_selection;
     std::vector<HistoryEntry> m_undoStack;
     std::vector<HistoryEntry> m_redoStack;
+    std::string m_assetCatalogStatusMessage;
+    bool m_assetCatalogStatusIsError;
 
     int m_selectedAssetIndex;
     ToolMode m_toolMode;

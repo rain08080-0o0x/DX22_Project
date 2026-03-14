@@ -123,6 +123,9 @@
     <ClCompile Include="Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="MainImGui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -324,6 +327,9 @@
       <Filter>Header Files\Application</Filter>
     </ClInclude>
     <ClInclude Include="Main.h">
+      <Filter>Header Files\Application</Filter>
+    </ClInclude>
+    <ClInclude Include="MainImGui.h">
       <Filter>Header Files\Application</Filter>
     </ClInclude>
     <ClInclude Include="TrailEffect.h">

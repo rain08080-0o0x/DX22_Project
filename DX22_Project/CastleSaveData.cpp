@@ -127,7 +127,7 @@ namespace
         for (int i = 0; i < editor.GetAssetCount(); ++i)
         {
             const SceneCastleEditor::AssetInfo* asset = editor.GetAssetInfo(i);
-            if (!asset || !asset->assetId) continue;
+            if (!asset || asset->assetId.empty()) continue;
             if (assetId == asset->assetId)
             {
                 return i;
@@ -281,13 +281,13 @@ bool CastleSaveData::Save(const SceneCastleEditor& editor, const char* path)
         if (!placement) return false;
 
         const SceneCastleEditor::AssetInfo* asset = editor.GetAssetInfo(placement->assetIndex);
-        if (!asset || !asset->assetId || asset->assetId[0] == '\0')
+        if (!asset || asset->assetId.empty())
         {
             return false;
         }
 
         SerializablePlacement item;
-        item.assetId = asset->assetId;
+        item.assetId = asset->assetId.c_str();
         item.gridX = placement->gridX;
         item.gridY = placement->gridY;
         item.gridZ = placement->gridZ;

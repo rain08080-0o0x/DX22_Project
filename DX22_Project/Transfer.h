@@ -137,6 +137,12 @@ private:
 		int enemyCount = 3;
 		int waveMax = 3;
 		int waveEnemyAddPerWave = 1;
+		int upgradeStepEasySmall = 1;
+		int upgradeStepEasyLarge = 2;
+		int upgradeStepNormalSmall = 2;
+		int upgradeStepNormalLarge = 3;
+		int upgradeStepHardSmall = 3;
+		int upgradeStepHardLarge = 5;
 		float groundTileSize = 1.0f;
 		float cameraIntroDuration = 1.20f;
 		float cameraIntroFocusDistance = 2.80f;
@@ -315,8 +321,10 @@ private:
 		int pauseOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:Back
 		int pauseOptionRequestClose = 0;
 		int titleOptionOpen = 0;
-		int titleOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:Back
+		int titleOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:KeyConfig 5:Back
 		int titleOptionRequestClose = 0;
+		int titleKeyConfigOpen = 0;
+		int titleKeyConfigRequestOpen = 0;
 		int titleDifficultyOpen = 0;
 		int titleDifficultySelection = 1; // 0:Easy 1:Normal 2:Hard
 		float pauseMenuUiScale = 1.0f;
@@ -431,6 +439,56 @@ public:
 			UpgradeEvadeCooldown
 		};
 	};
+	/**
+	 * @brief 入力デバイスごとの論理割り当てです。
+	 */
+	struct InputConfig
+	{
+		// XInput button bit values mirrored locally to avoid exposing XInput headers here.
+		enum XInputButton
+		{
+			XInputDPadUp = 0x0001,
+			XInputDPadDown = 0x0002,
+			XInputDPadLeft = 0x0004,
+			XInputDPadRight = 0x0008,
+			XInputStart = 0x0010,
+			XInputBack = 0x0020,
+			XInputLeftThumb = 0x0040,
+			XInputRightThumb = 0x0080,
+			XInputLeftShoulder = 0x0100,
+			XInputRightShoulder = 0x0200,
+			XInputA = 0x1000,
+			XInputB = 0x2000,
+			XInputX = 0x4000,
+			XInputY = 0x8000
+		};
+
+		int moveUp = 'W';
+		int moveDown = 'S';
+		int moveLeft = 'A';
+		int moveRight = 'D';
+		int dash = VK_SHIFT;
+		int attack = 'F';
+		int skill1 = 'O';
+		int skill2 = 'P';
+		int reroll = 'R';
+		int xinputConfirm = XInputA;
+		int xinputDash = XInputA;
+		int xinputAttack = XInputB;
+		int xinputSkill1 = XInputY;
+		int xinputSkill2 = XInputX;
+		int xinputReroll = XInputY;
+		int xinputTabPrev = XInputLeftShoulder;
+		int xinputTabNext = XInputRightShoulder;
+		int directInputConfirm = 0;
+		int directInputDash = 0;
+		int directInputAttack = 1;
+		int directInputSkill1 = 3;
+		int directInputSkill2 = 2;
+		int directInputReroll = 3;
+		int directInputTabPrev = 4;
+		int directInputTabNext = 5;
+	};
 public:
 	/**
 	 * @brief Transfer の唯一のインスタンスを返します。
@@ -451,6 +509,11 @@ public:
 	 * @brief ローグライク強化状態を初期値へ戻します。
 	 */
 	void ResetRoguelikeUpgrade();
+
+	/**
+	 * @brief キーコンフィグを既定値へ戻します。
+	 */
+	void ResetInputConfigToDefault();
 
 	/**
 	 * @brief 難易度プリセットに応じて基準調整値を設定します。
@@ -619,6 +682,13 @@ public:
 	float GetEnemyAttackScaleByUpgradeProgress() const;
 
 	/**
+	 * @brief 難易度から通常敵 HP 補正倍率を返します。
+	 * @param preset 難易度です。
+	 * @return 通常敵 HP 倍率です。
+	 */
+	float GetEnemyHpScaleByDifficulty(int preset) const;
+
+	/**
 	 * @brief 難易度からボス HP 補正倍率を返します。
 	 * @param preset 難易度です。
 	 * @return ボス HP 倍率です。
@@ -677,4 +747,6 @@ public:
 	GameplayDebug gameplayDebug;
 	/** @brief ローグライク強化の進行状況です。 */
 	RoguelikeUpgrade roguelike;
+	/** @brief 実行中に変更可能な入力割り当てです。 */
+	InputConfig input;
 };

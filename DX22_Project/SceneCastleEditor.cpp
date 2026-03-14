@@ -1,4 +1,4 @@
-#include "SceneCastleEditor.h"
+﻿#include "SceneCastleEditor.h"
 
 #include "CastleSaveData.h"
 #include "DirectX.h"
@@ -10,8 +10,13 @@
 
 #include <Windows.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #undef min
 #undef max
@@ -20,11 +25,348 @@ namespace
 {
     constexpr float kPi = 3.1415926535f;
     constexpr float kHalfPi = kPi * 0.5f;
+    constexpr char kAssetCatalogPath[] = "Assets/castle_editor_models.cfg";
+    constexpr char kAssetCatalogFormat[] = "CastleEditorAssetCatalog";
+    constexpr int kAssetCatalogVersion = 1;
     constexpr int kWireEdges[12][2] = {
         {0, 1}, {1, 2}, {2, 3}, {3, 0},
         {4, 5}, {5, 6}, {6, 7}, {7, 4},
         {0, 4}, {1, 5}, {2, 6}, {3, 7},
     };
+
+    void TrimString(std::string& text)
+    {
+        const char* whitespace = " \t\r\n";
+        const size_t begin = text.find_first_not_of(whitespace);
+        if (begin == std::string::npos)
+        {
+            text.clear();
+            return;
+        }
+
+        const size_t end = text.find_last_not_of(whitespace);
+        text = text.substr(begin, end - begin + 1);
+    }
+
+    bool TryParseInt(const std::unordered_map<std::string, std::string>& values, const char* key, int& outValue)
+    {
+        const auto it = values.find(key);
+        if (it == values.end())
+        {
+            return false;
+        }
+
+        char* end = nullptr;
+        const long parsed = std::strtol(it->second.c_str(), &end, 10);
+        if (!end || *end != '\0')
+        {
+            return false;
+        }
+
+        outValue = static_cast<int>(parsed);
+        return true;
+    }
+
+    bool TryParseFloat(const std::unordered_map<std::string, std::string>& values, const char* key, float& outValue)
+    {
+        const auto it = values.find(key);
+        if (it == values.end())
+        {
+            return false;
+        }
+
+        char* end = nullptr;
+        const float parsed = std::strtof(it->second.c_str(), &end);
+        if (!end || *end != '\0')
+        {
+            return false;
+        }
+
+        outValue = parsed;
+        return true;
+    }
+
+    std::vector<SceneCastleEditor::AssetInfo> BuildDefaultAssetCatalog()
+    {
+        return {
+            { "brick", "Brick", "Assets/Model/Castle/Brick.fbx", 1.0f, 0.0f },
+            { "wall", "Wall", "Assets/Model/Castle/Wall.fbx", 1.0f, 0.0f },
+        };
+    }
+
+    std::string ExtractFileStem(const std::string& path)
+    {
+        if (path.empty())
+        {
+            return {};
+        }
+
+        const size_t slash = path.find_last_of("\\/");
+        const size_t begin = (slash == std::string::npos) ? 0 : (slash + 1);
+        const size_t dot = path.find_last_of('.');
+        if (dot == std::string::npos || dot < begin)
+        {
+            return path.substr(begin);
+        }
+
+        return path.substr(begin, dot - begin);
+    }
+
+    std::string NormalizePathSlashes(std::string path)
+    {
+        std::replace(path.begin(), path.end(), '\\', '/');
+        return path;
+    }
+
+    std::string LowercaseAscii(std::string text)
+    {
+        std::transform(
+            text.begin(),
+            text.end(),
+            text.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        return text;
+    }
+
+    std::string NormalizeCatalogPath(const std::string& inputPath)
+    {
+        if (inputPath.empty())
+        {
+            return {};
+        }
+
+        char fullPath[MAX_PATH] = {};
+        const DWORD fullLen = GetFullPathNameA(inputPath.c_str(), MAX_PATH, fullPath, nullptr);
+        if (fullLen == 0 || fullLen >= MAX_PATH)
+        {
+            return NormalizePathSlashes(inputPath);
+        }
+
+        char currentDirectory[MAX_PATH] = {};
+        const DWORD currentDirectoryLen = GetCurrentDirectoryA(MAX_PATH, currentDirectory);
+
+        const std::string normalizedFullPath = NormalizePathSlashes(fullPath);
+        if (currentDirectoryLen == 0 || currentDirectoryLen >= MAX_PATH)
+        {
+            return normalizedFullPath;
+        }
+
+        std::string normalizedCurrentDirectory = NormalizePathSlashes(currentDirectory);
+        if (!normalizedCurrentDirectory.empty() && normalizedCurrentDirectory.back() != '/')
+        {
+            normalizedCurrentDirectory.push_back('/');
+        }
+
+        const std::string compareFullPath = LowercaseAscii(normalizedFullPath);
+        const std::string compareCurrentDirectory = LowercaseAscii(normalizedCurrentDirectory);
+        if (compareFullPath.rfind(compareCurrentDirectory, 0) == 0)
+        {
+            return normalizedFullPath.substr(normalizedCurrentDirectory.size());
+        }
+
+        return normalizedFullPath;
+    }
+
+    std::string NormalizeAssetIdToken(const std::string& source)
+    {
+        std::string result;
+        result.reserve(source.size());
+        for (unsigned char ch : source)
+        {
+            if (std::isalnum(ch))
+            {
+                result.push_back(static_cast<char>(std::tolower(ch)));
+            }
+            else if (ch == '_' || ch == '-' || ch == ' ')
+            {
+                if (result.empty() || result.back() == '_') continue;
+                result.push_back('_');
+            }
+        }
+
+        while (!result.empty() && result.back() == '_')
+        {
+            result.pop_back();
+        }
+        return result;
+    }
+
+    std::string MakeUniqueAssetId(
+        const std::string& displayName,
+        const std::string& path,
+        const std::unordered_set<std::string>& usedIds)
+    {
+        std::string base = NormalizeAssetIdToken(!displayName.empty() ? displayName : ExtractFileStem(path));
+        if (base.empty())
+        {
+            base = "asset";
+        }
+
+        std::string candidate = base;
+        int suffix = 2;
+        while (usedIds.find(candidate) != usedIds.end())
+        {
+            candidate = base + "_" + std::to_string(suffix++);
+        }
+        return candidate;
+    }
+
+    bool LoadAssetCatalogFromFile(const char* path, std::vector<SceneCastleEditor::AssetInfo>& outInfos, std::string& outError)
+    {
+        std::ifstream ifs(path);
+        if (!ifs.is_open())
+        {
+            outError = "Failed to open asset catalog: ";
+            outError += path;
+            return false;
+        }
+
+        std::unordered_map<std::string, std::string> values;
+        std::string line;
+        while (std::getline(ifs, line))
+        {
+            TrimString(line);
+            if (line.empty() || line[0] == '#') continue;
+
+            const size_t separator = line.find('=');
+            if (separator == std::string::npos) continue;
+
+            std::string key = line.substr(0, separator);
+            std::string value = line.substr(separator + 1);
+            TrimString(key);
+            TrimString(value);
+            if (key.empty()) continue;
+            values[key] = value;
+        }
+
+        const auto formatIt = values.find("format");
+        if (formatIt == values.end() || formatIt->second != kAssetCatalogFormat)
+        {
+            outError = "Asset catalog format is invalid.";
+            return false;
+        }
+
+        int version = 0;
+        if (!TryParseInt(values, "version", version) || version != kAssetCatalogVersion)
+        {
+            outError = "Asset catalog version is invalid.";
+            return false;
+        }
+
+        int assetCount = 0;
+        if (!TryParseInt(values, "assetCount", assetCount) || assetCount < 0)
+        {
+            outError = "Asset catalog assetCount is invalid.";
+            return false;
+        }
+
+        std::vector<SceneCastleEditor::AssetInfo> loaded;
+        loaded.reserve(static_cast<size_t>(assetCount));
+        std::unordered_set<std::string> usedIds;
+        for (int i = 0; i < assetCount; ++i)
+        {
+            char key[64];
+            SceneCastleEditor::AssetInfo info;
+
+            sprintf_s(key, "asset.%d.id", i);
+            const auto idIt = values.find(key);
+            if (idIt == values.end())
+            {
+                outError = "Asset catalog is missing asset id.";
+                return false;
+            }
+            info.assetId = NormalizeAssetIdToken(idIt->second);
+            if (info.assetId.empty())
+            {
+                outError = "Asset catalog contains invalid asset id.";
+                return false;
+            }
+            if (!usedIds.insert(info.assetId).second)
+            {
+                outError = "Asset catalog contains duplicate asset id: " + info.assetId;
+                return false;
+            }
+
+            sprintf_s(key, "asset.%d.name", i);
+            const auto nameIt = values.find(key);
+            if (nameIt == values.end())
+            {
+                outError = "Asset catalog is missing asset name.";
+                return false;
+            }
+            info.name = nameIt->second;
+            TrimString(info.name);
+
+            sprintf_s(key, "asset.%d.path", i);
+            const auto pathIt = values.find(key);
+            if (pathIt == values.end())
+            {
+                outError = "Asset catalog is missing asset path.";
+                return false;
+            }
+            info.path = pathIt->second;
+            TrimString(info.path);
+            info.path = NormalizePathSlashes(info.path);
+            if (info.path.empty())
+            {
+                outError = "Asset catalog contains empty asset path.";
+                return false;
+            }
+            if (info.name.empty())
+            {
+                info.name = ExtractFileStem(info.path);
+            }
+
+            sprintf_s(key, "asset.%d.scale", i);
+            TryParseFloat(values, key, info.scale);
+            if (info.scale <= 0.0f)
+            {
+                outError = "Asset catalog contains invalid scale.";
+                return false;
+            }
+
+            sprintf_s(key, "asset.%d.yOffset", i);
+            TryParseFloat(values, key, info.yOffset);
+
+            loaded.push_back(info);
+        }
+
+        outInfos = loaded;
+        return true;
+    }
+
+    bool SaveAssetCatalogToFile(const char* path, const std::vector<SceneCastleEditor::AssetInfo>& infos, std::string& outError)
+    {
+        std::ofstream ofs(path, std::ios::trunc);
+        if (!ofs.is_open())
+        {
+            outError = "Failed to write asset catalog: ";
+            outError += path;
+            return false;
+        }
+
+        ofs << "# DX22 castle editor asset catalog\n";
+        ofs << "format=" << kAssetCatalogFormat << "\n";
+        ofs << "version=" << kAssetCatalogVersion << "\n";
+        ofs << "assetCount=" << infos.size() << "\n";
+        for (size_t i = 0; i < infos.size(); ++i)
+        {
+            const SceneCastleEditor::AssetInfo& info = infos[i];
+            ofs << "asset." << i << ".id=" << info.assetId << "\n";
+            ofs << "asset." << i << ".name=" << info.name << "\n";
+            ofs << "asset." << i << ".path=" << info.path << "\n";
+            ofs << "asset." << i << ".scale=" << info.scale << "\n";
+            ofs << "asset." << i << ".yOffset=" << info.yOffset << "\n";
+        }
+
+        if (!ofs.good())
+        {
+            outError = "Failed while saving asset catalog.";
+            return false;
+        }
+
+        return true;
+    }
 
     struct RayHitResult
     {
@@ -203,7 +545,9 @@ namespace
 }
 
 SceneCastleEditor::SceneCastleEditor()
-    : m_selectedAssetIndex(0)
+    : m_assetCatalogStatusMessage()
+    , m_assetCatalogStatusIsError(false)
+    , m_selectedAssetIndex(-1)
     , m_toolMode(ToolMode::PlaceSingle)
     , m_activeLayer(0)
     , m_previewGridX(0)
@@ -380,6 +724,267 @@ const SceneCastleEditor::AssetInfo* SceneCastleEditor::GetAssetInfo(int index) c
 int SceneCastleEditor::GetSelectedAssetIndex() const
 {
     return m_selectedAssetIndex;
+}
+
+const char* SceneCastleEditor::GetAssetCatalogPath() const
+{
+    return kAssetCatalogPath;
+}
+
+const char* SceneCastleEditor::GetAssetCatalogStatusMessage() const
+{
+    return m_assetCatalogStatusMessage.c_str();
+}
+
+bool SceneCastleEditor::IsAssetCatalogStatusError() const
+{
+    return m_assetCatalogStatusIsError;
+}
+
+void SceneCastleEditor::SetAssetCatalogStatus(const std::string& message, bool isError)
+{
+    m_assetCatalogStatusMessage = message;
+    m_assetCatalogStatusIsError = isError;
+}
+
+int SceneCastleEditor::FindAssetIndexById(const std::string& assetId) const
+{
+    if (assetId.empty())
+    {
+        return -1;
+    }
+
+    for (int i = 0; i < static_cast<int>(m_assets.size()); ++i)
+    {
+        if (m_assets[static_cast<size_t>(i)].info.assetId == assetId)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+bool SceneCastleEditor::LoadAssetCatalogInfos(std::vector<AssetInfo>& outAssetInfos, std::string& outError) const
+{
+    std::ifstream ifs(kAssetCatalogPath);
+    if (!ifs.is_open())
+    {
+        outAssetInfos = BuildDefaultAssetCatalog();
+        return SaveAssetCatalogToFile(kAssetCatalogPath, outAssetInfos, outError);
+    }
+
+    return LoadAssetCatalogFromFile(kAssetCatalogPath, outAssetInfos, outError);
+}
+
+bool SceneCastleEditor::SaveAssetCatalogInfos(const std::vector<AssetInfo>& assetInfos, std::string& outError) const
+{
+    return SaveAssetCatalogToFile(kAssetCatalogPath, assetInfos, outError);
+}
+
+bool SceneCastleEditor::IsAssetReferencedBySessionId(const std::string& assetId) const
+{
+    if (assetId.empty())
+    {
+        return false;
+    }
+
+    const auto placementUsesAsset = [&](const PlacementInfo& placement)
+    {
+        if (placement.assetIndex < 0 || placement.assetIndex >= static_cast<int>(m_assets.size()))
+        {
+            return false;
+        }
+        return m_assets[static_cast<size_t>(placement.assetIndex)].info.assetId == assetId;
+    };
+
+    for (const PlacementInfo& placement : m_buildMap.GetPlacements())
+    {
+        if (placementUsesAsset(placement))
+        {
+            return true;
+        }
+    }
+
+    const auto historyUsesAsset = [&](const std::vector<HistoryEntry>& history)
+    {
+        for (const HistoryEntry& entry : history)
+        {
+            switch (entry.type)
+            {
+            case HistoryEntryType::AddPlacement:
+                if (placementUsesAsset(entry.afterPlacement)) return true;
+                break;
+            case HistoryEntryType::RemovePlacement:
+                if (placementUsesAsset(entry.beforePlacement)) return true;
+                break;
+            case HistoryEntryType::UpdatePlacement:
+                if (placementUsesAsset(entry.beforePlacement) || placementUsesAsset(entry.afterPlacement)) return true;
+                break;
+            case HistoryEntryType::AddPlacementBatch:
+            case HistoryEntryType::RemovePlacementBatch:
+                for (const PlacementInfo& placement : entry.placements)
+                {
+                    if (placementUsesAsset(placement)) return true;
+                }
+                break;
+            }
+        }
+
+        return false;
+    };
+
+    return historyUsesAsset(m_undoStack) || historyUsesAsset(m_redoStack);
+}
+
+bool SceneCastleEditor::CanRemoveAsset(int index) const
+{
+    const AssetInfo* asset = GetAssetInfo(index);
+    if (!asset)
+    {
+        return false;
+    }
+
+    return !IsAssetReferencedBySessionId(asset->assetId);
+}
+
+bool SceneCastleEditor::AddAssetFromPath(const char* displayName, const char* path)
+{
+    std::string name = displayName ? displayName : "";
+    std::string assetPath = path ? path : "";
+    TrimString(name);
+    TrimString(assetPath);
+    assetPath = NormalizeCatalogPath(assetPath);
+
+    if (assetPath.empty())
+    {
+        SetAssetCatalogStatus(u8"モデルパスを入力してください。", true);
+        return false;
+    }
+
+    if (name.empty())
+    {
+        name = ExtractFileStem(assetPath);
+    }
+    if (name.empty())
+    {
+        name = u8"New Model";
+    }
+
+    std::vector<AssetInfo> assetInfos;
+    std::string error;
+    if (!LoadAssetCatalogInfos(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    for (const AssetInfo& existing : assetInfos)
+    {
+        if (existing.path == assetPath)
+        {
+            SetAssetCatalogStatus(u8"同じパスのモデルは既に登録されています。", true);
+            return false;
+        }
+    }
+
+    std::unordered_set<std::string> usedIds;
+    for (const AssetInfo& info : assetInfos)
+    {
+        usedIds.insert(info.assetId);
+    }
+
+    AssetInfo newAsset;
+    newAsset.assetId = MakeUniqueAssetId(name, assetPath, usedIds);
+    newAsset.name = name;
+    newAsset.path = assetPath;
+    assetInfos.push_back(newAsset);
+
+    if (!ApplyAssetCatalog(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    if (!SaveAssetCatalogInfos(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    const int newAssetIndex = FindAssetIndexById(newAsset.assetId);
+    if (newAssetIndex >= 0)
+    {
+        SetSelectedAssetIndex(newAssetIndex);
+    }
+    SetAssetCatalogStatus(u8"モデルを追加しました。", false);
+    return true;
+}
+
+bool SceneCastleEditor::RemoveAsset(int index)
+{
+    const AssetInfo* asset = GetAssetInfo(index);
+    if (!asset)
+    {
+        SetAssetCatalogStatus(u8"削除対象のモデルが選ばれていません。", true);
+        return false;
+    }
+
+    if (!CanRemoveAsset(index))
+    {
+        SetAssetCatalogStatus(u8"配置中または履歴で参照中のモデルは削除できません。", true);
+        return false;
+    }
+
+    std::vector<AssetInfo> assetInfos;
+    std::string error;
+    if (!LoadAssetCatalogInfos(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    assetInfos.erase(
+        std::remove_if(
+            assetInfos.begin(),
+            assetInfos.end(),
+            [&](const AssetInfo& info) { return info.assetId == asset->assetId; }),
+        assetInfos.end());
+
+    if (!ApplyAssetCatalog(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    if (!SaveAssetCatalogInfos(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    SetAssetCatalogStatus(u8"モデルを削除しました。", false);
+    return true;
+}
+
+bool SceneCastleEditor::ReloadAssetCatalog()
+{
+    std::vector<AssetInfo> assetInfos;
+    std::string error;
+    if (!LoadAssetCatalogInfos(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    if (!ApplyAssetCatalog(assetInfos, error))
+    {
+        SetAssetCatalogStatus(error, true);
+        return false;
+    }
+
+    SetAssetCatalogStatus(u8"モデル一覧を再読込しました。", false);
+    return true;
 }
 
 void SceneCastleEditor::SetSelectedAssetIndex(int index)
@@ -764,6 +1369,220 @@ bool SceneCastleEditor::SaveCastleData(const char* path) const
 bool SceneCastleEditor::LoadCastleData(const char* path)
 {
     return CastleSaveData::Load(*this, path);
+}
+
+bool SceneCastleEditor::ApplyAssetCatalog(const std::vector<AssetInfo>& assetInfos, std::string& outError)
+{
+    std::vector<AssetInfo> normalizedInfos = assetInfos;
+    std::unordered_set<std::string> usedIds;
+    for (AssetInfo& info : normalizedInfos)
+    {
+        TrimString(info.assetId);
+        TrimString(info.name);
+        TrimString(info.path);
+        info.assetId = NormalizeAssetIdToken(info.assetId);
+        if (info.assetId.empty())
+        {
+            outError = "Asset id is empty.";
+            return false;
+        }
+        if (!usedIds.insert(info.assetId).second)
+        {
+            outError = "Duplicate asset id: " + info.assetId;
+            return false;
+        }
+        if (info.name.empty())
+        {
+            info.name = ExtractFileStem(info.path);
+        }
+        if (info.name.empty())
+        {
+            info.name = info.assetId;
+        }
+        if (info.path.empty())
+        {
+            outError = "Asset path is empty.";
+            return false;
+        }
+        if (info.scale <= 0.0f)
+        {
+            outError = "Asset scale must be positive.";
+            return false;
+        }
+    }
+
+    auto releaseAssetStates = [](std::vector<AssetState>& assets)
+    {
+        for (AssetState& asset : assets)
+        {
+            SAFE_DELETE(asset.thumbnailDS);
+            SAFE_DELETE(asset.thumbnailRT);
+            SAFE_DELETE(asset.model);
+        }
+        assets.clear();
+    };
+
+    std::vector<AssetState> loadedAssets;
+    loadedAssets.reserve(normalizedInfos.size());
+    for (const AssetInfo& info : normalizedInfos)
+    {
+        AssetState asset;
+        asset.info = info;
+        asset.model = new Model();
+        if (!asset.model->Load(asset.info.path.c_str(), asset.info.scale, Model::ZFlip))
+        {
+            outError = "Failed to load model: " + asset.info.path;
+            SAFE_DELETE(asset.model);
+            releaseAssetStates(loadedAssets);
+            return false;
+        }
+
+        DirectX::XMFLOAT3 minValue(FLT_MAX, FLT_MAX, FLT_MAX);
+        DirectX::XMFLOAT3 maxValue(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+        bool hasVertex = false;
+        for (unsigned int meshIndex = 0; meshIndex < asset.model->GetMeshNum(); ++meshIndex)
+        {
+            const Model::Mesh* mesh = asset.model->GetMesh(meshIndex);
+            if (!mesh) continue;
+            for (const Model::Vertex& vertex : mesh->vertices)
+            {
+                minValue.x = (vertex.pos.x < minValue.x) ? vertex.pos.x : minValue.x;
+                minValue.y = (vertex.pos.y < minValue.y) ? vertex.pos.y : minValue.y;
+                minValue.z = (vertex.pos.z < minValue.z) ? vertex.pos.z : minValue.z;
+                maxValue.x = (vertex.pos.x > maxValue.x) ? vertex.pos.x : maxValue.x;
+                maxValue.y = (vertex.pos.y > maxValue.y) ? vertex.pos.y : maxValue.y;
+                maxValue.z = (vertex.pos.z > maxValue.z) ? vertex.pos.z : maxValue.z;
+                hasVertex = true;
+            }
+        }
+        if (hasVertex)
+        {
+            asset.boundsMin = minValue;
+            asset.boundsMax = maxValue;
+            asset.placementAnchor = {
+                (minValue.x + maxValue.x) * 0.5f,
+                minValue.y,
+                (minValue.z + maxValue.z) * 0.5f
+            };
+            asset.hasBounds = true;
+        }
+
+        loadedAssets.push_back(std::move(asset));
+    }
+
+    std::vector<std::string> oldAssetIds;
+    oldAssetIds.reserve(m_assets.size());
+    for (const AssetState& asset : m_assets)
+    {
+        oldAssetIds.push_back(asset.info.assetId);
+    }
+
+    std::unordered_map<std::string, int> newAssetIndexById;
+    for (int i = 0; i < static_cast<int>(loadedAssets.size()); ++i)
+    {
+        newAssetIndexById[loadedAssets[static_cast<size_t>(i)].info.assetId] = i;
+    }
+
+    const auto remapPlacement = [&](PlacementInfo& placement) -> bool
+    {
+        if (placement.assetIndex < 0 || placement.assetIndex >= static_cast<int>(oldAssetIds.size()))
+        {
+            outError = "Placement refers to an invalid asset index.";
+            return false;
+        }
+
+        const std::string& assetId = oldAssetIds[static_cast<size_t>(placement.assetIndex)];
+        const auto it = newAssetIndexById.find(assetId);
+        if (it == newAssetIndexById.end())
+        {
+            outError = "Asset is still referenced by the current scene or history: " + assetId;
+            return false;
+        }
+
+        placement.assetIndex = it->second;
+        return true;
+    };
+
+    std::vector<PlacementInfo> remappedPlacements = m_buildMap.GetPlacements();
+    for (PlacementInfo& placement : remappedPlacements)
+    {
+        if (!remapPlacement(placement))
+        {
+            releaseAssetStates(loadedAssets);
+            return false;
+        }
+    }
+
+    const auto remapHistory = [&](std::vector<HistoryEntry>& history) -> bool
+    {
+        for (HistoryEntry& entry : history)
+        {
+            switch (entry.type)
+            {
+            case HistoryEntryType::AddPlacement:
+                if (!remapPlacement(entry.afterPlacement)) return false;
+                break;
+            case HistoryEntryType::RemovePlacement:
+                if (!remapPlacement(entry.beforePlacement)) return false;
+                break;
+            case HistoryEntryType::UpdatePlacement:
+                if (!remapPlacement(entry.beforePlacement)) return false;
+                if (!remapPlacement(entry.afterPlacement)) return false;
+                break;
+            case HistoryEntryType::AddPlacementBatch:
+            case HistoryEntryType::RemovePlacementBatch:
+                for (PlacementInfo& placement : entry.placements)
+                {
+                    if (!remapPlacement(placement)) return false;
+                }
+                break;
+            }
+        }
+
+        return true;
+    };
+
+    std::vector<HistoryEntry> remappedUndo = m_undoStack;
+    std::vector<HistoryEntry> remappedRedo = m_redoStack;
+    if (!remapHistory(remappedUndo) || !remapHistory(remappedRedo))
+    {
+        releaseAssetStates(loadedAssets);
+        return false;
+    }
+
+    const std::string selectedAssetId =
+        (m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(oldAssetIds.size()))
+        ? oldAssetIds[static_cast<size_t>(m_selectedAssetIndex)]
+        : std::string{};
+
+    ReleaseAssets();
+    m_assets = std::move(loadedAssets);
+    m_buildMap.SetPlacements(remappedPlacements);
+    m_undoStack = std::move(remappedUndo);
+    m_redoStack = std::move(remappedRedo);
+    m_selection.ClampSelection(m_buildMap.GetPlacementCount());
+
+    if (!selectedAssetId.empty())
+    {
+        m_selectedAssetIndex = FindAssetIndexById(selectedAssetId);
+    }
+    if (m_selectedAssetIndex < 0 && !m_assets.empty())
+    {
+        m_selectedAssetIndex = 0;
+    }
+    if (m_assets.empty())
+    {
+        m_selectedAssetIndex = -1;
+        if (m_toolMode != ToolMode::SelectSingle && m_toolMode != ToolMode::SelectFill)
+        {
+            m_toolMode = ToolMode::SelectSingle;
+        }
+    }
+
+    m_hasPreview = false;
+    m_canPlacePreview = false;
+    ClearPlacementToolState();
+    return true;
 }
 
 void SceneCastleEditor::HandleSceneViewInput(
@@ -1435,50 +2254,32 @@ int SceneCastleEditor::FindPlacementByRay(
 
 void SceneCastleEditor::LoadAssets()
 {
-    m_assets = {
-        { { "brick", u8"Brick", "Assets/Model/Castle/Brick.fbx", 1.0f, 0.0f }, nullptr },
-        { { "wall",  u8"Wall",  "Assets/Model/Castle/Wall.fbx",  1.0f, 0.0f }, nullptr },
-    };
-
-    for (AssetState& asset : m_assets)
+    std::vector<AssetInfo> assetInfos;
+    std::string error;
+    if (LoadAssetCatalogInfos(assetInfos, error) && ApplyAssetCatalog(assetInfos, error))
     {
-        asset.model = new Model();
-        if (!asset.model->Load(asset.info.path, asset.info.scale, Model::ZFlip))
-        {
-            std::string message = "Failed to load model: ";
-            message += asset.info.path;
-            MessageBoxA(nullptr, message.c_str(), "SceneCastleEditor", MB_OK | MB_ICONWARNING);
-        }
+        return;
+    }
 
-        DirectX::XMFLOAT3 minValue(FLT_MAX, FLT_MAX, FLT_MAX);
-        DirectX::XMFLOAT3 maxValue(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-        bool hasVertex = false;
-        for (unsigned int meshIndex = 0; meshIndex < asset.model->GetMeshNum(); ++meshIndex)
+    std::vector<AssetInfo> fallbackInfos = BuildDefaultAssetCatalog();
+    std::string fallbackError;
+    if (ApplyAssetCatalog(fallbackInfos, fallbackError))
+    {
+        std::string saveError;
+        if (!SaveAssetCatalogInfos(fallbackInfos, saveError) && error.empty())
         {
-            const Model::Mesh* mesh = asset.model->GetMesh(meshIndex);
-            if (!mesh) continue;
-            for (const Model::Vertex& vertex : mesh->vertices)
-            {
-                minValue.x = (vertex.pos.x < minValue.x) ? vertex.pos.x : minValue.x;
-                minValue.y = (vertex.pos.y < minValue.y) ? vertex.pos.y : minValue.y;
-                minValue.z = (vertex.pos.z < minValue.z) ? vertex.pos.z : minValue.z;
-                maxValue.x = (vertex.pos.x > maxValue.x) ? vertex.pos.x : maxValue.x;
-                maxValue.y = (vertex.pos.y > maxValue.y) ? vertex.pos.y : maxValue.y;
-                maxValue.z = (vertex.pos.z > maxValue.z) ? vertex.pos.z : maxValue.z;
-                hasVertex = true;
-            }
+            error = saveError;
         }
-        if (hasVertex)
-        {
-            asset.boundsMin = minValue;
-            asset.boundsMax = maxValue;
-            asset.placementAnchor = {
-                (minValue.x + maxValue.x) * 0.5f,
-                minValue.y,
-                (minValue.z + maxValue.z) * 0.5f
-            };
-            asset.hasBounds = true;
-        }
+    }
+    else if (error.empty())
+    {
+        error = fallbackError;
+    }
+
+    if (!error.empty())
+    {
+        SetAssetCatalogStatus(error, true);
+        MessageBoxA(nullptr, error.c_str(), "SceneCastleEditor", MB_OK | MB_ICONWARNING);
     }
 }
 
@@ -1492,6 +2293,8 @@ void SceneCastleEditor::ReleaseAssets()
         SAFE_DELETE(asset.thumbnailRT);
         SAFE_DELETE(asset.model);
     }
+    m_assets.clear();
+    m_modelViewSize = 0;
 }
 
 bool SceneCastleEditor::EnsureThumbnailTargets(AssetState& asset, unsigned int size)
@@ -2014,3 +2817,4 @@ void SceneCastleEditor::SyncCameraAnglesFromPose()
     m_cameraPitch = std::asin(ClampFloat(dy / m_cameraDistance, -1.0f, 1.0f));
     m_cameraYaw = std::atan2(dx, dz);
 }
+

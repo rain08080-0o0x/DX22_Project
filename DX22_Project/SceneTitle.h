@@ -25,6 +25,9 @@ private:
     int m_menuSelection;
     bool m_isOptionOpen;
     int m_optionSelection;
+    bool m_isKeyConfigOpen;
+    int m_keyConfigSelection;
+    bool m_isKeyConfigCapturing;
     bool m_isDifficultyOpen;
     int m_difficultySelection;
 };

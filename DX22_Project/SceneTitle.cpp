@@ -1,11 +1,13 @@
-﻿#include "SceneTitle.h"
+#include "SceneTitle.h"
 #include "SceneManager.h"
 #include "Input.h"
 #include "Transfer.h"
 #include "Main.h"
 #include "UIObject.h"
-
 #include "Defines.h"
+#include "imgui.h"
+
+#include <cstdio>
 
 namespace
 {
@@ -17,8 +19,10 @@ namespace
     constexpr int kOptionRowBgm = 1;
     constexpr int kOptionRowSe = 2;
     constexpr int kOptionRowDisplay = 3;
-    constexpr int kOptionRowBack = 4;
-    constexpr int kOptionRowCount = 5;
+    constexpr int kOptionRowKeyConfig = 4;
+    constexpr int kOptionRowBack = 5;
+    constexpr int kOptionRowCount = 6;
+
     constexpr float kVolumeStep = 0.05f;
     constexpr int kDifficultyChoiceCount = 3;
     constexpr float kDifficultyFrameWidth = 760.0f;
@@ -30,9 +34,33 @@ namespace
     constexpr float kHoveredScale = 1.12f;
     constexpr float kDifficultyPanelOffsetY = kDifficultyFrameHeight * 0.5f;
 
+    struct KeyConfigEntry
+    {
+        const char* label;
+        int Transfer::InputConfig::*member;
+        const char* padLabel;
+    };
+
+    const KeyConfigEntry kKeyConfigEntries[] =
+    {
+        { u8"Move Up",    &Transfer::InputConfig::moveUp,    "LeftStick Up / DPad Up" },
+        { u8"Move Down",  &Transfer::InputConfig::moveDown,  "LeftStick Down / DPad Down" },
+        { u8"Move Left",  &Transfer::InputConfig::moveLeft,  "LeftStick Left / DPad Left" },
+        { u8"Move Right", &Transfer::InputConfig::moveRight, "LeftStick Right / DPad Right" },
+        { u8"Dash",       &Transfer::InputConfig::dash,      "A" },
+        { u8"Attack",     &Transfer::InputConfig::attack,    "B" },
+        { u8"Skill 1",    &Transfer::InputConfig::skill1,    "Y" },
+        { u8"Skill 2",    &Transfer::InputConfig::skill2,    "X" },
+        { u8"Reroll",     &Transfer::InputConfig::reroll,    "Y" }
+    };
+    constexpr int kKeyConfigEntryCount = static_cast<int>(sizeof(kKeyConfigEntries) / sizeof(kKeyConfigEntries[0]));
+    constexpr int kKeyConfigRowReset = kKeyConfigEntryCount;
+    constexpr int kKeyConfigRowBack = kKeyConfigEntryCount + 1;
+    constexpr int kKeyConfigRowCount = kKeyConfigEntryCount + 2;
+
     bool IsTitleConfirmTriggered()
     {
-        return IsKeyTrigger(VK_RETURN) || IsKeyTrigger('F') || IsKeyTrigger(VK_SPACE);
+        return IsMenuConfirmTrigger();
     }
 
     int WrapIndex(int value, int count)
@@ -73,6 +101,249 @@ namespace
         pUI->SetSize(baseWidth * scale, baseHeight * scale);
         pUI->SetColor(color, color, color, 1.0f);
     }
+
+    BYTE NormalizeBindableKey(BYTE key)
+    {
+        if (key == VK_LSHIFT || key == VK_RSHIFT)
+        {
+            return VK_SHIFT;
+        }
+        return key;
+    }
+
+    const BYTE* GetBindableKeyList(size_t& outCount)
+    {
+        static const BYTE kBindableKeys[] =
+        {
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+            'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT,
+            VK_SPACE, VK_RETURN, VK_LSHIFT, VK_RSHIFT, VK_TAB, VK_LCONTROL, VK_RCONTROL
+        };
+        outCount = sizeof(kBindableKeys) / sizeof(kBindableKeys[0]);
+        return kBindableKeys;
+    }
+
+    BYTE FindTriggeredBindableKey()
+    {
+        size_t keyCount = 0;
+        const BYTE* bindableKeys = GetBindableKeyList(keyCount);
+        for (size_t i = 0; i < keyCount; ++i)
+        {
+            if (IsRawKeyTrigger(bindableKeys[i]))
+            {
+                return NormalizeBindableKey(bindableKeys[i]);
+            }
+        }
+        return 0;
+    }
+
+    void FormatKeyLabel(BYTE key, char* out, size_t outSize)
+    {
+        if (!out || outSize == 0)
+        {
+            return;
+        }
+
+        switch (key)
+        {
+        case VK_UP:
+            sprintf_s(out, outSize, "Up");
+            return;
+        case VK_DOWN:
+            sprintf_s(out, outSize, "Down");
+            return;
+        case VK_LEFT:
+            sprintf_s(out, outSize, "Left");
+            return;
+        case VK_RIGHT:
+            sprintf_s(out, outSize, "Right");
+            return;
+        case VK_SPACE:
+            sprintf_s(out, outSize, "Space");
+            return;
+        case VK_RETURN:
+            sprintf_s(out, outSize, "Enter");
+            return;
+        case VK_SHIFT:
+            sprintf_s(out, outSize, "Shift");
+            return;
+        case VK_TAB:
+            sprintf_s(out, outSize, "Tab");
+            return;
+        case VK_CONTROL:
+        case VK_LCONTROL:
+        case VK_RCONTROL:
+            sprintf_s(out, outSize, "Ctrl");
+            return;
+        default:
+            break;
+        }
+
+        if ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9'))
+        {
+            sprintf_s(out, outSize, "%c", key);
+            return;
+        }
+
+        UINT scanCode = MapVirtualKeyA(key, MAPVK_VK_TO_VSC);
+        if (scanCode != 0)
+        {
+            char buffer[128]{};
+            if (GetKeyNameTextA(static_cast<LONG>(scanCode << 16), buffer, static_cast<int>(sizeof(buffer))) > 0)
+            {
+                sprintf_s(out, outSize, "%s", buffer);
+                return;
+            }
+        }
+
+        sprintf_s(out, outSize, "VK_%u", static_cast<unsigned int>(key));
+    }
+
+    void AssignKeyBinding(Transfer::InputConfig& input, int Transfer::InputConfig::*member, BYTE newKey)
+    {
+        if (!member || newKey == 0)
+        {
+            return;
+        }
+
+        const int previousKey = input.*member;
+        if (previousKey == static_cast<int>(newKey))
+        {
+            return;
+        }
+
+        for (int i = 0; i < kKeyConfigEntryCount; ++i)
+        {
+            if (kKeyConfigEntries[i].member == member)
+            {
+                continue;
+            }
+            if (input.*(kKeyConfigEntries[i].member) == static_cast<int>(newKey))
+            {
+                input.*(kKeyConfigEntries[i].member) = previousKey;
+                break;
+            }
+        }
+        input.*member = newKey;
+    }
+
+    void DrawKeyConfigOverlay(const Transfer& tran, int selectedRow, bool capturing)
+    {
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        if (!viewport)
+        {
+            return;
+        }
+
+        ImDrawList* drawList = ImGui::GetForegroundDrawList(viewport);
+        if (!drawList)
+        {
+            return;
+        }
+
+        const float uiScale = (tran.gameplayDebug.pauseMenuUiScale < 0.75f) ? 0.75f
+            : (tran.gameplayDebug.pauseMenuUiScale > 2.0f ? 2.0f : tran.gameplayDebug.pauseMenuUiScale);
+        const ImVec2 panelSize(840.0f * uiScale, 620.0f * uiScale);
+        const ImVec2 panelMin(
+            viewport->Pos.x + (viewport->Size.x - panelSize.x) * 0.5f,
+            viewport->Pos.y + (viewport->Size.y - panelSize.y) * 0.5f);
+        const ImVec2 panelMax(panelMin.x + panelSize.x, panelMin.y + panelSize.y);
+        const float corner = 18.0f * uiScale;
+        const float rowHeight = 42.0f * uiScale;
+        const float actionX = panelMin.x + 32.0f * uiScale;
+        const float keyX = panelMin.x + 360.0f * uiScale;
+        const float padX = panelMin.x + 575.0f * uiScale;
+        const float firstRowY = panelMin.y + 150.0f * uiScale;
+
+        drawList->AddRectFilled(
+            viewport->Pos,
+            ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y),
+            IM_COL32(0, 0, 0, 150));
+        drawList->AddRectFilled(panelMin, panelMax, IM_COL32(20, 26, 34, 235), corner);
+        drawList->AddRect(panelMin, panelMax, IM_COL32(164, 196, 224, 220), corner, 0, 2.0f);
+
+        ImFont* font = ImGui::GetFont();
+        const float baseFontSize = ImGui::GetFontSize();
+        const float titleFontSize = baseFontSize * 1.55f * uiScale;
+        const float headerFontSize = baseFontSize * 1.05f * uiScale;
+        const float rowFontSize = baseFontSize * 0.98f * uiScale;
+        const float noteFontSize = baseFontSize * 0.92f * uiScale;
+
+        drawList->AddText(font, titleFontSize, ImVec2(panelMin.x + 28.0f * uiScale, panelMin.y + 24.0f * uiScale),
+            IM_COL32(245, 247, 252, 255), u8"Key Config");
+        drawList->AddText(font, noteFontSize, ImVec2(panelMin.x + 30.0f * uiScale, panelMin.y + 70.0f * uiScale),
+            IM_COL32(196, 208, 224, 255), u8"Enter / F / Space: change   Esc / Start: back");
+        drawList->AddText(font, noteFontSize, ImVec2(panelMin.x + 30.0f * uiScale, panelMin.y + 94.0f * uiScale),
+            IM_COL32(196, 208, 224, 255), u8"Esc is fixed. Controller bindings are fixed and shown as reference.");
+
+        drawList->AddLine(
+            ImVec2(panelMin.x + 28.0f * uiScale, panelMin.y + 126.0f * uiScale),
+            ImVec2(panelMax.x - 28.0f * uiScale, panelMin.y + 126.0f * uiScale),
+            IM_COL32(112, 132, 154, 190),
+            1.5f);
+        drawList->AddText(font, headerFontSize, ImVec2(actionX, panelMin.y + 132.0f * uiScale),
+            IM_COL32(210, 220, 236, 255), u8"Action");
+        drawList->AddText(font, headerFontSize, ImVec2(keyX, panelMin.y + 132.0f * uiScale),
+            IM_COL32(210, 220, 236, 255), u8"Keyboard");
+        drawList->AddText(font, headerFontSize, ImVec2(padX, panelMin.y + 132.0f * uiScale),
+            IM_COL32(210, 220, 236, 255), u8"Controller");
+
+        for (int row = 0; row < kKeyConfigRowCount; ++row)
+        {
+            const float rowTop = firstRowY + rowHeight * static_cast<float>(row);
+            const ImVec2 rowMin(panelMin.x + 24.0f * uiScale, rowTop);
+            const ImVec2 rowMax(panelMax.x - 24.0f * uiScale, rowTop + rowHeight - 4.0f * uiScale);
+            const bool selected = (selectedRow == row);
+            const bool captureRow = capturing && selected && row < kKeyConfigEntryCount;
+
+            ImU32 fillColor = IM_COL32(34, 40, 52, 220);
+            if (selected)
+            {
+                fillColor = captureRow ? IM_COL32(128, 84, 28, 240) : IM_COL32(36, 92, 164, 236);
+            }
+            drawList->AddRectFilled(rowMin, rowMax, fillColor, 10.0f * uiScale);
+            drawList->AddRect(rowMin, rowMax,
+                selected ? IM_COL32(240, 244, 255, 220) : IM_COL32(92, 104, 124, 150),
+                10.0f * uiScale, 0, selected ? 2.0f : 1.0f);
+
+            if (row < kKeyConfigEntryCount)
+            {
+                const KeyConfigEntry& entry = kKeyConfigEntries[row];
+                const int keyValue = tran.input.*(entry.member);
+                char keyLabel[64]{};
+                FormatKeyLabel(static_cast<BYTE>(keyValue), keyLabel, sizeof(keyLabel));
+                const char* currentKeyLabel = captureRow ? "Press key..." : keyLabel;
+                drawList->AddText(font, rowFontSize, ImVec2(actionX, rowTop + 10.0f * uiScale),
+                    IM_COL32(244, 246, 250, 255), entry.label);
+                drawList->AddText(font, rowFontSize, ImVec2(keyX, rowTop + 10.0f * uiScale),
+                    IM_COL32(255, 245, 190, 255), currentKeyLabel);
+                drawList->AddText(font, rowFontSize, ImVec2(padX, rowTop + 10.0f * uiScale),
+                    IM_COL32(202, 216, 232, 255), entry.padLabel);
+            }
+            else if (row == kKeyConfigRowReset)
+            {
+                drawList->AddText(font, rowFontSize, ImVec2(actionX, rowTop + 10.0f * uiScale),
+                    IM_COL32(244, 246, 250, 255), u8"Reset to Default");
+                drawList->AddText(font, rowFontSize, ImVec2(keyX, rowTop + 10.0f * uiScale),
+                    IM_COL32(202, 216, 232, 255), u8"Restore WASD / Shift / F / O / P / R");
+            }
+            else
+            {
+                drawList->AddText(font, rowFontSize, ImVec2(actionX, rowTop + 10.0f * uiScale),
+                    IM_COL32(244, 246, 250, 255), u8"Back");
+                drawList->AddText(font, rowFontSize, ImVec2(keyX, rowTop + 10.0f * uiScale),
+                    IM_COL32(202, 216, 232, 255), u8"Return to Title Option");
+            }
+        }
+
+        const char* footerText = capturing
+            ? u8"Waiting for input...  Esc / Start cancels capture."
+            : u8"Menu close / Pause is fixed to Esc on keyboard and Start on controller.";
+        drawList->AddText(font, noteFontSize, ImVec2(panelMin.x + 30.0f * uiScale, panelMax.y - 38.0f * uiScale),
+            IM_COL32(196, 208, 224, 255), footerText);
+    }
 }
 
 SceneTitle::SceneTitle()
@@ -88,12 +359,12 @@ SceneTitle::SceneTitle()
     , m_menuSelection(kTitleMenuStart)
     , m_isOptionOpen(false)
     , m_optionSelection(kOptionRowMaster)
+    , m_isKeyConfigOpen(false)
+    , m_keyConfigSelection(0)
+    , m_isKeyConfigCapturing(false)
     , m_isDifficultyOpen(false)
     , m_difficultySelection(1)
 {
-    // 画像は Assets/Texture/ を UIObject 側が付ける前提なら相対でOK
-    // 例: Assets/Texture/Title/Title_Logo.png を置いた場合は "Title/Title_Logo.png"
-
     m_pLogo = new UIObject("Title/Title_Logo.png", SCREEN_WIDTH * 0.5f, 210.0f, 900.0f, 380.0f);
     m_pStart = new UIObject("Title/Btn_Start.png", SCREEN_WIDTH * 0.5f, 500.0f, 360.0f, 96.0f);
     m_pOption = new UIObject("Title/Option.png", SCREEN_WIDTH * 0.5f, 600.0f, 360.0f, 96.0f);
@@ -103,10 +374,13 @@ SceneTitle::SceneTitle()
     m_pDifficultyNormal = new UIObject("Game/Normal.png", SCREEN_WIDTH * 0.5f, 395.0f, kDifficultyButtonWidth, kDifficultyButtonHeight);
     m_pDifficultyHard = new UIObject("Game/Hard.png", SCREEN_WIDTH * 0.5f, 500.0f, kDifficultyButtonWidth, kDifficultyButtonHeight);
     m_pDifficultyBack = new UIObject("Game/Back.png", SCREEN_WIDTH * 0.5f, 622.0f, kDifficultyBackWidth, kDifficultyBackHeight);
+
     TRAN_INS;
     tran.gameplayDebug.titleOptionOpen = 0;
     tran.gameplayDebug.titleOptionSelection = 0;
     tran.gameplayDebug.titleOptionRequestClose = 0;
+    tran.gameplayDebug.titleKeyConfigOpen = 0;
+    tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
     m_difficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
     tran.gameplayDebug.titleDifficultyOpen = 0;
     tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
@@ -128,20 +402,38 @@ SceneTitle::~SceneTitle()
 void SceneTitle::Update()
 {
     TRAN_INS;
+
     if (tran.gameplayDebug.titleOptionRequestClose != 0)
     {
         tran.gameplayDebug.titleOptionRequestClose = 0;
+        m_isKeyConfigOpen = false;
+        m_isKeyConfigCapturing = false;
         if (m_isOptionOpen)
         {
             m_isOptionOpen = false;
+            tran.gameplayDebug.titleKeyConfigOpen = 0;
             return;
         }
     }
+
+    if (tran.gameplayDebug.titleKeyConfigRequestOpen != 0)
+    {
+        tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
+        if (m_isOptionOpen)
+        {
+            m_isKeyConfigOpen = true;
+            m_keyConfigSelection = 0;
+            m_isKeyConfigCapturing = false;
+        }
+    }
+
     if (m_isDifficultyOpen)
     {
         tran.gameplayDebug.titleOptionOpen = 0;
         tran.gameplayDebug.titleOptionSelection = 0;
         tran.gameplayDebug.titleOptionRequestClose = 0;
+        tran.gameplayDebug.titleKeyConfigOpen = 0;
+        tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
         tran.gameplayDebug.titleDifficultyOpen = 1;
         tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
 
@@ -165,11 +457,13 @@ void SceneTitle::Update()
             tran.gameplayDebug.runTimerRunning = 0;
             tran.gameplayDebug.titleDifficultyOpen = 0;
             tran.gameplayDebug.titleDifficultySelection = selectedDifficulty;
+            tran.gameplayDebug.titleKeyConfigOpen = 0;
+            tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
             m_isDifficultyOpen = false;
             SceneManager::ChangeScene(SceneManager::SCENE_GAME);
         };
 
-        if (IsKeyTrigger(VK_ESCAPE))
+        if (IsMenuBackTrigger())
         {
             closeDifficultyOverlay();
             return;
@@ -240,14 +534,33 @@ void SceneTitle::Update()
         }
         return;
     }
+
     tran.gameplayDebug.titleDifficultyOpen = 0;
     tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
+
+    if (m_isKeyConfigOpen)
+    {
+        tran.gameplayDebug.titleOptionOpen = 1;
+        tran.gameplayDebug.titleOptionSelection = m_optionSelection;
+        tran.gameplayDebug.titleKeyConfigOpen = 1;
+
+        if (IsMenuBackTrigger())
+        {
+            m_isKeyConfigOpen = false;
+            tran.gameplayDebug.titleKeyConfigOpen = 0;
+            return;
+        }
+        return;
+    }
+
+    tran.gameplayDebug.titleKeyConfigOpen = 0;
+
     if (m_isOptionOpen)
     {
         tran.gameplayDebug.titleOptionOpen = 1;
         tran.gameplayDebug.titleOptionSelection = m_optionSelection;
 
-        if (IsKeyTrigger(VK_ESCAPE))
+        if (IsMenuBackTrigger())
         {
             m_isOptionOpen = false;
             return;
@@ -292,6 +605,12 @@ void SceneTitle::Update()
             {
                 ToggleAppFullscreen();
             }
+            else if (m_optionSelection == kOptionRowKeyConfig)
+            {
+                m_isKeyConfigOpen = true;
+                m_keyConfigSelection = 0;
+                m_isKeyConfigCapturing = false;
+            }
             else if (m_optionSelection == kOptionRowBack)
             {
                 m_isOptionOpen = false;
@@ -299,9 +618,12 @@ void SceneTitle::Update()
         }
         return;
     }
+
     tran.gameplayDebug.titleOptionOpen = 0;
     tran.gameplayDebug.titleOptionSelection = 0;
     tran.gameplayDebug.titleOptionRequestClose = 0;
+    tran.gameplayDebug.titleKeyConfigOpen = 0;
+    tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
 
     if (IsKeyTrigger(VK_ESCAPE))
     {
@@ -356,9 +678,13 @@ void SceneTitle::Update()
         {
             m_isOptionOpen = true;
             m_optionSelection = kOptionRowMaster;
+            m_isKeyConfigOpen = false;
+            m_isKeyConfigCapturing = false;
             tran.gameplayDebug.titleOptionOpen = 1;
             tran.gameplayDebug.titleOptionSelection = m_optionSelection;
             tran.gameplayDebug.titleOptionRequestClose = 0;
+            tran.gameplayDebug.titleKeyConfigOpen = 0;
+            tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
             return;
         }
         if (exitSelected)
