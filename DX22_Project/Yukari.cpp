@@ -2,9 +2,12 @@
 #include "Transfer.h"
 
 Yukari::Yukari()
+	: m_now(Yukari_Type::Normal)
+	, m_old(Yukari_Type::Normal)
+	, m_pYukari{ nullptr, nullptr, nullptr, nullptr }
+	, m_pFukidasi(nullptr)
 {
 	TRAN_INS;
-	m_old = m_now = Yukari_Type::Normal;
 
 	DirectX::XMFLOAT2 size = { 500.0f,500.0f };
 	DirectX::XMFLOAT2 pos = { SCREEN_WIDTH - (size.x / 2.0f) + 100.0f, SCREEN_HEIGHT - (size.y / 2.0f * 0.75f) };
@@ -35,6 +38,14 @@ Yukari::Yukari()
 
 Yukari::~Yukari()
 {
+	for (int i = 0; i < 4; ++i)
+	{
+		delete m_pYukari[i];
+		m_pYukari[i] = nullptr;
+	}
+
+	delete m_pFukidasi;
+	m_pFukidasi = nullptr;
 }
 
 

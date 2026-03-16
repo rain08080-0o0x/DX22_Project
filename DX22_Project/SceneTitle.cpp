@@ -20,8 +20,9 @@ namespace
     constexpr int kOptionRowSe = 2;
     constexpr int kOptionRowDisplay = 3;
     constexpr int kOptionRowKeyConfig = 4;
-    constexpr int kOptionRowBack = 5;
-    constexpr int kOptionRowCount = 6;
+    constexpr int kOptionRowEffectDebug = 5;
+    constexpr int kOptionRowBack = 6;
+    constexpr int kOptionRowCount = 7;
 
     constexpr float kVolumeStep = 0.05f;
     constexpr int kDifficultyChoiceCount = 3;
@@ -610,6 +611,18 @@ void SceneTitle::Update()
                 m_isKeyConfigOpen = true;
                 m_keyConfigSelection = 0;
                 m_isKeyConfigCapturing = false;
+            }
+            else if (m_optionSelection == kOptionRowEffectDebug)
+            {
+                m_isOptionOpen = false;
+                m_isKeyConfigOpen = false;
+                m_isKeyConfigCapturing = false;
+                tran.gameplayDebug.titleOptionOpen = 0;
+                tran.gameplayDebug.titleOptionSelection = 0;
+                tran.gameplayDebug.titleOptionRequestClose = 0;
+                tran.gameplayDebug.titleKeyConfigOpen = 0;
+                tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
+                SceneManager::ChangeScene(SceneManager::SCENE_EFFECT_DEBUG);
             }
             else if (m_optionSelection == kOptionRowBack)
             {

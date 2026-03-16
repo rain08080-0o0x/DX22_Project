@@ -79,6 +79,7 @@ Enemy::Enemy()
     , m_wanderTarget(0.0f, 0.0f, 0.0f)
     , m_wanderTimer(0.0f)
     , m_state(MoveState::Wander)
+    , m_forceChase(false)
 {
     // 生成直後は原点から開始し、初期種別の補正値をまとめて適用します。
     m_pos = { 0.0f, 0.0f, 0.0f };
@@ -131,7 +132,11 @@ void Enemy::Update()
     const float toTargetZ = m_targetPos.z - m_pos.z;
     const float targetDistSq = toTargetX * toTargetX + toTargetZ * toTargetZ;
 
-    if (m_state == MoveState::Wander)
+    if (m_forceChase)
+    {
+        m_state = MoveState::Chase;
+    }
+    else if (m_state == MoveState::Wander)
     {
         // 徘徊中に十分近づかれたら追跡へ切り替えます。
         if (targetDistSq <= chaseStart * chaseStart)
@@ -499,4 +504,13 @@ void Enemy::SetCamera(Camera* camera)
 void Enemy::SetTargetPos(DirectX::XMFLOAT3 targetPos)
 {
     m_targetPos = targetPos;
+}
+
+void Enemy::SetForceChase(bool forceChase)
+{
+    m_forceChase = forceChase;
+    if (m_forceChase)
+    {
+        m_state = MoveState::Chase;
+    }
 }

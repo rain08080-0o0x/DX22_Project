@@ -23,9 +23,106 @@
 // デバッグ用
 #include "DebugUtil.h"
 
+namespace
+{
+	struct FramePerfStats
+	{
+		float updateInputMs = 0.0f;
+		float updateAudioMs = 0.0f;
+		float sceneUpdateMs = 0.0f;
+		float updateTotalMs = 0.0f;
+		float beginDrawMs = 0.0f;
+		float sceneDrawMs = 0.0f;
+		float overlayDrawMs = 0.0f;
+		float endDrawMs = 0.0f;
+		float drawTotalMs = 0.0f;
+		float frameCpuMs = 0.0f;
+		SceneManager::SceneType scene = SceneManager::SceneType::SCENE_TITLE;
+	};
+
+	FramePerfStats g_perfFrameWorking{};
+	FramePerfStats g_perfFrameLast{};
+	FramePerfStats g_perfFrameAvg{};
+
+	void BlendPerfValue(float& accum, float sample)
+	{
+		if (accum <= 0.0f)
+		{
+			accum = sample;
+			return;
+		}
+		accum = accum * 0.85f + sample * 0.15f;
+	}
+
+	void CommitPerfFrame(const FramePerfStats& sample)
+	{
+		g_perfFrameLast = sample;
+		BlendPerfValue(g_perfFrameAvg.updateInputMs, sample.updateInputMs);
+		BlendPerfValue(g_perfFrameAvg.updateAudioMs, sample.updateAudioMs);
+		BlendPerfValue(g_perfFrameAvg.sceneUpdateMs, sample.sceneUpdateMs);
+		BlendPerfValue(g_perfFrameAvg.updateTotalMs, sample.updateTotalMs);
+		BlendPerfValue(g_perfFrameAvg.beginDrawMs, sample.beginDrawMs);
+		BlendPerfValue(g_perfFrameAvg.sceneDrawMs, sample.sceneDrawMs);
+		BlendPerfValue(g_perfFrameAvg.overlayDrawMs, sample.overlayDrawMs);
+		BlendPerfValue(g_perfFrameAvg.endDrawMs, sample.endDrawMs);
+		BlendPerfValue(g_perfFrameAvg.drawTotalMs, sample.drawTotalMs);
+		BlendPerfValue(g_perfFrameAvg.frameCpuMs, sample.frameCpuMs);
+		g_perfFrameAvg.scene = sample.scene;
+	}
+
+	const char* GetSceneProfileName(SceneManager::SceneType scene)
+	{
+		switch (scene)
+		{
+		case SceneManager::SceneType::SCENE_TITLE:
+			return "Title";
+		case SceneManager::SceneType::SCENE_GAME:
+			return "Game";
+		case SceneManager::SceneType::SCENE_RESULT:
+			return "Result";
+		case SceneManager::SceneType::SCENE_ENGINE_EDITOR:
+			return "CastleEditor";
+		case SceneManager::SceneType::SCENE_EFFECT_DEBUG:
+			return "EffectDebug";
+		default:
+			return "Unknown";
+		}
+	}
+
+	void FormatHudFixedFloat(float value, char* out, size_t outSize)
+	{
+		float safeValue = value;
+		if (safeValue < 0.0f)
+		{
+			safeValue = 0.0f;
+		}
+		if (safeValue > 999.99f)
+		{
+			safeValue = 999.99f;
+		}
+		sprintf_s(out, outSize, "%06.2f", safeValue);
+	}
+
+	ImU32 GetPerfBorderColor(float frameMs)
+	{
+		const float frameBudget60 = 1000.0f / 60.0f;
+		if (frameMs <= frameBudget60 * 0.90f)
+		{
+			return IM_COL32(90, 210, 120, 180);
+		}
+		if (frameMs <= frameBudget60)
+		{
+			return IM_COL32(255, 210, 90, 180);
+		}
+		return IM_COL32(255, 110, 110, 180);
+	}
+}
+
 HRESULT Init(HWND hWnd, UINT width, UINT height)
 {
+#ifdef _DEBUG
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
 
 	HRESULT hr;
 	hr = InitSound();
@@ -77,7 +174,15 @@ void Uninit()
 
 void Update()
 {
+	FramePerfStats perf{};
+	perf.scene = SceneManager::GetCurrent();
+	const double updateStart = NowMS();
+
+	double sectionStart = updateStart;
 	UpdateInput();
+	perf.updateInputMs = static_cast<float>(NowMS() - sectionStart);
+
+	sectionStart = NowMS();
 	{
 		TRAN_INS;
 		SetMasterVolume(tran.gameplay.volumeMaster);
@@ -85,12 +190,392 @@ void Update()
 		SetSeVolume(tran.gameplay.volumeSe);
 	}
 	UpdateSound();
+	perf.updateAudioMs = static_cast<float>(NowMS() - sectionStart);
+
+	sectionStart = NowMS();
 	SceneManager::Update();
+	perf.sceneUpdateMs = static_cast<float>(NowMS() - sectionStart);
+	perf.updateTotalMs = static_cast<float>(NowMS() - updateStart);
+	perf.scene = SceneManager::GetCurrent();
+	g_perfFrameWorking = perf;
 }
 
 void Draw()
 {
+	const double drawStart = NowMS();
+	double sectionStart = drawStart;
 	BeginDrawDirectX();
+	g_perfFrameWorking.beginDrawMs = static_cast<float>(NowMS() - sectionStart);
+
+	static bool show_overlay = false;
+	if (ImGui::IsKeyPressed(ImGuiKey_F2, false)) show_overlay = !show_overlay;
+
+	auto drawPauseMenuOverlay = [&](Transfer& tran)
+	{
+		if (SceneManager::GetCurrent() != SceneManager::SceneType::SCENE_GAME ||
+			tran.gameplayDebug.pauseMenuOpen == 0)
+		{
+			return;
+		}
+
+		const bool isFullscreen = IsAppFullscreen();
+		const OverlayScaleMetrics overlayMetrics = GetAdaptiveOverlayScaleMetrics(tran, isFullscreen);
+		const float uiScale = overlayMetrics.uiScale;
+		const float fontScale = overlayMetrics.fontScale;
+		const float buttonScale = overlayMetrics.buttonScale;
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		const bool pauseOptionOpen = (tran.gameplayDebug.pauseOptionOpen != 0);
+		const int selectedTab = (tran.gameplayDebug.pauseTabIndex < 0) ? 0
+			: (tran.gameplayDebug.pauseTabIndex > 2 ? 2 : tran.gameplayDebug.pauseTabIndex);
+		const ImVec2 windowSize = pauseOptionOpen
+			? ImVec2(700.0f * uiScale, 520.0f * uiScale)
+			: ImVec2(640.0f * uiScale, 500.0f * uiScale);
+		const ImVec2 windowPos(vp->Pos.x + (vp->Size.x - windowSize.x) * 0.5f,
+							   vp->Pos.y + (vp->Size.y - windowSize.y) * 0.5f);
+		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
+		ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * uiScale, 16.0f * uiScale));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * uiScale, 12.0f * uiScale));
+		ImGui::Begin("##pause_menu_overlay", nullptr,
+					 ImGuiWindowFlags_NoTitleBar |
+					 ImGuiWindowFlags_NoCollapse |
+					 ImGuiWindowFlags_NoResize |
+					 ImGuiWindowFlags_NoMove |
+					 ImGuiWindowFlags_NoDocking);
+		ImGui::SetWindowFontScale(fontScale);
+		ImGui::TextUnformatted(u8"ポーズ");
+		ImGui::Separator();
+		if (ImGui::BeginTabBar("##pause_tabs", ImGuiTabBarFlags_FittingPolicyShrink))
+		{
+			if (ImGui::BeginTabItem(u8"ゲーム", nullptr, (selectedTab == 0) ? ImGuiTabItemFlags_SetSelected : 0))
+			{
+				tran.gameplayDebug.pauseTabIndex = 0;
+				const char* difficultyText = GetDifficultyName(tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset));
+				const int enemiesAlive = (tran.gameplayDebug.enemiesAlive < 0) ? 0 : tran.gameplayDebug.enemiesAlive;
+				const int enemiesTarget = (tran.gameplayDebug.enemiesTarget < 0) ? 0 : tran.gameplayDebug.enemiesTarget;
+				int defeated = enemiesTarget - enemiesAlive;
+				if (defeated < 0) defeated = 0;
+				if (defeated > enemiesTarget) defeated = enemiesTarget;
+				const float defeatRate = (enemiesTarget > 0)
+					? (static_cast<float>(defeated) / static_cast<float>(enemiesTarget)) * 100.0f
+					: 0.0f;
+
+				ImGui::Text(u8"現在Wave: %d / %d", tran.gameplayDebug.currentWave, tran.gameplayDebug.maxWave);
+				ImGui::Text(u8"難易度: %s", difficultyText);
+				ImGui::Text(u8"敵撃破率: %.0f%%", defeatRate);
+				if (tran.gameplayDebug.bossBattleActive != 0)
+				{
+					ImGui::Spacing();
+					ImGui::TextUnformatted(u8"現在はボス戦状態です。");
+				}
+				ImGui::Spacing();
+				ImGui::Separator();
+				ImGui::TextUnformatted(u8"タブ切替: 1 / 2 / 3");
+				ImGui::TextUnformatted(u8"コントローラー: Configured Prev / Next Tab");
+				ImGui::TextUnformatted(u8"閉じる: Esc / Start");
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem(u8"強化状態", nullptr, (selectedTab == 1) ? ImGuiTabItemFlags_SetSelected : 0))
+			{
+				tran.gameplayDebug.pauseTabIndex = 1;
+				ImGui::Text(u8"攻撃Lv: %d", tran.roguelike.attackPowerLevel);
+				ImGui::Text(u8"攻撃頻度Lv: %d", tran.roguelike.attackSpeedLevel);
+				ImGui::Text(u8"回避Lv: %d", tran.roguelike.evadeCooldownLevel);
+				if (tran.roguelike.lastUpgradeType >= 0)
+				{
+					char lastUpgradeText[128]{};
+					FormatUpgradeLabel(tran, tran.roguelike.lastUpgradeType, lastUpgradeText, sizeof(lastUpgradeText));
+					ImGui::Text(u8"最終取得: %s", lastUpgradeText);
+				}
+
+				const auto drawSkillStatus = [&](const char* slotLabel, int skillType)
+				{
+					char detail[128]{};
+					switch (skillType)
+					{
+					case Transfer::RoguelikeUpgrade::SkillShot:
+						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / 威力Lv%d / CTLv%d",
+								  tran.roguelike.skillShotRangeLevel,
+								  tran.roguelike.skillShotPowerLevel,
+								  tran.roguelike.skillShotCooldownLevel);
+						break;
+					case Transfer::RoguelikeUpgrade::SkillNova:
+						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / 威力Lv%d / CTLv%d",
+								  tran.roguelike.skillNovaRangeLevel,
+								  tran.roguelike.skillNovaPowerLevel,
+								  tran.roguelike.skillNovaCooldownLevel);
+						break;
+					case Transfer::RoguelikeUpgrade::SkillOrbit:
+						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / CTLv%d / 個数Lv%d",
+								  tran.roguelike.skillOrbitRangeLevel,
+								  tran.roguelike.skillOrbitCooldownLevel,
+								  tran.roguelike.skillOrbitCountLevel);
+						break;
+					default:
+						sprintf_s(detail, sizeof(detail), "%s", u8"未取得");
+						break;
+					}
+
+					ImGui::SeparatorText(slotLabel);
+					ImGui::Text(u8"スキル: %s", GetSkillNameByType(skillType));
+					ImGui::TextUnformatted(detail);
+				};
+
+				drawSkillStatus("Q", tran.roguelike.skillSlot1);
+				drawSkillStatus("E", tran.roguelike.skillSlot2);
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem(u8"設定", nullptr, (selectedTab == 2) ? ImGuiTabItemFlags_SetSelected : 0))
+			{
+				tran.gameplayDebug.pauseTabIndex = 2;
+				if (pauseOptionOpen)
+				{
+					const int selected = tran.gameplayDebug.pauseOptionSelection;
+					const float closeButtonWidth = 88.0f * uiScale;
+					ImGui::TextUnformatted(u8"Option");
+					ImGui::SameLine();
+					ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - closeButtonWidth);
+					if (ImGui::Button("Close##pause_option_close", ImVec2(closeButtonWidth, 0.0f)))
+					{
+						tran.gameplayDebug.pauseOptionRequestClose = 1;
+					}
+					ImGui::Separator();
+
+					const char* selectedLabel = u8"Master";
+					switch (selected)
+					{
+					case 1: selectedLabel = u8"BGM"; break;
+					case 2: selectedLabel = u8"SE"; break;
+					case 3: selectedLabel = u8"表示"; break;
+					case 4: selectedLabel = u8"戻る"; break;
+					default: break;
+					}
+					ImGui::Text(u8"選択中: %s", selectedLabel);
+
+					float master = tran.gameplay.volumeMaster;
+					if (ImGui::SliderFloat(u8"Master", &master, 0.0f, 2.0f, "%.2f"))
+					{
+						tran.gameplay.volumeMaster = master;
+					}
+					float bgm = tran.gameplay.volumeBgm;
+					if (ImGui::SliderFloat(u8"BGM", &bgm, 0.0f, 2.0f, "%.2f"))
+					{
+						tran.gameplay.volumeBgm = bgm;
+					}
+					float se = tran.gameplay.volumeSe;
+					if (ImGui::SliderFloat(u8"SE", &se, 0.0f, 2.0f, "%.2f"))
+					{
+						tran.gameplay.volumeSe = se;
+					}
+
+					bool fullscreenChecked = isFullscreen;
+					bool windowChecked = !isFullscreen;
+					if (ImGui::Checkbox(u8"Fullscreen", &fullscreenChecked))
+					{
+						SetAppFullscreen(fullscreenChecked);
+					}
+					ImGui::SameLine();
+					if (ImGui::Checkbox(u8"Window", &windowChecked))
+					{
+						SetAppFullscreen(!windowChecked);
+					}
+					ImGui::Separator();
+					ImGui::TextUnformatted(u8"移動: W/S or ↑/↓");
+					ImGui::TextUnformatted(u8"変更: A/D or ←/→");
+					ImGui::TextUnformatted(u8"決定: Enter / F / Space / Controller Confirm");
+					ImGui::TextUnformatted(u8"戻る: Esc / Start");
+				}
+				else
+				{
+					const int selected = tran.gameplayDebug.pauseMenuSelection;
+					ImGui::TextUnformatted(u8"設定項目");
+					ImGui::Separator();
+					ImGui::TextUnformatted(u8"選択: A/D W/S ←→↑↓");
+					ImGui::TextUnformatted(u8"決定: Enter / F / Space / Controller Confirm");
+					ImGui::TextUnformatted(u8"タブ切替: 1 / 2 / 3 or Configured Prev / Next Tab");
+					const ImVec2 buttonSize(300.0f * uiScale * buttonScale, 62.0f * uiScale * buttonScale);
+					const auto drawMenuButton = [&](int index, const char* label, int request)
+					{
+						if (selected == index)
+						{
+							ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 120, 210, 230));
+						}
+						if (ImGui::Button(label, buttonSize))
+						{
+							tran.gameplayDebug.pauseMenuRequest = request;
+						}
+						if (selected == index)
+						{
+							ImGui::PopStyleColor();
+						}
+					};
+					drawMenuButton(0, u8"続行", 1);
+					drawMenuButton(1, u8"Option", 3);
+					drawMenuButton(2, u8"Titleへ", 2);
+				}
+				ImGui::EndTabItem();
+			}
+			ImGui::EndTabBar();
+		}
+		ImGui::SetWindowFontScale(1.0f);
+		ImGui::End();
+		ImGui::PopStyleVar(2);
+	};
+
+	auto drawOverlayHud = [&](const Transfer& tran)
+	{
+		if (!show_overlay)
+		{
+			return;
+		}
+
+		ImGuiIO& io = ImGui::GetIO();
+		ImGuiViewport* vp = ImGui::GetMainViewport();
+		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+		const ImVec2 pad(8.0f, 6.0f);
+		const float frameBudget60 = 1000.0f / 60.0f;
+		const FramePerfStats& perfLast = g_perfFrameLast;
+		const FramePerfStats& perfAvg = g_perfFrameAvg;
+		const ImU32 borderColor = GetPerfBorderColor(perfAvg.frameCpuMs);
+		char fpsText[16]{};
+		char cpuLastText[16]{};
+		char cpuAvgText[16]{};
+		char budget60Text[16]{};
+		char updateText[16]{};
+		char updateInputText[16]{};
+		char updateSoundText[16]{};
+		char updateSceneText[16]{};
+		char inputKbmText[16]{};
+		char inputXiText[16]{};
+		char inputDiText[16]{};
+		char drawText[16]{};
+		char beginDrawText[16]{};
+		char sceneDrawText[16]{};
+		char overlayDrawText[16]{};
+		char endDrawText[16]{};
+		FormatHudFixedFloat(io.Framerate, fpsText, sizeof(fpsText));
+		FormatHudFixedFloat(perfLast.frameCpuMs, cpuLastText, sizeof(cpuLastText));
+		FormatHudFixedFloat(perfAvg.frameCpuMs, cpuAvgText, sizeof(cpuAvgText));
+		FormatHudFixedFloat(frameBudget60, budget60Text, sizeof(budget60Text));
+		FormatHudFixedFloat(perfLast.updateTotalMs, updateText, sizeof(updateText));
+		FormatHudFixedFloat(perfLast.updateInputMs, updateInputText, sizeof(updateInputText));
+		FormatHudFixedFloat(perfLast.updateAudioMs, updateSoundText, sizeof(updateSoundText));
+		FormatHudFixedFloat(perfLast.sceneUpdateMs, updateSceneText, sizeof(updateSceneText));
+		FormatHudFixedFloat(GetInputKeyboardMouseMs(), inputKbmText, sizeof(inputKbmText));
+		FormatHudFixedFloat(GetInputXInputMs(), inputXiText, sizeof(inputXiText));
+		FormatHudFixedFloat(GetInputDirectInputMs(), inputDiText, sizeof(inputDiText));
+		FormatHudFixedFloat(perfLast.drawTotalMs, drawText, sizeof(drawText));
+		FormatHudFixedFloat(perfLast.beginDrawMs, beginDrawText, sizeof(beginDrawText));
+		FormatHudFixedFloat(perfLast.sceneDrawMs, sceneDrawText, sizeof(sceneDrawText));
+		FormatHudFixedFloat(perfLast.overlayDrawMs, overlayDrawText, sizeof(overlayDrawText));
+		FormatHudFixedFloat(perfLast.endDrawMs, endDrawText, sizeof(endDrawText));
+
+#ifdef _DEBUG
+		const ImVec2 mouse = io.MousePos;
+		const ImVec2 center(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f);
+		const float cross = 10.0f;
+		dl->AddLine(ImVec2(mouse.x - cross, mouse.y), ImVec2(mouse.x + cross, mouse.y), IM_COL32(255, 255, 0, 255), 1.0f);
+		dl->AddLine(ImVec2(mouse.x, mouse.y - cross), ImVec2(mouse.x, mouse.y + cross), IM_COL32(255, 255, 0, 255), 1.0f);
+		dl->AddCircle(center, 6.0f, IM_COL32(0, 255, 255, 255), 16, 1.0f);
+		char playerHpText[16]{};
+		char playerMaxHpText[16]{};
+		FormatHudFixedFloat(tran.player.hp, playerHpText, sizeof(playerHpText));
+		FormatHudFixedFloat(tran.player.maxHp, playerMaxHpText, sizeof(playerMaxHpText));
+
+		char hud[768];
+		sprintf_s(
+			hud,
+			u8"FPS %s\n"
+			u8"Scene %s\n"
+			u8"CPU Last %s ms / Avg %s ms / 60FPS %s ms\n"
+			u8"Update %s ms (Input %s / Sound %s / Scene %s)\n"
+			u8"Input %s ms (KBM %s / XI %s / DI %s)\n"
+			u8"Draw %s ms (Begin %s / Scene %s / Overlay %s / Present %s)\n"
+			u8"マウス (%04.0f, %04.0f)\n"
+			u8"プレイヤーHP %s / %s",
+			fpsText,
+			GetSceneProfileName(perfLast.scene),
+			cpuLastText,
+			cpuAvgText,
+			budget60Text,
+			updateText,
+			updateInputText,
+			updateSoundText,
+			updateSceneText,
+			updateInputText,
+			inputKbmText,
+			inputXiText,
+			inputDiText,
+			drawText,
+			beginDrawText,
+			sceneDrawText,
+			overlayDrawText,
+			endDrawText,
+			mouse.x,
+			mouse.y,
+			playerHpText,
+			playerMaxHpText);
+
+		const char* hudTemplate =
+			u8"FPS 888.88\n"
+			u8"Scene CastleEditor\n"
+			u8"CPU Last 888.88 ms / Avg 888.88 ms / 60FPS 888.88 ms\n"
+			u8"Update 888.88 ms (Input 888.88 / Sound 888.88 / Scene 888.88)\n"
+			u8"Input 888.88 ms (KBM 888.88 / XI 888.88 / DI 888.88)\n"
+			u8"Draw 888.88 ms (Begin 888.88 / Scene 888.88 / Overlay 888.88 / Present 888.88)\n"
+			u8"マウス (8888, 8888)\n"
+			u8"プレイヤーHP 888.88 / 888.88";
+		const ImVec2 textSize = ImGui::CalcTextSize(hudTemplate);
+		const ImVec2 boxMin(vp->Pos.x + vp->Size.x - textSize.x - pad.x * 2.0f - 10.0f, vp->Pos.y + 10.0f);
+		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 160), 4.0f);
+		dl->AddRect(boxMin, boxMax, borderColor, 4.0f);
+		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), hud);
+#else
+		char hud[512];
+		sprintf_s(
+			hud,
+			"FPS %s\n"
+			"Scene %s\n"
+			"CPU Last %s ms / Avg %s ms / 60FPS %s ms\n"
+			"Update %s ms (Input %s / Sound %s / Scene %s)\n"
+			"Input %s ms (KBM %s / XI %s / DI %s)\n"
+			"Draw %s ms (Begin %s / Scene %s / Overlay %s / Present %s)",
+			fpsText,
+			GetSceneProfileName(perfLast.scene),
+			cpuLastText,
+			cpuAvgText,
+			budget60Text,
+			updateText,
+			updateInputText,
+			updateSoundText,
+			updateSceneText,
+			updateInputText,
+			inputKbmText,
+			inputXiText,
+			inputDiText,
+			drawText,
+			beginDrawText,
+			sceneDrawText,
+			overlayDrawText,
+			endDrawText);
+		const char* hudTemplate =
+			"FPS 888.88\n"
+			"Scene CastleEditor\n"
+			"CPU Last 888.88 ms / Avg 888.88 ms / 60FPS 888.88 ms\n"
+			"Update 888.88 ms (Input 888.88 / Sound 888.88 / Scene 888.88)\n"
+			"Input 888.88 ms (KBM 888.88 / XI 888.88 / DI 888.88)\n"
+			"Draw 888.88 ms (Begin 888.88 / Scene 888.88 / Overlay 888.88 / Present 888.88)";
+		const ImVec2 textSize = ImGui::CalcTextSize(hudTemplate);
+		const ImVec2 boxMin(vp->Pos.x + vp->Size.x - textSize.x - pad.x * 2.0f - 10.0f, vp->Pos.y + 10.0f);
+		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 160), 4.0f);
+		dl->AddRect(boxMin, boxMax, borderColor, 4.0f);
+		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), hud);
+#endif
+	};
 
 #ifdef _DEBUG
 	TRAN_INS;
@@ -160,12 +645,65 @@ void Draw()
 		case SceneManager::SceneType::SCENE_ENGINE_EDITOR:
 			sceneTxt = u8"城エディタ";
 			break;
+		case SceneManager::SceneType::SCENE_EFFECT_DEBUG:
+			sceneTxt = u8"エフェクト確認";
+			break;
 		default:
 			sceneTxt = u8"不明";
 			break;
 		}
 		sceneTxt = u8"現在シーン: " + sceneTxt;
 		ImGui::Text(sceneTxt.c_str());
+		static int debugSceneSelection = -1;
+		static int debugSceneLastObserved = -1;
+		static int debugResultSelection = static_cast<int>(SceneManager::ResultType::Win);
+		const int currentSceneValue = static_cast<int>(SceneManager::GetCurrent());
+		if (debugSceneSelection < 0 || debugSceneSelection >= static_cast<int>(SceneManager::SceneType::SCENE_MAX))
+		{
+			debugSceneSelection = currentSceneValue;
+		}
+		if (debugSceneLastObserved != currentSceneValue && debugSceneSelection == debugSceneLastObserved)
+		{
+			debugSceneSelection = currentSceneValue;
+		}
+		debugSceneLastObserved = currentSceneValue;
+
+		const char* debugSceneItems[] =
+		{
+			u8"タイトル",
+			u8"ゲーム",
+			u8"リザルト",
+			u8"城エディタ",
+			u8"エフェクト確認"
+		};
+		const char* debugResultItems[] =
+		{
+			"None",
+			"Win",
+			"Lose"
+		};
+		ImGui::SeparatorText(u8"シーン切り替え");
+		ImGui::SetNextItemWidth(220.0f);
+		ImGui::Combo(u8"遷移先", &debugSceneSelection, debugSceneItems, IM_ARRAYSIZE(debugSceneItems));
+		if (debugSceneSelection == static_cast<int>(SceneManager::SceneType::SCENE_RESULT))
+		{
+			ImGui::SetNextItemWidth(160.0f);
+			ImGui::Combo(u8"リザルト種別", &debugResultSelection, debugResultItems, IM_ARRAYSIZE(debugResultItems));
+		}
+		if (ImGui::Button(u8"シーンを切り替え"))
+		{
+			const SceneManager::SceneType targetScene = static_cast<SceneManager::SceneType>(debugSceneSelection);
+			if (targetScene == SceneManager::SceneType::SCENE_RESULT)
+			{
+				SceneManager::ChangeResult(static_cast<SceneManager::ResultType>(debugResultSelection));
+			}
+			else
+			{
+				SceneManager::ChangeResult(SceneManager::ResultType::None);
+			}
+			SceneManager::ChangeScene(targetScene);
+		}
+		ImGui::Separator();
 
 		if (BeginTabBar("TabBar"))
 		{
@@ -365,7 +903,7 @@ void Draw()
 
 				DragInt(u8"最大Wave", &tran.gameplay.waveMax, 1.0f, 1, 32);
 				DragInt(u8"Wave毎の敵追加数", &tran.gameplay.waveEnemyAddPerWave, 1.0f, 0, 16);
-				DragInt(u8"強化リロール上限", &tran.roguelike.rerollMaxPerStage, 1.0f, 0, 9);
+				DragInt(u8"進行ごとのリロール獲得数", &tran.roguelike.rerollMaxPerStage, 1.0f, 0, 9);
 				ImGui::TextDisabled(u8"初期値: 最大Wave3 / Wave追加1");
 				ImGui::SeparatorText(u8"開始カメラ演出");
 				ImGui::TextDisabled(u8"初期値: 演出時間1.20秒 / フォーカス距離2.80");
@@ -413,9 +951,9 @@ void Draw()
 					GetSkillNameByType(tran.roguelike.skillSlot1),
 					GetSkillNameByType(tran.roguelike.skillSlot2));
 				ImGui::Text(u8"回避中: %s", tran.gameplayDebug.playerEvading ? u8"はい" : u8"いいえ");
-				ImGui::Text(u8"強化選択待ち: %d / リロール残り: %d", tran.gameplayDebug.upgradeSelectionPending, tran.gameplayDebug.upgradeRerollRemain);
+				ImGui::Text(u8"強化選択待ち: %d / リロール所持: %d", tran.gameplayDebug.upgradeSelectionPending, tran.gameplayDebug.upgradeRerollRemain);
 				ImGui::Text(u8"タイマー: %.2f sec (記録 %.2f sec / 稼働 %d)", tran.gameplayDebug.runElapsedSec, tran.gameplayDebug.runRecordedSec, tran.gameplayDebug.runTimerRunning);
-				ImGui::Text(u8"ボスデバッグ戦: %s", tran.gameplayDebug.bossBattleActive ? u8"ON" : u8"OFF");
+				ImGui::Text(u8"ボス戦中: %s", tran.gameplayDebug.bossBattleActive ? u8"ON" : u8"OFF");
 				ImGui::SeparatorText(u8"HP直接操作");
 				DragFloat(u8"プレイヤー現在HP", &tran.player.hp, 0.1f, 0.0f, 9999.0f);
 				DragFloat(u8"プレイヤー最大HP", &tran.player.maxHp, 0.1f, 1.0f, 9999.0f);
@@ -471,6 +1009,71 @@ void Draw()
 				{
 					tran.ResetRoguelikeUpgrade();
 				}
+
+				EndTabItem();
+			}
+			if (BeginTabItem(u8"挑戦"))
+			{
+				auto beginDebugChallenge = [&](int challengeType)
+				{
+					tran.gameplayDebug.requestChallengeType = challengeType;
+					tran.gameplayDebug.challengeReturnToGameAfterReward = 1;
+					tran.gameplayDebug.challengeSuccess = 0;
+					tran.gameplayDebug.challengeRewardCount = 0;
+					SceneManager::ChangeResult(SceneManager::ResultType::None);
+					if (SceneManager::GetCurrent() != SceneManager::SCENE_GAME)
+					{
+						SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+					}
+				};
+
+				ImGui::TextDisabled(u8"現状はデバッグ起動のみです。マップ分岐への接続は後で行います。");
+				if (Button(u8"ノーダメ挑戦を開始"))
+				{
+					beginDebugChallenge(1);
+				}
+				SameLine();
+				if (Button(u8"防衛挑戦を開始"))
+				{
+					beginDebugChallenge(2);
+				}
+
+				const char* challengeTypeText = u8"なし";
+				switch (tran.gameplayDebug.challengeType)
+				{
+				case 1: challengeTypeText = u8"ノーダメ"; break;
+				case 2: challengeTypeText = u8"防衛"; break;
+				default: break;
+				}
+				ImGui::SeparatorText(u8"実行状態");
+				ImGui::Text(u8"現在: %s / Active=%s", challengeTypeText, tran.gameplayDebug.challengeActive ? u8"ON" : u8"OFF");
+				ImGui::Text(u8"経過: %.2f / %.2f", tran.gameplayDebug.challengeElapsedSec, tran.gameplayDebug.challengeDurationSec);
+				ImGui::Text(u8"現在の報酬見込み: %d", tran.gameplayDebug.challengeRewardCount);
+				ImGui::Text(u8"直近の結果: %s", tran.gameplayDebug.challengeSuccess ? u8"成功" : u8"未達成/失敗");
+				ImGui::Text(u8"被弾回数: %d", tran.gameplayDebug.challengeHitCount);
+				ImGui::Text(u8"ビーコンHP: %.1f / %.1f", tran.gameplayDebug.challengeBeaconHp, tran.gameplayDebug.challengeBeaconMaxHp);
+
+				ImGui::SeparatorText(u8"ノーダメ挑戦");
+				ImGui::TextDisabled(u8"攻撃は予兆後に発生し、被弾した時点で挑戦失敗として報酬画面へ移行します。");
+				DragFloat(u8"制限時間##challenge_no_damage_duration", &tran.gameplay.challengeNoDamageDuration, 0.1f, 5.0f, 120.0f);
+				DragFloat(u8"攻撃間隔##challenge_no_damage_interval", &tran.gameplay.challengeNoDamageAttackInterval, 0.01f, 0.20f, 10.0f);
+				DragFloat(u8"予兆時間##challenge_no_damage_telegraph", &tran.gameplay.challengeNoDamageTelegraph, 0.01f, 0.10f, 8.0f);
+				DragFloat(u8"攻撃半径##challenge_no_damage_radius", &tran.gameplay.challengeNoDamageRadius, 0.01f, 0.20f, 8.0f);
+				DragFloat(u8"被弾ダメージ##challenge_no_damage_damage", &tran.gameplay.challengeNoDamageDamage, 0.1f, 0.0f, 20.0f);
+				DragInt(u8"同時攻撃数##challenge_no_damage_burst", &tran.gameplay.challengeNoDamageBurstCount, 1.0f, 1, 8);
+
+				ImGui::SeparatorText(u8"防衛挑戦");
+				ImGui::TextDisabled(u8"中心ビーコンを守るモードです。敵は常にビーコンへ向かい、到達するとHPを削ります。");
+				DragFloat(u8"制限時間##challenge_defense_duration", &tran.gameplay.challengeDefenseDuration, 0.1f, 5.0f, 180.0f);
+				DragFloat(u8"ビーコン最大HP##challenge_defense_beacon_hp", &tran.gameplay.challengeDefenseBeaconMaxHp, 0.5f, 1.0f, 500.0f);
+				DragFloat(u8"ビーコン半径##challenge_defense_beacon_radius", &tran.gameplay.challengeDefenseBeaconRadius, 0.01f, 0.30f, 6.0f);
+				DragFloat(u8"到達ダメージ##challenge_defense_contact_damage", &tran.gameplay.challengeDefenseBeaconContactDamage, 0.1f, 0.1f, 100.0f);
+				DragFloat(u8"敵スポーン間隔##challenge_defense_spawn_interval", &tran.gameplay.challengeDefenseSpawnInterval, 0.01f, 0.20f, 15.0f);
+				DragFloat(u8"敵移動速度##challenge_defense_speed", &tran.gameplay.challengeDefenseEnemyMoveSpeed, 0.01f, 0.05f, 4.0f);
+				DragFloat(u8"高速型HP加算率##challenge_defense_speed_hp", &tran.gameplay.challengeDefenseSpeedHpBonusRate, 0.01f, 0.0f, 5.0f);
+				DragFloat(u8"遠距離型HP加算率##challenge_defense_ranged_hp", &tran.gameplay.challengeDefenseRangedHpBonusRate, 0.01f, 0.0f, 5.0f);
+				DragFloat(u8"重量型HP加算率##challenge_defense_tank_hp", &tran.gameplay.challengeDefenseTankHpBonusRate, 0.01f, 0.0f, 5.0f);
+				DragInt(u8"同時敵数上限##challenge_defense_cap", &tran.gameplay.challengeDefenseEnemyCap, 1.0f, 1, 16);
 
 				EndTabItem();
 			}
@@ -969,11 +1572,9 @@ void Draw()
 	//   - DrawList : 画面上への簡易オーバーレイ
 	// -----------------------------
 	static bool show_table_window = false;
-	static bool show_overlay = false;
 
 	// TABキーのメインウィンドウだけだと隠れやすいので、ここで簡易トグルも用意
 	if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) show_table_window = !show_table_window;
-	if (ImGui::IsKeyPressed(ImGuiKey_F2, false)) show_overlay = !show_overlay;
 
 	if (show_table_window)
 	{
@@ -1095,11 +1696,11 @@ void Draw()
 			row_i1(u8"強化:攻撃頻度Lv", tran.gameplayDebug.attackSpeedLevel);
 			row_i1(u8"強化:回避CTLv", tran.gameplayDebug.evadeCooldownLevel);
 			row_i1(u8"強化選択待ち", tran.gameplayDebug.upgradeSelectionPending);
-			row_i1(u8"強化リロール残り", tran.gameplayDebug.upgradeRerollRemain);
+			row_i1(u8"リロール所持", tran.gameplayDebug.upgradeRerollRemain);
 			row_f1(u8"タイマー経過秒", tran.gameplayDebug.runElapsedSec);
 			row_f1(u8"タイマー記録秒", tran.gameplayDebug.runRecordedSec);
 			row_i1(u8"タイマー稼働中", tran.gameplayDebug.runTimerRunning);
-			row_i1(u8"ボスデバッグ戦中", tran.gameplayDebug.bossBattleActive);
+			row_i1(u8"ボス戦中", tran.gameplayDebug.bossBattleActive);
 			row_f1(u8"ボスHP", tran.gameplayDebug.bossHp);
 			row_f1(u8"ボス最大HP", tran.gameplayDebug.bossMaxHp);
 			row_s1(u8"カーソル対象", tran.gameplayDebug.cursorHoverTarget);
@@ -1215,216 +1816,10 @@ void Draw()
 			}
 		}
 	}
-	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_GAME &&
-		tran.gameplayDebug.pauseMenuOpen != 0)
-	{
-		const bool isFullscreen = IsAppFullscreen();
-		const OverlayScaleMetrics overlayMetrics = GetAdaptiveOverlayScaleMetrics(tran, isFullscreen);
-		const float uiScale = overlayMetrics.uiScale;
-		const float fontScale = overlayMetrics.fontScale;
-		const float buttonScale = overlayMetrics.buttonScale;
-		ImGuiViewport* vp = ImGui::GetMainViewport();
-		const bool pauseOptionOpen = (tran.gameplayDebug.pauseOptionOpen != 0);
-		const int selectedTab = (tran.gameplayDebug.pauseTabIndex < 0) ? 0
-			: (tran.gameplayDebug.pauseTabIndex > 2 ? 2 : tran.gameplayDebug.pauseTabIndex);
-		const ImVec2 windowSize = pauseOptionOpen
-			? ImVec2(700.0f * uiScale, 520.0f * uiScale)
-			: ImVec2(640.0f * uiScale, 500.0f * uiScale);
-		const ImVec2 windowPos(vp->Pos.x + (vp->Size.x - windowSize.x) * 0.5f,
-							   vp->Pos.y + (vp->Size.y - windowSize.y) * 0.5f);
-		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
-		ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * uiScale, 16.0f * uiScale));
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * uiScale, 12.0f * uiScale));
-		ImGui::Begin("##pause_menu_overlay", nullptr,
-					 ImGuiWindowFlags_NoTitleBar |
-					 ImGuiWindowFlags_NoCollapse |
-					 ImGuiWindowFlags_NoResize |
-					 ImGuiWindowFlags_NoMove |
-					 ImGuiWindowFlags_NoDocking);
-		ImGui::SetWindowFontScale(fontScale);
-		ImGui::TextUnformatted(u8"ポーズ");
-		ImGui::Separator();
-		if (ImGui::BeginTabBar("##pause_tabs", ImGuiTabBarFlags_FittingPolicyShrink))
-		{
-			if (ImGui::BeginTabItem(u8"ゲーム", nullptr, (selectedTab == 0) ? ImGuiTabItemFlags_SetSelected : 0))
-			{
-				tran.gameplayDebug.pauseTabIndex = 0;
-				const char* difficultyText = GetDifficultyName(tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset));
-				const int enemiesAlive = (tran.gameplayDebug.enemiesAlive < 0) ? 0 : tran.gameplayDebug.enemiesAlive;
-				const int enemiesTarget = (tran.gameplayDebug.enemiesTarget < 0) ? 0 : tran.gameplayDebug.enemiesTarget;
-				int defeated = enemiesTarget - enemiesAlive;
-				if (defeated < 0) defeated = 0;
-				if (defeated > enemiesTarget) defeated = enemiesTarget;
-				const float defeatRate = (enemiesTarget > 0)
-					? (static_cast<float>(defeated) / static_cast<float>(enemiesTarget)) * 100.0f
-					: 0.0f;
-
-				ImGui::Text(u8"現在Wave: %d / %d", tran.gameplayDebug.currentWave, tran.gameplayDebug.maxWave);
-				ImGui::Text(u8"難易度: %s", difficultyText);
-				ImGui::Text(u8"敵撃破率: %.0f%%", defeatRate);
-				if (tran.gameplayDebug.bossBattleActive != 0)
-				{
-					ImGui::Spacing();
-					ImGui::TextUnformatted(u8"現在はボス戦状態です。");
-				}
-				ImGui::Spacing();
-				ImGui::Separator();
-				ImGui::TextUnformatted(u8"タブ切替: 1 / 2 / 3");
-				ImGui::TextUnformatted(u8"コントローラー: Configured Prev / Next Tab");
-				ImGui::TextUnformatted(u8"閉じる: Esc / Start");
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem(u8"強化状態", nullptr, (selectedTab == 1) ? ImGuiTabItemFlags_SetSelected : 0))
-			{
-				tran.gameplayDebug.pauseTabIndex = 1;
-				ImGui::Text(u8"攻撃Lv: %d", tran.roguelike.attackPowerLevel);
-				ImGui::Text(u8"攻撃頻度Lv: %d", tran.roguelike.attackSpeedLevel);
-				ImGui::Text(u8"回避Lv: %d", tran.roguelike.evadeCooldownLevel);
-				if (tran.roguelike.lastUpgradeType >= 0)
-				{
-					char lastUpgradeText[128]{};
-					FormatUpgradeLabel(tran, tran.roguelike.lastUpgradeType, lastUpgradeText, sizeof(lastUpgradeText));
-					ImGui::Text(u8"最終取得: %s", lastUpgradeText);
-				}
-
-				const auto drawSkillStatus = [&](const char* slotLabel, int skillType)
-				{
-					char detail[128]{};
-					switch (skillType)
-					{
-					case Transfer::RoguelikeUpgrade::SkillShot:
-						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / 威力Lv%d / CTLv%d",
-								  tran.roguelike.skillShotRangeLevel,
-								  tran.roguelike.skillShotPowerLevel,
-								  tran.roguelike.skillShotCooldownLevel);
-						break;
-					case Transfer::RoguelikeUpgrade::SkillNova:
-						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / 威力Lv%d / CTLv%d",
-								  tran.roguelike.skillNovaRangeLevel,
-								  tran.roguelike.skillNovaPowerLevel,
-								  tran.roguelike.skillNovaCooldownLevel);
-						break;
-					case Transfer::RoguelikeUpgrade::SkillOrbit:
-						sprintf_s(detail, sizeof(detail), u8"範囲Lv%d / CTLv%d / 個数Lv%d",
-								  tran.roguelike.skillOrbitRangeLevel,
-								  tran.roguelike.skillOrbitCooldownLevel,
-								  tran.roguelike.skillOrbitCountLevel);
-						break;
-					default:
-						sprintf_s(detail, sizeof(detail), "%s", u8"未取得");
-						break;
-					}
-
-					ImGui::SeparatorText(slotLabel);
-					ImGui::Text(u8"スキル: %s", GetSkillNameByType(skillType));
-					ImGui::TextUnformatted(detail);
-				};
-
-				drawSkillStatus("Q", tran.roguelike.skillSlot1);
-				drawSkillStatus("E", tran.roguelike.skillSlot2);
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem(u8"設定", nullptr, (selectedTab == 2) ? ImGuiTabItemFlags_SetSelected : 0))
-			{
-				tran.gameplayDebug.pauseTabIndex = 2;
-				if (pauseOptionOpen)
-				{
-					const int selected = tran.gameplayDebug.pauseOptionSelection;
-					const float closeButtonWidth = 88.0f * uiScale;
-					ImGui::TextUnformatted(u8"Option");
-					ImGui::SameLine();
-					ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - closeButtonWidth);
-					if (ImGui::Button("Close##pause_option_close", ImVec2(closeButtonWidth, 0.0f)))
-					{
-						tran.gameplayDebug.pauseOptionRequestClose = 1;
-					}
-					ImGui::Separator();
-
-					const char* selectedLabel = u8"Master";
-					switch (selected)
-					{
-					case 1: selectedLabel = u8"BGM"; break;
-					case 2: selectedLabel = u8"SE"; break;
-					case 3: selectedLabel = u8"表示"; break;
-					case 4: selectedLabel = u8"戻る"; break;
-					default: break;
-					}
-					ImGui::Text(u8"選択中: %s", selectedLabel);
-
-					float master = tran.gameplay.volumeMaster;
-					if (ImGui::SliderFloat(u8"Master", &master, 0.0f, 2.0f, "%.2f"))
-					{
-						tran.gameplay.volumeMaster = master;
-					}
-					float bgm = tran.gameplay.volumeBgm;
-					if (ImGui::SliderFloat(u8"BGM", &bgm, 0.0f, 2.0f, "%.2f"))
-					{
-						tran.gameplay.volumeBgm = bgm;
-					}
-					float se = tran.gameplay.volumeSe;
-					if (ImGui::SliderFloat(u8"SE", &se, 0.0f, 2.0f, "%.2f"))
-					{
-						tran.gameplay.volumeSe = se;
-					}
-
-					bool fullscreenChecked = isFullscreen;
-					bool windowChecked = !isFullscreen;
-					if (ImGui::Checkbox(u8"Fullscreen", &fullscreenChecked))
-					{
-						SetAppFullscreen(fullscreenChecked);
-					}
-					ImGui::SameLine();
-					if (ImGui::Checkbox(u8"Window", &windowChecked))
-					{
-						SetAppFullscreen(!windowChecked);
-					}
-					ImGui::Separator();
-					ImGui::TextUnformatted(u8"移動: W/S or ↑/↓");
-					ImGui::TextUnformatted(u8"変更: A/D or ←/→");
-					ImGui::TextUnformatted(u8"決定: Enter / F / Space / Controller Confirm");
-					ImGui::TextUnformatted(u8"戻る: Esc / Start");
-				}
-				else
-				{
-					const int selected = tran.gameplayDebug.pauseMenuSelection;
-					ImGui::TextUnformatted(u8"設定項目");
-					ImGui::Separator();
-					ImGui::TextUnformatted(u8"選択: A/D W/S ←→↑↓");
-					ImGui::TextUnformatted(u8"決定: Enter / F / Space / Controller Confirm");
-					ImGui::TextUnformatted(u8"タブ切替: 1 / 2 / 3 or Configured Prev / Next Tab");
-					const ImVec2 buttonSize(300.0f * uiScale * buttonScale, 62.0f * uiScale * buttonScale);
-					const auto drawMenuButton = [&](int index, const char* label, int request)
-					{
-						if (selected == index)
-						{
-							ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 120, 210, 230));
-						}
-						if (ImGui::Button(label, buttonSize))
-						{
-							tran.gameplayDebug.pauseMenuRequest = request;
-						}
-						if (selected == index)
-						{
-							ImGui::PopStyleColor();
-						}
-					};
-					drawMenuButton(0, u8"続行", 1);
-					drawMenuButton(1, u8"Option", 3);
-					drawMenuButton(2, u8"Titleへ", 2);
-				}
-				ImGui::EndTabItem();
-			}
-			ImGui::EndTabBar();
-		}
-		ImGui::SetWindowFontScale(1.0f);
-		ImGui::End();
-		ImGui::PopStyleVar(2);
-	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
-		!(SceneManager::GetResultType() == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0))
+		!(SceneManager::GetResultType() == SceneManager::ResultType::Win &&
+		  (tran.roguelike.selectionPending != 0 ||
+		   tran.roguelike.intermissionMode != Transfer::RoguelikeUpgrade::IntermissionNone)))
 	{
 		ImGuiViewport* vp = ImGui::GetMainViewport();
 		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
@@ -1505,41 +1900,6 @@ void Draw()
 		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 8.0f);
 		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), titleGuide);
 	}
-	// DrawList overlay（画面上に線や矩形などを描く）
-	// 3D上の座標投影まではやらず、まずは「画面座標の可視化」に寄せてある
-	if (show_overlay)
-	{
-		ImGuiIO& io = ImGui::GetIO();
-		ImGuiViewport* vp = ImGui::GetMainViewport();
-		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
-
-		const ImVec2 mouse = io.MousePos;
-		const ImVec2 center(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f);
-
-		// クロスヘア（マウス）
-		const float cross = 10.0f;
-		dl->AddLine(ImVec2(mouse.x - cross, mouse.y), ImVec2(mouse.x + cross, mouse.y), IM_COL32(255, 255, 0, 255), 1.0f);
-		dl->AddLine(ImVec2(mouse.x, mouse.y - cross), ImVec2(mouse.x, mouse.y + cross), IM_COL32(255, 255, 0, 255), 1.0f);
-
-		// 画面中央マーカー
-		dl->AddCircle(center, 6.0f, IM_COL32(0, 255, 255, 255), 16, 1.0f);
-
-		// 右上に簡易HUD（背景付き）
-		char hud[256];
-		sprintf_s(hud, u8"FPS %.1f\nマウス (%.0f, %.0f)\nプレイヤーHP %.1f / %.1f",
-			io.Framerate, mouse.x, mouse.y, tran.player.hp, tran.player.maxHp);
-
-		const ImVec2 pad(8.0f, 6.0f);
-		const ImVec2 text_size = ImGui::CalcTextSize(hud);
-		const ImVec2 box_min(vp->Pos.x + vp->Size.x - text_size.x - pad.x * 2.0f - 10.0f, vp->Pos.y + 10.0f);
-		const ImVec2 box_max(box_min.x + text_size.x + pad.x * 2.0f, box_min.y + text_size.y + pad.y * 2.0f);
-
-		dl->AddRectFilled(box_min, box_max, IM_COL32(0, 0, 0, 160), 4.0f);
-		dl->AddRect(box_min, box_max, IM_COL32(255, 255, 255, 100), 4.0f);
-		dl->AddText(ImVec2(box_min.x + pad.x, box_min.y + pad.y), IM_COL32(255, 255, 255, 255), hud);
-	}
-
-
 	if (!IsEngineEditorScene(SceneManager::GetCurrent()))
 	{
 		// 軸線の表示
@@ -1612,22 +1972,25 @@ void Draw()
 
 	if (IsEngineEditorScene(SceneManager::GetCurrent()))
 	{
+		sectionStart = NowMS();
 		DrawSceneToEngineEditorRenderTarget();
+		g_perfFrameWorking.sceneDrawMs = static_cast<float>(NowMS() - sectionStart);
 	}
 	else
 	{
+		sectionStart = NowMS();
 		SceneManager::Draw();
+		g_perfFrameWorking.sceneDrawMs = static_cast<float>(NowMS() - sectionStart);
 	}
+	sectionStart = NowMS();
 	{
 		TRAN_INS;
-#ifdef _DEBUG
-		const bool showBossDebugHint = true;
-#else
 		const bool showBossDebugHint = false;
-#endif
 		DrawUpgradeSelectionOverlay(tran, showBossDebugHint);
 		DrawTitleOptionOverlay(tran);
 		DrawTitleKeyConfigWindow(tran);
+		drawPauseMenuOverlay(tran);
+		drawOverlayHud(tran);
 	}
 #ifndef _DEBUG
 	{
@@ -1658,7 +2021,14 @@ void Draw()
 		}
 	}
 #endif
+	g_perfFrameWorking.overlayDrawMs = static_cast<float>(NowMS() - sectionStart);
+	sectionStart = NowMS();
 	EndDrawDirectX();
+	g_perfFrameWorking.endDrawMs = static_cast<float>(NowMS() - sectionStart);
+	g_perfFrameWorking.drawTotalMs = static_cast<float>(NowMS() - drawStart);
+	g_perfFrameWorking.frameCpuMs = g_perfFrameWorking.updateTotalMs + g_perfFrameWorking.drawTotalMs;
+	g_perfFrameWorking.scene = SceneManager::GetCurrent();
+	CommitPerfFrame(g_perfFrameWorking);
 }
 
 // EOF

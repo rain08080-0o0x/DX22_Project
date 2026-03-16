@@ -1463,6 +1463,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         }, m_boss.size);
         if (HitAabb(attackBox, bossBox))
         {
+            SpawnHitEffect(bossBox.center, bossBox.size);
             const float playerDamage = MaxFloat(static_cast<float>(playerAttackDamage), 0.0f);
             if (!m_boss.isBroken)
             {

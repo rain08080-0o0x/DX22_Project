@@ -252,6 +252,24 @@ private:
 		float pushSlop = 0.01f;
 		float playerPushShare = 0.55f;
 		float enemyPushShare = 0.45f;
+
+		// Challenge stage tuning.
+		float challengeNoDamageDuration = 18.0f;
+		float challengeNoDamageAttackInterval = 1.10f;
+		float challengeNoDamageTelegraph = 0.90f;
+		float challengeNoDamageRadius = 1.20f;
+		float challengeNoDamageDamage = 1.0f;
+		int challengeNoDamageBurstCount = 2;
+		float challengeDefenseDuration = 25.0f;
+		float challengeDefenseBeaconMaxHp = 25.0f;
+		float challengeDefenseBeaconRadius = 0.90f;
+		float challengeDefenseBeaconContactDamage = 2.0f;
+		float challengeDefenseSpawnInterval = 1.40f;
+		float challengeDefenseEnemyMoveSpeed = 0.32f;
+		float challengeDefenseSpeedHpBonusRate = 0.10f;
+		float challengeDefenseRangedHpBonusRate = 0.30f;
+		float challengeDefenseTankHpBonusRate = 0.50f;
+		int challengeDefenseEnemyCap = 8;
 	};
 
 	/**
@@ -321,7 +339,7 @@ private:
 		int pauseOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:Back
 		int pauseOptionRequestClose = 0;
 		int titleOptionOpen = 0;
-		int titleOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:KeyConfig 5:Back
+		int titleOptionSelection = 0; // 0:Master 1:BGM 2:SE 3:Display 4:KeyConfig 5:EffectDebug 6:Back
 		int titleOptionRequestClose = 0;
 		int titleKeyConfigOpen = 0;
 		int titleKeyConfigRequestOpen = 0;
@@ -330,6 +348,19 @@ private:
 		float pauseMenuUiScale = 1.0f;
 		float pauseMenuFontScale = 1.0f;
 		float pauseMenuButtonScale = 1.0f;
+
+		// Challenge runtime / debug state.
+		int requestChallengeType = 0; // 0:None 1:NoDamage 2:Defense
+		int challengeActive = 0;
+		int challengeType = 0;
+		int challengeSuccess = 0;
+		int challengeRewardCount = 0;
+		int challengeHitCount = 0;
+		float challengeElapsedSec = 0.0f;
+		float challengeDurationSec = 0.0f;
+		float challengeBeaconHp = 0.0f;
+		float challengeBeaconMaxHp = 0.0f;
+		int challengeReturnToGameAfterReward = 0;
 	};
 
 public:
@@ -339,9 +370,11 @@ public:
 	struct RoguelikeUpgrade
 	{
 		/** @brief 各強化項目の最大レベルです。 */
-		static const int kLevelMax = 10;
+		static const int kLevelMax = 5;
 		/** @brief 同時提示する強化候補数です。 */
 		static const int kOfferCount = 3;
+		/** @brief 1 run 内で進行するステージ数です。 */
+		static const int kRunStageCount = 12;
 
 		/**
 		 * @brief 強化候補の種類です。
@@ -388,7 +421,30 @@ public:
 		{
 			SelectionNone = 0,
 			SelectionStatus = 1,
-			SelectionSkill = 2
+			SelectionSkill = 2,
+			SelectionMixed = 3
+		};
+
+		/**
+		 * @brief run マップ上のステージ種別です。
+		 */
+		enum StageType
+		{
+			StageCombat = 0,
+			StageShop = 1,
+			StageRest = 2,
+			StageBoss = 3
+		};
+
+		/**
+		 * @brief リザルトシーン中の進行モードです。
+		 */
+		enum IntermissionMode
+		{
+			IntermissionNone = 0,
+			IntermissionMapSelect = 1,
+			IntermissionShop = 2,
+			IntermissionRest = 3
 		};
 
 		/** @brief クリア済みステージ数です。 */
@@ -423,14 +479,16 @@ public:
 		int skillOrbitCooldownLevel = 0;
 		/** @brief 衛星スキルの生成数レベルです。 */
 		int skillOrbitCountLevel = 0;
-		/** @brief 1 ステージあたりの最大リロール回数です。 */
-		int rerollMaxPerStage = 2;
-		/** @brief 現在残っているリロール回数です。 */
+		/** @brief 1 ステージ進行ごとに獲得するリロールアイテム数です。 */
+		int rerollMaxPerStage = 1;
+		/** @brief 現在所持しているリロールアイテム数です。 */
 		int rerollRemain = 0;
 		/** @brief 強化選択待ちかどうかです。 */
 		int selectionPending = 0;
 		/** @brief 現在の報酬フェーズです。 */
 		int selectionPhase = SelectionNone;
+		/** @brief 現在の選択フローで残っている報酬回数です。 */
+		int selectionRoundsRemaining = 0;
 		/** @brief 現在提示中の強化候補です。 */
 		int offers[kOfferCount] =
 		{
@@ -438,6 +496,26 @@ public:
 			UpgradeAttackSpeed,
 			UpgradeEvadeCooldown
 		};
+		/** @brief 現在進行中のステージ番号です。0 始まりです。 */
+		int currentStageIndex = 0;
+		/** @brief 現在進行中のステージ種別です。 */
+		int currentStageType = StageCombat;
+		/** @brief リザルトシーン中の進行モードです。 */
+		int intermissionMode = IntermissionNone;
+		/** @brief run マップ上の各ステージ種別です。 */
+		int stageTypes[kRunStageCount] =
+		{
+			StageCombat, StageCombat, StageCombat, StageShop,
+			StageCombat, StageCombat, StageCombat, StageShop,
+			StageCombat, StageCombat, StageRest, StageBoss
+		};
+		/** @brief 各ステージへ進む際に表示する候補数です。 */
+		int stageOptionCounts[kRunStageCount] =
+		{
+			1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 1
+		};
+		/** @brief 現在のショップ訪問で何回購入したかです。 */
+		int shopPurchaseCount = 0;
 	};
 	/**
 	 * @brief 入力デバイスごとの論理割り当てです。
@@ -532,6 +610,12 @@ public:
 	void BeginUpgradeSelection();
 
 	/**
+	 * @brief 挑戦ステージ用の混合報酬選択を開始します。
+	 * @param rewardCount 付与する報酬回数です。
+	 */
+	void BeginChallengeRewardSelection(int rewardCount);
+
+	/**
 	 * @brief 現在の強化候補を再抽選します。
 	 * @return 再抽選に成功した場合は true です。
 	 */
@@ -566,6 +650,79 @@ public:
 	 * @brief 強化選択状態を終了し、候補と選択位置を初期化します。
 	 */
 	void FinishUpgradeSelection();
+
+	/**
+	 * @brief run マップ上の総ステージ数を返します。
+	 * @return 固定 8 ステージです。
+	 */
+	int GetRunStageCount() const;
+
+	/**
+	 * @brief 指定番号のステージ種別を返します。
+	 * @param stageIndex 0 始まりのステージ番号です。
+	 * @return StageType の値です。
+	 */
+	int GetRunStageTypeAt(int stageIndex) const;
+
+	/**
+	 * @brief 現在進行中のステージ種別を返します。
+	 * @return StageType の値です。
+	 */
+	int GetCurrentRunStageType() const;
+
+	/**
+	 * @brief 指定ステージへ進む際に表示する候補数を返します。
+	 * @param stageIndex 0 始まりのステージ番号です。
+	 * @return 1 から 3 の候補数です。
+	 */
+	int GetRunStageOptionCount(int stageIndex) const;
+
+	/**
+	 * @brief 次ステージ選択へ進行します。
+	 * @return 次ステージ選択を開始できた場合は true です。
+	 */
+	bool BeginNextStageSelection();
+
+	/**
+	 * @brief 次ステージ候補から 1 つ選択して進行します。
+	 * @param optionIndex 選択した候補番号です。
+	 * @return 進行に成功した場合は true です。
+	 */
+	bool SelectNextStage(int optionIndex);
+
+	/**
+	 * @brief 現在の非戦闘ステージを終了し、次の進行へ移ります。
+	 * @return 次の進行へ移れた場合は true です。
+	 */
+	bool ContinueFromCurrentNonCombatStage();
+
+	/**
+	 * @brief ステージ進行報酬としてリロールアイテムを加算します。
+	 */
+	void GrantStageProgressRerollItems();
+
+	/**
+	 * @brief 指定フェーズ向けの候補を生成します。
+	 * @param selectionPhase SelectionPhase の値です。
+	 * @param offers 候補出力先です。
+	 * @return 1 件以上候補がある場合は true です。
+	 */
+	bool GenerateOffersForSelectionPhase(int selectionPhase, int offers[RoguelikeUpgrade::kOfferCount]) const;
+
+	/**
+	 * @brief 指定強化を即時適用します。
+	 * @param upgradeType UpgradeType の値です。
+	 * @return 適用に成功した場合は true です。
+	 */
+	bool ApplyUpgradeTypeImmediate(int upgradeType);
+
+	/**
+	 * @brief ショップ系処理向けに、指定カテゴリの強化選択画面を開始します。
+	 * @param selectionPhase SelectionStatus または SelectionSkill です。
+	 * @param cost 消費するリロールアイテム数です。
+	 * @return 購入処理と選択開始に成功した場合は true です。
+	 */
+	bool PurchaseRandomUpgrade(int selectionPhase, int cost);
 
 	/**
 	 * @brief 難易度値を有効範囲へ丸めます。

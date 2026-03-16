@@ -67,6 +67,9 @@
     <ClCompile Include="Player.cpp">
       <Filter>Source Files\Object</Filter>
     </ClCompile>
+    <ClCompile Include="ParticleEmitter2D.cpp">
+      <Filter>Source Files\System</Filter>
+    </ClCompile>
     <ClCompile Include="Collision.cpp">
       <Filter>Source Files\System</Filter>
     </ClCompile>
@@ -129,6 +132,9 @@
     <ClCompile Include="Model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ParticleEffectPreset.cpp">
+      <Filter>Source Files\System</Filter>
+    </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -183,6 +189,9 @@
     <ClCompile Include="SceneCastleEditor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SceneEffectDebug.cpp">
+      <Filter>Source Files\System\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="CastleSaveData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -207,6 +216,9 @@
       <Filter>Header Files\System</Filter>
     </ClInclude>
     <ClInclude Include="Model.h">
+      <Filter>Header Files\System</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleEffectPreset.h">
       <Filter>Header Files\System</Filter>
     </ClInclude>
     <ClInclude Include="Scene.h">
@@ -247,6 +259,9 @@
     </ClInclude>
     <ClInclude Include="Player.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleEmitter2D.h">
+      <Filter>Header Files\System</Filter>
     </ClInclude>
     <ClInclude Include="Enemy.h">
       <Filter>Header Files</Filter>
@@ -339,6 +354,9 @@
     </ClInclude>
     <ClInclude Include="Scene3DEditor.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneEffectDebug.h">
+      <Filter>Header Files\System</Filter>
     </ClInclude>
     <ClInclude Include="SceneCastleEditor.h">
       <Filter>Header Files</Filter>

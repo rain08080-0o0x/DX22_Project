@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <commdlg.h>
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 
 #include "CastleSaveData.h"
@@ -41,6 +42,21 @@ const char* GetDifficultyName(int difficultyPreset)
 		return u8"Hard";
 	default:
 		return u8"Normal";
+	}
+}
+
+const char* GetRunStageTypeName(int stageType)
+{
+	switch (stageType)
+	{
+	case Transfer::RoguelikeUpgrade::StageShop:
+		return u8"ショップ";
+	case Transfer::RoguelikeUpgrade::StageRest:
+		return u8"休憩所";
+	case Transfer::RoguelikeUpgrade::StageBoss:
+		return u8"ボス";
+	default:
+		return u8"戦闘";
 	}
 }
 
@@ -423,7 +439,8 @@ void DrawTitleOptionOverlay(Transfer& tran)
 	case 2: selectedLabel = u8"SE"; break;
 	case 3: selectedLabel = u8"表示"; break;
 	case 4: selectedLabel = u8"キーコンフィグ"; break;
-	case 5: selectedLabel = u8"戻る"; break;
+	case 5: selectedLabel = u8"エフェクト確認"; break;
+	case 6: selectedLabel = u8"戻る"; break;
 	default: break;
 	}
 	ImGui::Text(u8"選択中: %s", selectedLabel);
@@ -465,6 +482,24 @@ void DrawTitleOptionOverlay(Transfer& tran)
 		tran.gameplayDebug.titleKeyConfigRequestOpen = 1;
 	}
 	if (selected == 4)
+	{
+		ImGui::PopStyleColor();
+	}
+
+	if (selected == 5)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 140, 90, 230));
+	}
+	if (ImGui::Button(u8"エフェクト確認", ImVec2(220.0f * metrics.uiScale, 0.0f)))
+	{
+		tran.gameplayDebug.titleOptionOpen = 0;
+		tran.gameplayDebug.titleOptionSelection = 0;
+		tran.gameplayDebug.titleOptionRequestClose = 0;
+		tran.gameplayDebug.titleKeyConfigOpen = 0;
+		tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
+		SceneManager::ChangeScene(SceneManager::SCENE_EFFECT_DEBUG);
+	}
+	if (selected == 5)
 	{
 		ImGui::PopStyleColor();
 	}
@@ -964,34 +999,54 @@ void DrawSkillUpgradeValueTable(const Transfer& tran)
 
 void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 {
+	(void)showBossDebugHint;
 	if (SceneManager::GetCurrent() != SceneManager::SceneType::SCENE_RESULT) return;
 	if (SceneManager::GetResultType() != SceneManager::ResultType::Win) return;
-	if (tran.roguelike.selectionPending == 0) return;
-
-	const bool hasAnyOffer =
-		(tran.roguelike.offers[0] >= 0) ||
-		(tran.roguelike.offers[1] >= 0) ||
-		(tran.roguelike.offers[2] >= 0);
-	int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
-	if (optionIndex < 0) optionIndex = 0;
-	const bool isStatusPhase = (tran.roguelike.selectionPhase == Transfer::RoguelikeUpgrade::SelectionStatus);
-	const char* overlayTitle = isStatusPhase ? u8"ステータス強化" : u8"スキル獲得 / 強化";
-	const char* continueLabel = isStatusPhase ? u8"スキル強化フェーズへ" : u8"結果へ進む";
-
-	char upgradeHud[1024]{};
-	if (!hasAnyOffer)
+	if (tran.roguelike.selectionPending != 0)
 	{
-		if (showBossDebugHint)
+		const bool hasAnyOffer =
+			(tran.roguelike.offers[0] >= 0) ||
+			(tran.roguelike.offers[1] >= 0) ||
+			(tran.roguelike.offers[2] >= 0);
+		int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
+		if (optionIndex < 0) optionIndex = 0;
+		const bool isStatusPhase = (tran.roguelike.selectionPhase == Transfer::RoguelikeUpgrade::SelectionStatus);
+		const bool isMixedPhase = (tran.roguelike.selectionPhase == Transfer::RoguelikeUpgrade::SelectionMixed);
+		const bool isShopSelection =
+			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
+			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest;
+		const bool hasEmptySkillSlot =
+			(tran.roguelike.skillSlot1 == Transfer::RoguelikeUpgrade::SkillNone) ||
+			(tran.roguelike.skillSlot2 == Transfer::RoguelikeUpgrade::SkillNone);
+		const char* overlayTitle = u8"ステータス強化";
+		const bool hasFollowupReward = (tran.roguelike.selectionRoundsRemaining > 1);
+		const char* continueLabel = hasFollowupReward ? u8"次の報酬へ" : u8"マップ選択へ";
+		if (!hasFollowupReward && tran.gameplayDebug.challengeReturnToGameAfterReward != 0)
 		{
-			sprintf_s(
-				upgradeHud,
-				u8"%s\n\nなにもない\n\n%s %s\n%s ボス戦へ（デバッグ）\n\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
-				overlayTitle,
-				(optionIndex == 0) ? u8">" : u8" ",
-				continueLabel,
-				(optionIndex == 1) ? u8">" : u8" ");
+			continueLabel = u8"ゲームへ戻る";
 		}
-		else
+		if (isShopSelection)
+		{
+			continueLabel =
+				tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest
+				? u8"休憩所へ戻る"
+				: u8"ショップへ戻る";
+			if (!isStatusPhase)
+			{
+				overlayTitle = hasEmptySkillSlot ? u8"スキル獲得 / 強化" : u8"スキル強化";
+			}
+		}
+		else if (isMixedPhase)
+		{
+			overlayTitle = u8"挑戦報酬";
+		}
+		else if (!isStatusPhase)
+		{
+			overlayTitle = hasEmptySkillSlot ? u8"スキル獲得" : u8"ステータス / スキル強化";
+		}
+
+		char upgradeHud[1024]{};
+		if (!hasAnyOffer)
 		{
 			sprintf_s(
 				upgradeHud,
@@ -1000,46 +1055,113 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 				(optionIndex == 0) ? u8">" : u8" ",
 				continueLabel);
 		}
-	}
-	else
-	{
-		char l0[64]{}, l1[64]{}, l2[64]{};
-		char d0[96]{}, d1[96]{}, d2[96]{};
-		FormatUpgradeLabel(tran, tran.roguelike.offers[0], l0, sizeof(l0));
-		FormatUpgradeLabel(tran, tran.roguelike.offers[1], l1, sizeof(l1));
-		FormatUpgradeLabel(tran, tran.roguelike.offers[2], l2, sizeof(l2));
-		FormatUpgradeDescription(tran, tran.roguelike.offers[0], d0, sizeof(d0));
-		FormatUpgradeDescription(tran, tran.roguelike.offers[1], d1, sizeof(d1));
-		FormatUpgradeDescription(tran, tran.roguelike.offers[2], d2, sizeof(d2));
-
-		if (showBossDebugHint)
-		{
-			sprintf_s(
-				upgradeHud,
-				u8"%s: 1つ選択\n\n%s %s\n    %s\n%s %s\n    %s\n%s %s\n    %s\n%s ボス戦へ（デバッグ）\n\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定\n[R / Controller Reroll] リロール: 残り %d / %d",
-				overlayTitle,
-				(optionIndex == 0) ? u8">" : u8" ", l0, d0,
-				(optionIndex == 1) ? u8">" : u8" ", l1, d1,
-				(optionIndex == 2) ? u8">" : u8" ", l2, d2,
-				(optionIndex == 3) ? u8">" : u8" ",
-				tran.roguelike.rerollRemain,
-				tran.roguelike.rerollMaxPerStage);
-		}
 		else
 		{
+			char l0[64]{}, l1[64]{}, l2[64]{};
+			char d0[96]{}, d1[96]{}, d2[96]{};
+			FormatUpgradeLabel(tran, tran.roguelike.offers[0], l0, sizeof(l0));
+			FormatUpgradeLabel(tran, tran.roguelike.offers[1], l1, sizeof(l1));
+			FormatUpgradeLabel(tran, tran.roguelike.offers[2], l2, sizeof(l2));
+			FormatUpgradeDescription(tran, tran.roguelike.offers[0], d0, sizeof(d0));
+			FormatUpgradeDescription(tran, tran.roguelike.offers[1], d1, sizeof(d1));
+			FormatUpgradeDescription(tran, tran.roguelike.offers[2], d2, sizeof(d2));
+
 			sprintf_s(
 				upgradeHud,
-				u8"%s: 1つ選択\n\n%s %s\n    %s\n%s %s\n    %s\n%s %s\n    %s\n\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定\n[R / Controller Reroll] リロール: 残り %d / %d",
+				u8"%s: 1つ選択\n\n%s %s\n    %s\n%s %s\n    %s\n%s %s\n    %s\n\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定\n[R / Controller Reroll] リロール所持: %d",
 				overlayTitle,
 				(optionIndex == 0) ? u8">" : u8" ", l0, d0,
 				(optionIndex == 1) ? u8">" : u8" ", l1, d1,
 				(optionIndex == 2) ? u8">" : u8" ", l2, d2,
-				tran.roguelike.rerollRemain,
-				tran.roguelike.rerollMaxPerStage);
+				tran.roguelike.rerollRemain);
 		}
+
+		DrawCenteredOverlayText(upgradeHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+		return;
 	}
 
-	DrawCenteredOverlayText(upgradeHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+	if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionMapSelect)
+	{
+		const int nextStageIndex = tran.roguelike.currentStageIndex + 1;
+		if (nextStageIndex < 0 || nextStageIndex >= tran.GetRunStageCount())
+		{
+			return;
+		}
+
+		char routeText[512]{};
+		size_t routeLen = 0;
+		for (int i = 0; i < tran.GetRunStageCount(); ++i)
+		{
+			const char* stageName = GetRunStageTypeName(tran.GetRunStageTypeAt(i));
+			char segment[64]{};
+			sprintf_s(segment, sizeof(segment), (i == tran.roguelike.currentStageIndex) ? u8"[%d:%s]" : u8"%d:%s", i + 1, stageName);
+			if (routeLen > 0)
+			{
+				sprintf_s(routeText + routeLen, sizeof(routeText) - routeLen, u8" -> ");
+				routeLen = strlen(routeText);
+			}
+			sprintf_s(routeText + routeLen, sizeof(routeText) - routeLen, "%s", segment);
+			routeLen = strlen(routeText);
+		}
+
+		const int optionCount = tran.GetRunStageOptionCount(nextStageIndex);
+		int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
+		if (optionIndex < 0) optionIndex = 0;
+		if (optionIndex >= optionCount) optionIndex = optionCount - 1;
+		char optionsText[512]{};
+		size_t optionsLen = 0;
+		for (int i = 0; i < optionCount; ++i)
+		{
+			char line[96]{};
+			sprintf_s(
+				line,
+				sizeof(line),
+				u8"%s 候補%d: %s\n",
+				(optionIndex == i) ? u8">" : u8" ",
+				i + 1,
+				GetRunStageTypeName(tran.GetRunStageTypeAt(nextStageIndex)));
+			sprintf_s(optionsText + optionsLen, sizeof(optionsText) - optionsLen, "%s", line);
+			optionsLen = strlen(optionsText);
+		}
+
+		char mapHud[1536]{};
+		sprintf_s(
+			mapHud,
+			u8"次ステージ選択\n\n現在: %d / %d  %s\n次: %d / %d  %s\n所持リロール: %d\n\n%s\n\n%s\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
+			tran.roguelike.currentStageIndex + 1,
+			tran.GetRunStageCount(),
+			GetRunStageTypeName(tran.GetCurrentRunStageType()),
+			nextStageIndex + 1,
+			tran.GetRunStageCount(),
+			GetRunStageTypeName(tran.GetRunStageTypeAt(nextStageIndex)),
+			tran.roguelike.rerollRemain,
+			optionsText,
+			routeText);
+		DrawCenteredOverlayText(mapHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+		return;
+	}
+
+	if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
+		tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest)
+	{
+		const bool isRest = (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest);
+		const int optionIndex = (tran.gameplayDebug.rewardSelectionIndex < 0) ? 0 : tran.gameplayDebug.rewardSelectionIndex;
+		const int shopCost = 1 + ((tran.roguelike.shopPurchaseCount < 0) ? 0 : tran.roguelike.shopPurchaseCount);
+		char stageHud[1024]{};
+		sprintf_s(
+			stageHud,
+			u8"%s\n\n現在: %d / %d\n所持リロール: %d\n購入コスト: %d\n%s ステータス強化を購入\n%s スキル強化を購入\n%s 次へ進む\n\n%s[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
+			isRest ? u8"休憩所" : u8"ショップ",
+			tran.roguelike.currentStageIndex + 1,
+			tran.GetRunStageCount(),
+			tran.roguelike.rerollRemain,
+			shopCost,
+			(optionIndex == 0) ? u8">" : u8" ",
+			(optionIndex == 1) ? u8">" : u8" ",
+			(optionIndex == 2) ? u8">" : u8" ",
+			isRest ? u8"HPを全回復しました。\n装備交換は今回未実装です。\n\n" : u8"");
+		DrawCenteredOverlayText(stageHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+	}
 }
 
 bool IsEngineEditorScene(SceneManager::SceneType sceneType)

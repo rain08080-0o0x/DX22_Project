@@ -155,6 +155,12 @@ public:
      * @param targetPos 追跡先のワールド座標です。
      */
     void SetTargetPos(DirectX::XMFLOAT3 targetPos);
+
+    /**
+     * @brief 徘徊を無効化して常に追跡移動するか設定します。
+     * @param forceChase true の間は追跡状態を維持します。
+     */
+    void SetForceChase(bool forceChase);
 private:
     /**
      * @brief 敵の移動 AI 状態です。
@@ -207,4 +213,6 @@ private:
     float m_wanderTimer;
     /** @brief 現在の移動 AI 状態です。 */
     MoveState m_state;
+    /** @brief true の間は徘徊へ戻らず追跡移動を続けます。 */
+    bool m_forceChase;
 };

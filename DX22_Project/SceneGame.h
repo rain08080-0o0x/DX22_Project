@@ -4,6 +4,7 @@
 #include "Scene.h"
 #include "Boss.h"
 #include "Camera.h"
+#include "ParticleEmitter2D.h"
 #include "Player.h"
 #include "UIObjectManager.h"
 #include <functional>
@@ -140,6 +141,18 @@ private:
     };
 
     /**
+     * @brief 挑戦ステージ中に使う攻撃予兆 1 個分です。
+     */
+    struct ChallengeHazard
+    {
+        DirectX::XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
+        float radius = 1.0f;
+        float timer = 0.0f;
+        float telegraphDuration = 0.8f;
+        bool resolved = false;
+    };
+
+    /**
      * @brief 距離ソートして描画するエントリです。
      */
     struct DrawEntry
@@ -173,6 +186,16 @@ private:
         CooldownSkill2,
         /** @brief スロット数です。 */
         CooldownSlotCount
+    };
+
+    /**
+     * @brief デバッグ起動できる挑戦種別です。
+     */
+    enum ChallengeType
+    {
+        ChallengeNone = 0,
+        ChallengeNoDamage = 1,
+        ChallengeDefense = 2
     };
 
     /**
@@ -241,6 +264,56 @@ private:
     bool UpdateBossDebugSetup(float stageSize);
 
     /**
+     * @brief デバッグ要求に応じて挑戦ステージ開始状態を整えます。
+     * @param stageSize フィールド初期化に使うステージサイズです。
+     */
+    void UpdateChallengeDebugSetup(float stageSize);
+
+    /**
+     * @brief 指定挑戦を開始し、戦闘用の一時状態を初期化します。
+     * @param challengeType 開始する挑戦種別です。
+     * @param stageSize 現在のステージサイズです。
+     */
+    void StartChallenge(int challengeType, float stageSize);
+
+    /**
+     * @brief 挑戦ステージの一時状態を全て初期化します。
+     */
+    void ResetChallengeState();
+
+    /**
+     * @brief ノーダメ挑戦を更新します。
+     * @param stageSize 現在のステージサイズです。
+     * @return シーン遷移などでこのフレームを終了した場合は true です。
+     */
+    bool UpdateChallengeNoDamage(float stageSize);
+
+    /**
+     * @brief 防衛挑戦を更新します。
+     * @param stageSize 現在のステージサイズです。
+     * @return シーン遷移などでこのフレームを終了した場合は true です。
+     */
+    bool UpdateChallengeDefense(float stageSize);
+
+    /**
+     * @brief 防衛挑戦用の敵を 1 体だけ追加します。
+     * @param stageSize スポーン計算に使うステージサイズです。
+     */
+    void SpawnDefenseEnemy(float stageSize);
+
+    /**
+     * @brief 現在進行中の挑戦を報酬付きで終了します。
+     * @param success クリア扱いなら true、失敗扱いなら false です。
+     */
+    void FinishChallenge(bool success);
+
+    /**
+     * @brief 挑戦失敗時の進行度に応じた報酬数を返します。
+     * @return 1 以上 2 以下の報酬数です。
+     */
+    int CalcChallengeFailureRewardCount() const;
+
+    /**
      * @brief ボス戦の行動更新とプレイヤー攻撃適用を処理します。
      * @param stageSize フィールドサイズです。
      * @param playerAttackDamage プレイヤー攻撃ダメージです。
@@ -255,6 +328,11 @@ private:
      * @brief ボスの予兆マーカーを描画します。
      */
     void DrawBossTelegraphMarker() const;
+
+    /**
+     * @brief 挑戦ステージ用の予兆とビーコンを描画します。
+     */
+    void DrawChallengeMarkers() const;
 
     /**
      * @brief ボス攻撃の落下物演出を描画します。
@@ -304,6 +382,40 @@ private:
     void UpdateSkillActors(float dt, float stageSize);
 
     /**
+     * @brief ヒット演出用の保存済みパーティクル設定を読み込みます。
+     */
+    void LoadHitEffectPreset();
+
+    /**
+     * @brief ヒット演出用 emitter プールを初期化します。
+     */
+    void InitializeHitEffectEmitters();
+
+    /**
+     * @brief ヒット演出用 emitter プールを解放します。
+     */
+    void ReleaseHitEffectEmitters();
+
+    /**
+     * @brief ヒット演出 emitter を更新します。
+     * @param dt 更新秒数です。
+     */
+    void UpdateHitEffectEmitters(float dt);
+
+    /**
+     * @brief ヒット演出 emitter を描画します。
+     */
+    void DrawHitEffectEmitters() const;
+
+    /**
+     * @brief 指定座標へ保存済みヒット演出を再生します。
+     * @param pos 再生位置です。
+     * @param size 当たり判定サイズです。
+     * @param spawnParticle true の場合は particle も再生します。
+     */
+    void SpawnHitEffect(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& size, bool spawnParticle = true);
+
+    /**
      * @brief カーソル位置から Ray を飛ばし、現在指している対象名をデバッグ共有へ反映します。
      * @param stageSize 現在のステージサイズです。
      */
@@ -330,6 +442,10 @@ private:
     std::vector<EnemySlot> m_enemies;
     /** @brief 一時マーカー演出一覧です。 */
     std::vector<MarkerEffect> m_markerEffects;
+    /** @brief ヒット演出用 emitter プールです。 */
+    std::vector<ParticleEmitter2D*> m_hitEffectEmitters;
+    /** @brief 挑戦ステージ用の予兆一覧です。 */
+    std::vector<ChallengeHazard> m_challengeHazards;
     /** @brief 敵弾一覧です。 */
     std::vector<EnemyProjectile> m_enemyProjectiles;
     /** @brief スキル弾一覧です。 */
@@ -340,6 +456,8 @@ private:
     Texture* m_pShadow;
     /** @brief プレイヤー攻撃範囲可視化用テクスチャです。 */
     Texture* m_pAttackMarker;
+    /** @brief 攻撃/被弾のスプライトシート演出に使うテクスチャです。 */
+    Texture* m_pCombatEffectTexture;
     /** @brief スキル描画用テクスチャです。 */
     Texture* m_pSkillTexture;
     /** @brief ボス攻撃予兆用テクスチャです。 */
@@ -423,6 +541,8 @@ private:
     float m_skill2CooldownDuration;
     /** @brief 現在スイングの識別 ID です。 */
     int m_attackSwingId;
+    /** @brief 次に使うヒット演出 emitter の添字です。 */
+    int m_nextHitEffectEmitter;
     /** @brief 次に発行するスキル弾識別 ID です。 */
     int m_skillProjectileSerial;
     /** @brief 今回スイングで当てた敵数です。 */
@@ -459,6 +579,32 @@ private:
     DirectX::XMFLOAT3 m_attackSize;
     /** @brief 現在の衛星スキル状態です。 */
     OrbitSkillState m_orbitSkill;
+    /** @brief 保存済みヒット演出の設定です。 */
+    ParticleEmitter2D::Settings m_hitEffectPreset;
+    /** @brief 現在有効な挑戦種別です。 */
+    int m_challengeType;
+    /** @brief 挑戦が進行中かどうかです。 */
+    bool m_challengeActive;
+    /** @brief 挑戦の経過時間です。 */
+    float m_challengeTimer;
+    /** @brief 挑戦全体の制限時間です。 */
+    float m_challengeDuration;
+    /** @brief ノーダメ挑戦の次回攻撃生成までの残り時間です。 */
+    float m_challengeNoDamageSpawnTimer;
+    /** @brief 防衛挑戦の次回敵生成までの残り時間です。 */
+    float m_challengeDefenseSpawnTimer;
+    /** @brief 防衛挑戦ビーコンの現在 HP です。 */
+    float m_challengeBeaconHp;
+    /** @brief 防衛挑戦ビーコンの最大 HP です。 */
+    float m_challengeBeaconMaxHp;
+    /** @brief ノーダメ挑戦で被弾した回数です。 */
+    int m_challengeHitCount;
+    /** @brief 防衛挑戦のスポーン順を決める連番です。 */
+    int m_challengeSpawnSerial;
+    /** @brief 防衛挑戦ビーコンの中心位置です。 */
+    DirectX::XMFLOAT3 m_challengeBeaconPos;
+    /** @brief 防衛挑戦ビーコンの描画サイズです。 */
+    DirectX::XMFLOAT3 m_challengeBeaconSize;
     /** @brief 最後にボスへ当てたスキル弾識別 ID です。 */
     int m_lastBossSkillProjectileId;
     /** @brief ポーズ中かどうかです。 */

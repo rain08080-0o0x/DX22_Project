@@ -27,6 +27,9 @@ POINT g_mousePos{};
 POINT g_oldMousePos{};
 bool g_mouseLeftDown = false;
 bool g_oldMouseLeftDown = false;
+float g_inputKeyboardMouseMs = 0.0f;
+float g_inputXInputMs = 0.0f;
+float g_inputDirectInputMs = 0.0f;
 
 namespace
 {
@@ -34,6 +37,20 @@ namespace
 	const float kStickPressThreshold = 0.35f;
 	const LONG kDirectInputAxisRange = 1000;
 	const LONG kDirectInputDeadZone = 250;
+	const ULONGLONG kDirectInputRetryIntervalMs = 1000;
+	ULONGLONG g_nextDirectInputEnumTick = 0;
+
+	double QueryPerfMs()
+	{
+		static LARGE_INTEGER freq = [] {
+			LARGE_INTEGER f{};
+			QueryPerformanceFrequency(&f);
+			return f;
+		}();
+		LARGE_INTEGER now{};
+		QueryPerformanceCounter(&now);
+		return static_cast<double>(now.QuadPart) * 1000.0 / static_cast<double>(freq.QuadPart);
+	}
 
 	float NormalizeThumbAxis(SHORT value, SHORT deadZone)
 	{
@@ -400,13 +417,21 @@ namespace
 			return true;
 		}
 
-		HWND hWnd = GetInputWindow();
-		if (!hWnd || !EnsureDirectInputCreated())
+		const ULONGLONG nowTick = GetTickCount64();
+		if (nowTick < g_nextDirectInputEnumTick)
 		{
 			return false;
 		}
 
+		HWND hWnd = GetInputWindow();
+		if (!hWnd || !EnsureDirectInputCreated())
+		{
+			g_nextDirectInputEnumTick = nowTick + kDirectInputRetryIntervalMs;
+			return false;
+		}
+
 		g_pDirectInput->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumGameControllerCallback, hWnd, DIEDFL_ATTACHEDONLY);
+		g_nextDirectInputEnumTick = g_pDirectInputPad ? 0 : (nowTick + kDirectInputRetryIntervalMs);
 		return g_pDirectInputPad != nullptr;
 	}
 
@@ -582,6 +607,7 @@ void UninitInput()
 
 void UpdateInput()
 {
+	double sectionStart = QueryPerfMs();
 	memcpy_s(g_oldTable, sizeof(g_oldTable), g_keyTable, sizeof(g_keyTable));
 	GetKeyboardState(g_keyTable);
 
@@ -589,12 +615,32 @@ void UpdateInput()
 	g_oldMouseLeftDown = g_mouseLeftDown;
 	g_mousePos = QueryMousePosition();
 	g_mouseLeftDown = (::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	g_inputKeyboardMouseMs = static_cast<float>(QueryPerfMs() - sectionStart);
 
+	sectionStart = QueryPerfMs();
 	g_oldPadState = g_padState;
 	UpdateXInputState();
+	g_inputXInputMs = static_cast<float>(QueryPerfMs() - sectionStart);
 
+	sectionStart = QueryPerfMs();
 	g_oldDiPadState = g_diPadState;
 	UpdateDirectInputState();
+	g_inputDirectInputMs = static_cast<float>(QueryPerfMs() - sectionStart);
+}
+
+float GetInputKeyboardMouseMs()
+{
+	return g_inputKeyboardMouseMs;
+}
+
+float GetInputXInputMs()
+{
+	return g_inputXInputMs;
+}
+
+float GetInputDirectInputMs()
+{
+	return g_inputDirectInputMs;
 }
 
 bool IsKeyPress(BYTE key)

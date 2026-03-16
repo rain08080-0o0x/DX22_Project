@@ -4,6 +4,7 @@
 #include "SceneResult.h"
 #include "Scene3DEditor.h"
 #include "SceneCastleEditor.h"
+#include "SceneEffectDebug.h"
 
 Scene* SceneManager::m_pScene = nullptr;
 SceneManager::SceneType SceneManager::m_current = SceneManager::SCENE_TITLE;
@@ -50,6 +51,9 @@ void SceneManager::CreateScene(SceneType type)
         break;
     case SCENE_ENGINE_EDITOR:
         m_pScene = new SceneCastleEditor();
+        break;
+    case SCENE_EFFECT_DEBUG:
+        m_pScene = new SceneEffectDebug();
         break;
     default:
         m_pScene = new SceneTitle();

@@ -112,6 +112,13 @@ namespace
 		return v;
 	}
 
+	float ClampFloat(float v, float lo, float hi)
+	{
+		if (v < lo) return lo;
+		if (v > hi) return hi;
+		return v;
+	}
+
 	bool IsSupportedXInputBindingValue(int value)
 	{
 		switch (value)
@@ -167,6 +174,8 @@ namespace
 			break;
 		}
 	}
+
+	void InitializeRunStageRoute(Transfer::RoguelikeUpgrade& roguelike);
 
 	template <typename GameplayTuningT, typename RoguelikeT>
 	void ApplyGameplayTuningFileDefaults(GameplayTuningT& gameplay,
@@ -274,32 +283,49 @@ namespace
 		gameplay.pushSlop = 0.01f;
 		gameplay.playerPushShare = 0.55f;
 		gameplay.enemyPushShare = 0.45f;
+		gameplay.challengeNoDamageDuration = 18.0f;
+		gameplay.challengeNoDamageAttackInterval = 1.10f;
+		gameplay.challengeNoDamageTelegraph = 0.90f;
+		gameplay.challengeNoDamageRadius = 1.20f;
+		gameplay.challengeNoDamageDamage = 1.0f;
+		gameplay.challengeNoDamageBurstCount = 2;
+		gameplay.challengeDefenseDuration = 25.0f;
+		gameplay.challengeDefenseBeaconMaxHp = 25.0f;
+		gameplay.challengeDefenseBeaconRadius = 0.90f;
+		gameplay.challengeDefenseBeaconContactDamage = 2.0f;
+		gameplay.challengeDefenseSpawnInterval = 1.40f;
+		gameplay.challengeDefenseEnemyMoveSpeed = 0.32f;
+		gameplay.challengeDefenseSpeedHpBonusRate = 0.10f;
+		gameplay.challengeDefenseRangedHpBonusRate = 0.30f;
+		gameplay.challengeDefenseTankHpBonusRate = 0.50f;
+		gameplay.challengeDefenseEnemyCap = 8;
 
 		difficultyPreset = 1;
 
 		roguelike = RoguelikeT{};
 		roguelike.stageClearCount = 37;
-		roguelike.attackPowerLevel = 10;
-		roguelike.attackSpeedLevel = 10;
-		roguelike.evadeCooldownLevel = 10;
+		roguelike.attackPowerLevel = 5;
+		roguelike.attackSpeedLevel = 5;
+		roguelike.evadeCooldownLevel = 5;
 		roguelike.lastUpgradeType = 17;
 		roguelike.skillSlot1 = Transfer::RoguelikeUpgrade::SkillOrbit;
 		roguelike.skillSlot2 = Transfer::RoguelikeUpgrade::SkillNova;
 		roguelike.skillShotRangeLevel = 0;
 		roguelike.skillShotPowerLevel = 0;
 		roguelike.skillShotCooldownLevel = 0;
-		roguelike.skillNovaRangeLevel = 9;
+		roguelike.skillNovaRangeLevel = 5;
 		roguelike.skillNovaPowerLevel = 0;
-		roguelike.skillNovaCooldownLevel = 10;
+		roguelike.skillNovaCooldownLevel = 5;
 		roguelike.skillOrbitRangeLevel = 0;
-		roguelike.skillOrbitCooldownLevel = 10;
+		roguelike.skillOrbitCooldownLevel = 5;
 		roguelike.skillOrbitCountLevel = 5;
-		roguelike.rerollMaxPerStage = 2;
+		roguelike.rerollMaxPerStage = 1;
+		InitializeRunStageRoute(roguelike);
 	}
 
-	const int kGameplayTuningRequiredKeyCount = 118;
+	const int kGameplayTuningRequiredKeyCount = 134;
 
-	const int kUpgradeTierMax = 10;
+	const int kUpgradeTierMax = Transfer::RoguelikeUpgrade::kLevelMax;
 
 	/**
 	 * @brief 強化レベルを有効範囲へ丸めます。
@@ -314,17 +340,17 @@ namespace
 	// Level tables used to convert upgrade tiers into actual runtime values.
 	const int kAttackDamageByTier[kUpgradeTierMax + 1] =
 	{
-		1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 10
+		1, 2, 3, 5, 7, 10
 	};
 
 	const float kAttackCooldownScaleByTier[kUpgradeTierMax + 1] =
 	{
-		1.00f, 0.96f, 0.92f, 0.88f, 0.84f, 0.80f, 0.76f, 0.72f, 0.68f, 0.64f, 0.60f
+		1.00f, 0.92f, 0.84f, 0.76f, 0.68f, 0.60f
 	};
 
 	const float kEvadeCooldownScaleByTier[kUpgradeTierMax + 1] =
 	{
-		1.00f, 0.95f, 0.90f, 0.84f, 0.78f, 0.72f, 0.66f, 0.60f, 0.54f, 0.48f, 0.42f
+		1.00f, 0.90f, 0.78f, 0.66f, 0.54f, 0.42f
 	};
 
 	int RandRangeInt(int minValue, int maxValue)
@@ -352,7 +378,52 @@ namespace
 		return ClampInt(
 			selectionPhase,
 			Transfer::RoguelikeUpgrade::SelectionNone,
-			Transfer::RoguelikeUpgrade::SelectionSkill);
+			Transfer::RoguelikeUpgrade::SelectionMixed);
+	}
+
+	int NormalizeStageTypeValue(int stageType)
+	{
+		return ClampInt(
+			stageType,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageBoss);
+	}
+
+	void InitializeRunStageRoute(Transfer::RoguelikeUpgrade& roguelike)
+	{
+		const int defaultStageTypes[Transfer::RoguelikeUpgrade::kRunStageCount] =
+		{
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageShop,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageShop,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageCombat,
+			Transfer::RoguelikeUpgrade::StageRest,
+			Transfer::RoguelikeUpgrade::StageBoss
+		};
+
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kRunStageCount; ++i)
+		{
+			roguelike.stageTypes[i] = defaultStageTypes[i];
+			roguelike.stageOptionCounts[i] = 1;
+		}
+
+		roguelike.stageOptionCounts[1] = RandRangeInt(2, 3);
+		roguelike.stageOptionCounts[2] = RandRangeInt(2, 3);
+		roguelike.stageOptionCounts[4] = RandRangeInt(2, 3);
+		roguelike.stageOptionCounts[5] = RandRangeInt(2, 3);
+		roguelike.stageOptionCounts[6] = RandRangeInt(2, 3);
+		roguelike.stageOptionCounts[8] = RandRangeInt(2, 3);
+		roguelike.stageOptionCounts[9] = RandRangeInt(2, 3);
+		roguelike.currentStageIndex = 0;
+		roguelike.currentStageType = Transfer::RoguelikeUpgrade::StageCombat;
+		roguelike.intermissionMode = Transfer::RoguelikeUpgrade::IntermissionNone;
+		roguelike.shopPurchaseCount = 0;
 	}
 
 	bool HasSkillType(int skillSlot1, int skillSlot2, int skillType)
@@ -669,6 +740,17 @@ namespace
 				   HasEmptySkillSlot(roguelike.skillSlot1, roguelike.skillSlot2) &&
 				   !HasSkillType(roguelike.skillSlot1, roguelike.skillSlot2, skillType);
 		}
+		default:
+			break;
+		}
+
+		return false;
+	}
+
+	bool IsSkillUpgradeTypeAvailable(const Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		switch (upgradeType)
+		{
 		case Transfer::RoguelikeUpgrade::UpgradeSkillShotRange:
 		case Transfer::RoguelikeUpgrade::UpgradeSkillShotPower:
 		case Transfer::RoguelikeUpgrade::UpgradeSkillShotCooldown:
@@ -690,6 +772,30 @@ namespace
 		default:
 			return false;
 		}
+	}
+
+	bool IsRewardFollowupTypeAvailable(const Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		if (HasEmptySkillSlot(roguelike.skillSlot1, roguelike.skillSlot2))
+		{
+			return IsSkillRewardTypeAvailable(roguelike, upgradeType);
+		}
+
+		return IsStatusUpgradeTypeAvailable(roguelike, upgradeType) ||
+			   IsSkillUpgradeTypeAvailable(roguelike, upgradeType);
+	}
+
+	bool IsShopSkillTypeAvailable(const Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		return IsSkillRewardTypeAvailable(roguelike, upgradeType) ||
+			   IsSkillUpgradeTypeAvailable(roguelike, upgradeType);
+	}
+
+	bool IsMixedRewardTypeAvailable(const Transfer::RoguelikeUpgrade& roguelike, int upgradeType)
+	{
+		return IsStatusUpgradeTypeAvailable(roguelike, upgradeType) ||
+			   IsSkillRewardTypeAvailable(roguelike, upgradeType) ||
+			   IsSkillUpgradeTypeAvailable(roguelike, upgradeType);
 	}
 
 	void FillOfferArrayFromAvailable(int offers[kUpgradeOfferCount], int available[kUpgradeTypeCount], int availableCount)
@@ -745,7 +851,39 @@ namespace
 			 t < Transfer::RoguelikeUpgrade::UpgradeTypeCount;
 			 ++t)
 		{
-			if (IsSkillRewardTypeAvailable(roguelike, t))
+			if (IsShopSkillTypeAvailable(roguelike, t))
+			{
+				available[availableCount++] = t;
+			}
+		}
+		FillOfferArrayFromAvailable(offers, available, availableCount);
+	}
+
+	void GenerateRewardFollowupOffers(int offers[kUpgradeOfferCount], const Transfer::RoguelikeUpgrade& roguelike)
+	{
+		int available[kUpgradeTypeCount]{};
+		int availableCount = 0;
+		for (int t = Transfer::RoguelikeUpgrade::UpgradeAttackPower;
+			 t < Transfer::RoguelikeUpgrade::UpgradeTypeCount;
+			 ++t)
+		{
+			if (IsRewardFollowupTypeAvailable(roguelike, t))
+			{
+				available[availableCount++] = t;
+			}
+		}
+		FillOfferArrayFromAvailable(offers, available, availableCount);
+	}
+
+	void GenerateMixedOffers(int offers[kUpgradeOfferCount], const Transfer::RoguelikeUpgrade& roguelike)
+	{
+		int available[kUpgradeTypeCount]{};
+		int availableCount = 0;
+		for (int t = Transfer::RoguelikeUpgrade::UpgradeAttackPower;
+			 t < Transfer::RoguelikeUpgrade::UpgradeTypeCount;
+			 ++t)
+		{
+			if (IsMixedRewardTypeAvailable(roguelike, t))
 			{
 				available[availableCount++] = t;
 			}
@@ -763,7 +901,10 @@ namespace
 			GenerateStatusOffers(offers, roguelike);
 			break;
 		case Transfer::RoguelikeUpgrade::SelectionSkill:
-			GenerateSkillOffers(offers, roguelike);
+			GenerateRewardFollowupOffers(offers, roguelike);
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionMixed:
+			GenerateMixedOffers(offers, roguelike);
 			break;
 		default:
 			ResetOffers(offers);
@@ -855,6 +996,7 @@ void Transfer::ResetRoguelikeUpgrade()
 {
 	// 選択候補や残リロールも含めて、すべて初期化します。
 	roguelike = RoguelikeUpgrade{};
+	InitializeRunStageRoute(roguelike);
 }
 
 /**
@@ -877,7 +1019,7 @@ void Transfer::ApplyDifficultyPreset(int preset)
 	{
 	case 0: // Easy
 		gameplay.enemyCount = 2;
-		gameplay.waveMax = 2;
+		gameplay.waveMax = 3;
 		gameplay.waveEnemyAddPerWave = 1;
 		gameplay.enemyAttackWindup = 0.65f;
 		gameplay.enemyAttackCooldown = 1.20f;
@@ -890,7 +1032,7 @@ void Transfer::ApplyDifficultyPreset(int preset)
 		break;
 	case 2: // Hard
 		gameplay.enemyCount = 4;
-		gameplay.waveMax = 4;
+		gameplay.waveMax = 3;
 		gameplay.waveEnemyAddPerWave = 2;
 		gameplay.enemyAttackWindup = 0.45f;
 		gameplay.enemyAttackCooldown = 0.80f;
@@ -944,8 +1086,22 @@ void Transfer::BeginUpgradeSelection()
 {
 	++roguelike.stageClearCount;
 	roguelike.selectionPending = 1;
-	roguelike.selectionPhase = RoguelikeUpgrade::SelectionStatus;
-	roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+	roguelike.selectionPhase =
+		HasEmptySkillSlot(roguelike.skillSlot1, roguelike.skillSlot2)
+		? RoguelikeUpgrade::SelectionStatus
+		: RoguelikeUpgrade::SelectionSkill;
+	roguelike.selectionRoundsRemaining = 2;
+	GrantStageProgressRerollItems();
+	ResetOffers(roguelike.offers);
+	gameplayDebug.rewardSelectionIndex = 0;
+	RefreshUpgradeSelectionState();
+}
+
+void Transfer::BeginChallengeRewardSelection(int rewardCount)
+{
+	roguelike.selectionPending = 1;
+	roguelike.selectionPhase = RoguelikeUpgrade::SelectionMixed;
+	roguelike.selectionRoundsRemaining = ClampInt(rewardCount, 1, 3);
 	ResetOffers(roguelike.offers);
 	gameplayDebug.rewardSelectionIndex = 0;
 	RefreshUpgradeSelectionState();
@@ -974,10 +1130,17 @@ bool Transfer::AdvanceUpgradeSelectionPhase()
 {
 	if (roguelike.selectionPending == 0) return false;
 
-	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
+	if (roguelike.selectionRoundsRemaining > 0)
 	{
-		roguelike.selectionPhase = RoguelikeUpgrade::SelectionSkill;
-		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+		--roguelike.selectionRoundsRemaining;
+	}
+
+	if (roguelike.selectionRoundsRemaining > 0)
+	{
+		roguelike.selectionPhase =
+			(roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
+			? RoguelikeUpgrade::SelectionSkill
+			: NormalizeSelectionPhaseValue(roguelike.selectionPhase);
 		ResetOffers(roguelike.offers);
 		gameplayDebug.rewardSelectionIndex = 0;
 		RefreshUpgradeSelectionState();
@@ -1010,10 +1173,17 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 	GetUpgradeStepsForDifficulty(gameplayDebug.difficultyPreset, smallStep, largeStep);
 	ApplyUpgradeType(roguelike, selectedType, smallStep, largeStep);
 	roguelike.lastUpgradeType = selectedType;
-	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
+	if (roguelike.selectionRoundsRemaining > 0)
 	{
-		roguelike.selectionPhase = RoguelikeUpgrade::SelectionSkill;
-		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
+		--roguelike.selectionRoundsRemaining;
+	}
+
+	if (roguelike.selectionRoundsRemaining > 0)
+	{
+		roguelike.selectionPhase =
+			(roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
+			? RoguelikeUpgrade::SelectionSkill
+			: NormalizeSelectionPhaseValue(roguelike.selectionPhase);
 		ResetOffers(roguelike.offers);
 		gameplayDebug.rewardSelectionIndex = 0;
 		RefreshUpgradeSelectionState();
@@ -1036,7 +1206,6 @@ bool Transfer::RefreshUpgradeSelectionState()
 	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionNone)
 	{
 		roguelike.selectionPhase = RoguelikeUpgrade::SelectionStatus;
-		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
 	}
 
 	if (HasAnyOffer(roguelike.offers))
@@ -1052,16 +1221,14 @@ bool Transfer::RefreshUpgradeSelectionState()
 
 	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
 	{
+		if (roguelike.selectionRoundsRemaining > 1)
+		{
+			--roguelike.selectionRoundsRemaining;
+		}
 		roguelike.selectionPhase = RoguelikeUpgrade::SelectionSkill;
-		roguelike.rerollRemain = ClampInt(roguelike.rerollMaxPerStage, 0, 99);
 		ResetOffers(roguelike.offers);
 		gameplayDebug.rewardSelectionIndex = 0;
 		GenerateUpgradeOffers(roguelike.offers, roguelike, roguelike.selectionPhase);
-	}
-
-	if (!HasAnyOffer(roguelike.offers))
-	{
-		roguelike.rerollRemain = 0;
 	}
 
 	return true;
@@ -1076,9 +1243,193 @@ void Transfer::FinishUpgradeSelection()
 {
 	roguelike.selectionPending = 0;
 	roguelike.selectionPhase = RoguelikeUpgrade::SelectionNone;
-	roguelike.rerollRemain = 0;
+	roguelike.selectionRoundsRemaining = 0;
 	ResetOffers(roguelike.offers);
 	gameplayDebug.rewardSelectionIndex = 0;
+}
+
+int Transfer::GetRunStageCount() const
+{
+	return RoguelikeUpgrade::kRunStageCount;
+}
+
+int Transfer::GetRunStageTypeAt(int stageIndex) const
+{
+	const int clampedStageIndex = ClampInt(stageIndex, 0, RoguelikeUpgrade::kRunStageCount - 1);
+	return NormalizeStageTypeValue(roguelike.stageTypes[clampedStageIndex]);
+}
+
+int Transfer::GetCurrentRunStageType() const
+{
+	return NormalizeStageTypeValue(roguelike.currentStageType);
+}
+
+int Transfer::GetRunStageOptionCount(int stageIndex) const
+{
+	const int clampedStageIndex = ClampInt(stageIndex, 0, RoguelikeUpgrade::kRunStageCount - 1);
+	return ClampInt(roguelike.stageOptionCounts[clampedStageIndex], 1, RoguelikeUpgrade::kOfferCount);
+}
+
+bool Transfer::BeginNextStageSelection()
+{
+	FinishUpgradeSelection();
+	if (roguelike.currentStageIndex >= RoguelikeUpgrade::kRunStageCount - 1)
+	{
+		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionNone;
+		return false;
+	}
+
+	roguelike.intermissionMode = RoguelikeUpgrade::IntermissionMapSelect;
+	gameplayDebug.rewardSelectionIndex = 0;
+	return true;
+}
+
+bool Transfer::SelectNextStage(int optionIndex)
+{
+	if (roguelike.intermissionMode != RoguelikeUpgrade::IntermissionMapSelect)
+	{
+		return false;
+	}
+
+	const int nextStageIndex = roguelike.currentStageIndex + 1;
+	if (nextStageIndex < 0 || nextStageIndex >= RoguelikeUpgrade::kRunStageCount)
+	{
+		return false;
+	}
+
+	const int optionCount = GetRunStageOptionCount(nextStageIndex);
+	if (optionIndex < 0 || optionIndex >= optionCount)
+	{
+		return false;
+	}
+
+	roguelike.currentStageIndex = nextStageIndex;
+	roguelike.currentStageType = GetRunStageTypeAt(nextStageIndex);
+	roguelike.shopPurchaseCount = 0;
+	switch (roguelike.currentStageType)
+	{
+	case RoguelikeUpgrade::StageShop:
+		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionShop;
+		break;
+	case RoguelikeUpgrade::StageRest:
+		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionRest;
+		player.hp = player.maxHp;
+		break;
+	default:
+		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionNone;
+		break;
+	}
+
+	gameplayDebug.rewardSelectionIndex = 0;
+	return true;
+}
+
+bool Transfer::ContinueFromCurrentNonCombatStage()
+{
+	const int currentStageType = GetCurrentRunStageType();
+	if (currentStageType != RoguelikeUpgrade::StageShop &&
+		currentStageType != RoguelikeUpgrade::StageRest)
+	{
+		return false;
+	}
+
+	GrantStageProgressRerollItems();
+	roguelike.shopPurchaseCount = 0;
+	if (roguelike.currentStageIndex >= RoguelikeUpgrade::kRunStageCount - 1)
+	{
+		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionNone;
+		return false;
+	}
+
+	const int nextStageIndex = roguelike.currentStageIndex + 1;
+	if (GetRunStageTypeAt(nextStageIndex) == RoguelikeUpgrade::StageBoss)
+	{
+		roguelike.currentStageIndex = nextStageIndex;
+		roguelike.currentStageType = RoguelikeUpgrade::StageBoss;
+		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionNone;
+		gameplayDebug.rewardSelectionIndex = 0;
+		return true;
+	}
+
+	roguelike.intermissionMode = RoguelikeUpgrade::IntermissionMapSelect;
+	gameplayDebug.rewardSelectionIndex = 0;
+	return true;
+}
+
+void Transfer::GrantStageProgressRerollItems()
+{
+	const int gain = ClampInt(roguelike.rerollMaxPerStage, 0, 9);
+	roguelike.rerollRemain = ClampInt(roguelike.rerollRemain + gain, 0, 999);
+}
+
+bool Transfer::GenerateOffersForSelectionPhase(int selectionPhase, int offers[RoguelikeUpgrade::kOfferCount]) const
+{
+	if (!offers)
+	{
+		return false;
+	}
+
+	switch (NormalizeSelectionPhaseValue(selectionPhase))
+	{
+	case RoguelikeUpgrade::SelectionStatus:
+		GenerateStatusOffers(offers, roguelike);
+		break;
+	case RoguelikeUpgrade::SelectionSkill:
+		GenerateSkillOffers(offers, roguelike);
+		break;
+	case RoguelikeUpgrade::SelectionMixed:
+		GenerateMixedOffers(offers, roguelike);
+		break;
+	default:
+		ResetOffers(offers);
+		break;
+	}
+	return HasAnyOffer(offers);
+}
+
+bool Transfer::ApplyUpgradeTypeImmediate(int upgradeType)
+{
+	if (upgradeType < 0 || upgradeType >= RoguelikeUpgrade::UpgradeTypeCount)
+	{
+		return false;
+	}
+
+	int smallStep = 1;
+	int largeStep = 2;
+	GetUpgradeStepsForDifficulty(gameplayDebug.difficultyPreset, smallStep, largeStep);
+	ApplyUpgradeType(roguelike, upgradeType, smallStep, largeStep);
+	roguelike.lastUpgradeType = upgradeType;
+	return true;
+}
+
+bool Transfer::PurchaseRandomUpgrade(int selectionPhase, int cost)
+{
+	if (cost <= 0 || roguelike.rerollRemain < cost)
+	{
+		return false;
+	}
+
+	const int normalizedPhase = NormalizeSelectionPhaseValue(selectionPhase);
+	if (normalizedPhase == RoguelikeUpgrade::SelectionNone)
+	{
+		return false;
+	}
+
+	int offers[RoguelikeUpgrade::kOfferCount]{};
+	if (!GenerateOffersForSelectionPhase(normalizedPhase, offers))
+	{
+		return false;
+	}
+
+	roguelike.rerollRemain = ClampInt(roguelike.rerollRemain - cost, 0, 999);
+	++roguelike.shopPurchaseCount;
+	roguelike.selectionPending = 1;
+	roguelike.selectionPhase = normalizedPhase;
+	roguelike.selectionRoundsRemaining = 1;
+	ResetOffers(roguelike.offers);
+	gameplayDebug.rewardSelectionIndex = 0;
+	RefreshUpgradeSelectionState();
+	return true;
 }
 
 /**
@@ -1407,6 +1758,22 @@ bool Transfer::LoadGameplayTuning(const char* path)
 		if (key == "bindDirectInputReroll") { loadedInput.directInputReroll = ToInt(value, loadedInput.directInputReroll); continue; }
 		if (key == "bindDirectInputTabPrev") { loadedInput.directInputTabPrev = ToInt(value, loadedInput.directInputTabPrev); continue; }
 		if (key == "bindDirectInputTabNext") { loadedInput.directInputTabNext = ToInt(value, loadedInput.directInputTabNext); continue; }
+		if (key == "challengeNoDamageDuration") { loaded.challengeNoDamageDuration = ToFloat(value, loaded.challengeNoDamageDuration); loadedKeys.insert(key); continue; }
+		if (key == "challengeNoDamageAttackInterval") { loaded.challengeNoDamageAttackInterval = ToFloat(value, loaded.challengeNoDamageAttackInterval); loadedKeys.insert(key); continue; }
+		if (key == "challengeNoDamageTelegraph") { loaded.challengeNoDamageTelegraph = ToFloat(value, loaded.challengeNoDamageTelegraph); loadedKeys.insert(key); continue; }
+		if (key == "challengeNoDamageRadius") { loaded.challengeNoDamageRadius = ToFloat(value, loaded.challengeNoDamageRadius); loadedKeys.insert(key); continue; }
+		if (key == "challengeNoDamageDamage") { loaded.challengeNoDamageDamage = ToFloat(value, loaded.challengeNoDamageDamage); loadedKeys.insert(key); continue; }
+		if (key == "challengeNoDamageBurstCount") { loaded.challengeNoDamageBurstCount = ToInt(value, loaded.challengeNoDamageBurstCount); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseDuration") { loaded.challengeDefenseDuration = ToFloat(value, loaded.challengeDefenseDuration); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseBeaconMaxHp") { loaded.challengeDefenseBeaconMaxHp = ToFloat(value, loaded.challengeDefenseBeaconMaxHp); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseBeaconRadius") { loaded.challengeDefenseBeaconRadius = ToFloat(value, loaded.challengeDefenseBeaconRadius); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseBeaconContactDamage") { loaded.challengeDefenseBeaconContactDamage = ToFloat(value, loaded.challengeDefenseBeaconContactDamage); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseSpawnInterval") { loaded.challengeDefenseSpawnInterval = ToFloat(value, loaded.challengeDefenseSpawnInterval); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseEnemyMoveSpeed") { loaded.challengeDefenseEnemyMoveSpeed = ToFloat(value, loaded.challengeDefenseEnemyMoveSpeed); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseSpeedHpBonusRate") { loaded.challengeDefenseSpeedHpBonusRate = ToFloat(value, loaded.challengeDefenseSpeedHpBonusRate); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseRangedHpBonusRate") { loaded.challengeDefenseRangedHpBonusRate = ToFloat(value, loaded.challengeDefenseRangedHpBonusRate); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseTankHpBonusRate") { loaded.challengeDefenseTankHpBonusRate = ToFloat(value, loaded.challengeDefenseTankHpBonusRate); loadedKeys.insert(key); continue; }
+		if (key == "challengeDefenseEnemyCap") { loaded.challengeDefenseEnemyCap = ToInt(value, loaded.challengeDefenseEnemyCap); loadedKeys.insert(key); continue; }
 
 		// キー名に応じて、対象項目だけを個別に復元します。
 		bool matchedKey = true;
@@ -1623,6 +1990,22 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	loaded.upgradeStepNormalLarge = ClampInt(loaded.upgradeStepNormalLarge, loaded.upgradeStepNormalSmall, 10);
 	loaded.upgradeStepHardSmall = ClampInt(loaded.upgradeStepHardSmall, 0, 10);
 	loaded.upgradeStepHardLarge = ClampInt(loaded.upgradeStepHardLarge, loaded.upgradeStepHardSmall, 10);
+	loaded.challengeNoDamageDuration = ClampFloat(loaded.challengeNoDamageDuration, 5.0f, 120.0f);
+	loaded.challengeNoDamageAttackInterval = ClampFloat(loaded.challengeNoDamageAttackInterval, 0.20f, 10.0f);
+	loaded.challengeNoDamageTelegraph = ClampFloat(loaded.challengeNoDamageTelegraph, 0.10f, 8.0f);
+	loaded.challengeNoDamageRadius = ClampFloat(loaded.challengeNoDamageRadius, 0.20f, 8.0f);
+	loaded.challengeNoDamageDamage = ClampFloat(loaded.challengeNoDamageDamage, 0.0f, 20.0f);
+	loaded.challengeNoDamageBurstCount = ClampInt(loaded.challengeNoDamageBurstCount, 1, 8);
+	loaded.challengeDefenseDuration = ClampFloat(loaded.challengeDefenseDuration, 5.0f, 180.0f);
+	loaded.challengeDefenseBeaconMaxHp = ClampFloat(loaded.challengeDefenseBeaconMaxHp, 1.0f, 500.0f);
+	loaded.challengeDefenseBeaconRadius = ClampFloat(loaded.challengeDefenseBeaconRadius, 0.30f, 6.0f);
+	loaded.challengeDefenseBeaconContactDamage = ClampFloat(loaded.challengeDefenseBeaconContactDamage, 0.1f, 100.0f);
+	loaded.challengeDefenseSpawnInterval = ClampFloat(loaded.challengeDefenseSpawnInterval, 0.20f, 15.0f);
+	loaded.challengeDefenseEnemyMoveSpeed = ClampFloat(loaded.challengeDefenseEnemyMoveSpeed, 0.05f, 4.0f);
+	loaded.challengeDefenseSpeedHpBonusRate = ClampFloat(loaded.challengeDefenseSpeedHpBonusRate, 0.0f, 5.0f);
+	loaded.challengeDefenseRangedHpBonusRate = ClampFloat(loaded.challengeDefenseRangedHpBonusRate, 0.0f, 5.0f);
+	loaded.challengeDefenseTankHpBonusRate = ClampFloat(loaded.challengeDefenseTankHpBonusRate, 0.0f, 5.0f);
+	loaded.challengeDefenseEnemyCap = ClampInt(loaded.challengeDefenseEnemyCap, 1, 16);
 
 	// 正常化済みの値だけを本体へ反映します。
 	gameplay = loaded;
@@ -1655,6 +2038,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	loadedRogue.selectionPending = 0;
 	loadedRogue.selectionPhase = RoguelikeUpgrade::SelectionNone;
 	ResetOffers(loadedRogue.offers);
+	InitializeRunStageRoute(loadedRogue);
 	roguelike = loadedRogue;
 	auto sanitizeBinding = [](int value, int fallback) -> int
 	{
@@ -1836,6 +2220,22 @@ bool Transfer::SaveGameplayTuning(const char* path) const
 		ofs << "pushSlop=" << gameplay.pushSlop << "\n";
 		ofs << "playerPushShare=" << gameplay.playerPushShare << "\n";
 		ofs << "enemyPushShare=" << gameplay.enemyPushShare << "\n";
+		ofs << "challengeNoDamageDuration=" << gameplay.challengeNoDamageDuration << "\n";
+		ofs << "challengeNoDamageAttackInterval=" << gameplay.challengeNoDamageAttackInterval << "\n";
+		ofs << "challengeNoDamageTelegraph=" << gameplay.challengeNoDamageTelegraph << "\n";
+		ofs << "challengeNoDamageRadius=" << gameplay.challengeNoDamageRadius << "\n";
+		ofs << "challengeNoDamageDamage=" << gameplay.challengeNoDamageDamage << "\n";
+		ofs << "challengeNoDamageBurstCount=" << gameplay.challengeNoDamageBurstCount << "\n";
+		ofs << "challengeDefenseDuration=" << gameplay.challengeDefenseDuration << "\n";
+		ofs << "challengeDefenseBeaconMaxHp=" << gameplay.challengeDefenseBeaconMaxHp << "\n";
+		ofs << "challengeDefenseBeaconRadius=" << gameplay.challengeDefenseBeaconRadius << "\n";
+		ofs << "challengeDefenseBeaconContactDamage=" << gameplay.challengeDefenseBeaconContactDamage << "\n";
+		ofs << "challengeDefenseSpawnInterval=" << gameplay.challengeDefenseSpawnInterval << "\n";
+		ofs << "challengeDefenseEnemyMoveSpeed=" << gameplay.challengeDefenseEnemyMoveSpeed << "\n";
+		ofs << "challengeDefenseSpeedHpBonusRate=" << gameplay.challengeDefenseSpeedHpBonusRate << "\n";
+		ofs << "challengeDefenseRangedHpBonusRate=" << gameplay.challengeDefenseRangedHpBonusRate << "\n";
+		ofs << "challengeDefenseTankHpBonusRate=" << gameplay.challengeDefenseTankHpBonusRate << "\n";
+		ofs << "challengeDefenseEnemyCap=" << gameplay.challengeDefenseEnemyCap << "\n";
 		ofs << "bindMoveUp=" << input.moveUp << "\n";
 		ofs << "bindMoveDown=" << input.moveDown << "\n";
 		ofs << "bindMoveLeft=" << input.moveLeft << "\n";

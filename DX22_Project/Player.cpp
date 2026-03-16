@@ -15,7 +15,7 @@ namespace
     const float kDefaultMaxHp = 100.0f;
     const float kDefaultDashDistance = 1.4f;
     const float kDefaultDashCooldown = 0.4f;
-    const float kDefaultDashDuration = 0.16f;
+    const float kDefaultDashDuration = 0.50f;
     const float kMoveDt = 1.0f / 60.0f;
 
     /**
@@ -33,6 +33,14 @@ namespace
         if (v > hi) return hi;
         // 範囲内なら補正せず、そのまま返します。
         return v;
+    }
+
+    float EvaluateDashTravel01(float t)
+    {
+        const float clamped = ClampFloat(t, 0.0f, 1.0f);
+        const float inv = 1.0f - clamped;
+        // 回避距離を前半へ寄せて、踏み込みの加速感を強くします。
+        return 1.0f - inv * inv * inv * inv;
     }
 }
 
@@ -425,18 +433,31 @@ void Player::ApplyMovement(float dt)
 
     if (m_isDashing)
     {
-        // 回避中は通常移動を止め、距離と時間から算出した一定速度で移動します。
+        // 回避中は移動量を前半へ寄せ、見た目にも分かる加速感を出します。
         const float duration = m_dashDuration;
         const float distance = m_dashDistance;
         if (duration > 0.0f && distance > 0.0f)
         {
-            const float speed = distance / duration;
+            const float prevTimer = m_dashTimer;
+            float nextTimer = m_dashTimer - dt;
+            if (nextTimer < 0.0f) nextTimer = 0.0f;
+
+            const float prevProgress = 1.0f - ClampFloat(prevTimer / duration, 0.0f, 1.0f);
+            const float nextProgress = 1.0f - ClampFloat(nextTimer / duration, 0.0f, 1.0f);
+            const float traveled =
+                (EvaluateDashTravel01(nextProgress) - EvaluateDashTravel01(prevProgress)) * distance;
+            const float speed = (dt > 0.0f) ? (traveled / dt) : 0.0f;
+
             m_velocity.x = m_dashDir.x * speed;
             m_velocity.y = 0.0f;
             m_velocity.z = m_dashDir.z * speed;
             m_facingDir = m_dashDir;
-            m_pos.x += m_velocity.x * dt;
-            m_pos.z += m_velocity.z * dt;
+            m_pos.x += m_dashDir.x * traveled;
+            m_pos.z += m_dashDir.z * traveled;
+        }
+        else
+        {
+            m_velocity = { 0.0f, 0.0f, 0.0f };
         }
 
         // 残り時間が尽きたら回避終了へ切り替えます。
@@ -445,6 +466,7 @@ void Player::ApplyMovement(float dt)
         {
             m_dashTimer = 0.0f;
             m_isDashing = false;
+            m_velocity = { 0.0f, 0.0f, 0.0f };
         }
         return;
     }

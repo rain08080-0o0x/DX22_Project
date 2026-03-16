@@ -67,7 +67,9 @@ HRESULT InitDirectX(HWND hWnd, UINT width, UINT height, bool fullscreen)
 	UINT numDriverTypes = ARRAYSIZE(driverTypes);
 
 	UINT createDeviceFlags = 0;
+#ifdef _DEBUG
 	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
 
 	// 機能レベル
 	D3D_FEATURE_LEVEL featureLevels[] =
@@ -85,22 +87,36 @@ HRESULT InitDirectX(HWND hWnd, UINT width, UINT height, bool fullscreen)
 	D3D_DRIVER_TYPE driverType;
 	D3D_FEATURE_LEVEL featureLevel;
 
+	auto tryCreateDeviceAndSwapChain = [&](UINT flags, D3D_DRIVER_TYPE type) -> HRESULT
+	{
+		SAFE_RELEASE(g_pContext);
+		SAFE_RELEASE(g_pDevice);
+		SAFE_RELEASE(g_pSwapChain);
+		return D3D11CreateDeviceAndSwapChain(
+			NULL,					// ディスプレイデバイスのアダプタ（NULLの場合最初に見つかったアダプタ）
+			type,					// デバイスドライバのタイプ
+			NULL,					// ソフトウェアラスタライザを使用する場合に指定する
+			flags,					// デバイスフラグ
+			featureLevels,			// 機能レベル
+			numFeatureLevels,		// 機能レベル数
+			D3D11_SDK_VERSION,		//
+			&sd,					// スワップチェインの設定
+			&g_pSwapChain,			// IDXGISwapChainインタフェース
+			&g_pDevice,				// ID3D11Deviceインタフェース
+			&featureLevel,			// サポートされている機能レベル
+			&g_pContext);			// デバイスコンテキスト
+	};
+
 	for (UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; ++driverTypeIndex)
 	{
 		driverType = driverTypes[driverTypeIndex];
-		hr = D3D11CreateDeviceAndSwapChain(
-			NULL,					// ディスプレイデバイスのアダプタ（NULLの場合最初に見つかったアダプタ）
-			driverType,				// デバイスドライバのタイプ
-			NULL,					// ソフトウェアラスタライザを使用する場合に指定する
-			createDeviceFlags,		// デバイスフラグ
-			featureLevels,			// 機能レベル
-			numFeatureLevels,		// 機能レベル数
-			D3D11_SDK_VERSION,		// 
-			&sd,					// スワップチェインの設定
-			&g_pSwapChain,			// IDXGIDwapChainインタフェース	
-			&g_pDevice,				// ID3D11Deviceインタフェース
-			&featureLevel,		// サポートされている機能レベル
-			&g_pContext);		// デバイスコンテキスト
+		hr = tryCreateDeviceAndSwapChain(createDeviceFlags, driverType);
+#ifdef _DEBUG
+		if (FAILED(hr) && (createDeviceFlags & D3D11_CREATE_DEVICE_DEBUG))
+		{
+			hr = tryCreateDeviceAndSwapChain(createDeviceFlags & ~D3D11_CREATE_DEVICE_DEBUG, driverType);
+		}
+#endif
 		if (SUCCEEDED(hr)) {
 			break;
 		}
@@ -365,8 +381,10 @@ void InitImGui(HWND hWnd)
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 
 	ImGui::StyleColorsDark();
+#ifdef _DEBUG
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // OS外にウィンドウを出せる
+#endif
 
 	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 	{

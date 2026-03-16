@@ -9,7 +9,9 @@ namespace
 	constexpr int kMenuRestart = 0;
 	constexpr int kMenuTitle = 1;
 	constexpr int kRewardContinue = 100;
-	constexpr int kRewardBossBattle = 101;
+	constexpr int kStageShopBuyStatus = 200;
+	constexpr int kStageShopBuySkill = 201;
+	constexpr int kStageShopContinue = 202;
 
 	bool IsResultConfirmTriggered()
 	{
@@ -26,17 +28,16 @@ namespace
 		return IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D') || IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S');
 	}
 
-	void StartBossBattleDebug(Transfer& tran)
+	bool IsRunIntermissionActive(const Transfer& tran)
 	{
-		tran.FinishUpgradeSelection();
-		tran.gameplayDebug.upgradeSelectionPending = 0;
-		tran.gameplayDebug.upgradeRerollRemain = 0;
-		tran.gameplayDebug.upgradeOffer0 = -1;
-		tran.gameplayDebug.upgradeOffer1 = -1;
-		tran.gameplayDebug.upgradeOffer2 = -1;
-		tran.gameplayDebug.requestBossBattle = 1;
-		tran.gameplayDebug.bossBattleActive = 0;
-		tran.gameplayDebug.showBossResultTimer = 0;
+		return
+			tran.roguelike.selectionPending != 0 ||
+			tran.roguelike.intermissionMode != Transfer::RoguelikeUpgrade::IntermissionNone;
+	}
+
+	int GetCurrentShopCost(const Transfer& tran)
+	{
+		return 1 + ((tran.roguelike.shopPurchaseCount < 0) ? 0 : tran.roguelike.shopPurchaseCount);
 	}
 }
 
@@ -94,6 +95,11 @@ void SceneResult::Update()
 	TRAN_INS;
 	tran.gameplayDebug.runTimerRunning = 0;
 	tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+	tran.gameplayDebug.upgradeSelectionPending = tran.roguelike.selectionPending;
+	tran.gameplayDebug.upgradeRerollRemain = tran.roguelike.rerollRemain;
+	tran.gameplayDebug.upgradeOffer0 = tran.roguelike.offers[0];
+	tran.gameplayDebug.upgradeOffer1 = tran.roguelike.offers[1];
+	tran.gameplayDebug.upgradeOffer2 = tran.roguelike.offers[2];
 	if (m_pResultBgmVoice)
 	{
 		float masterVolume = tran.gameplay.volumeMaster;
@@ -111,98 +117,197 @@ void SceneResult::Update()
 		SceneManager::ChangeScene(SceneManager::SCENE_TITLE);
 		return;
 	}
-	if (m_current == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0)
+	if (m_current == SceneManager::ResultType::Win && IsRunIntermissionActive(tran))
 	{
-		tran.RefreshUpgradeSelectionState();
-#ifdef _DEBUG
-		const bool showBossDebugHint = true;
-#else
-		const bool showBossDebugHint = false;
-#endif
-		const bool hasAnyOffer = tran.HasAnyUpgradeOffer();
-		int optionIds[4] = {};
-		int optionCount = 0;
-		if (hasAnyOffer)
+		if (tran.roguelike.selectionPending != 0)
 		{
-			for (int i = 0; i < Transfer::RoguelikeUpgrade::kOfferCount; ++i)
+			const bool returnToShopAfterSelection =
+				tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
+				tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest;
+			tran.RefreshUpgradeSelectionState();
+			const bool hasAnyOffer = tran.HasAnyUpgradeOffer();
+			int optionIds[Transfer::RoguelikeUpgrade::kOfferCount + 1] = {};
+			int optionCount = 0;
+			if (hasAnyOffer)
 			{
-				if (tran.roguelike.offers[i] >= 0)
+				for (int i = 0; i < Transfer::RoguelikeUpgrade::kOfferCount; ++i)
 				{
-					optionIds[optionCount++] = i;
+					if (tran.roguelike.offers[i] >= 0)
+					{
+						optionIds[optionCount++] = i;
+					}
 				}
 			}
-		}
-		else
-		{
-			optionIds[optionCount++] = kRewardContinue;
-		}
-		if (showBossDebugHint && optionCount < 4)
-		{
-			optionIds[optionCount++] = kRewardBossBattle;
-		}
-		if (optionCount <= 0)
-		{
-			optionIds[0] = kRewardContinue;
-			optionCount = 1;
-		}
-		if (m_rewardSelection < 0) m_rewardSelection = 0;
-		if (m_rewardSelection >= optionCount) m_rewardSelection = optionCount - 1;
-		tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
-
-		if (IsSelectionPrevTriggered())
-		{
-			--m_rewardSelection;
-			if (m_rewardSelection < 0) m_rewardSelection = optionCount - 1;
-			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
-		}
-		else if (IsSelectionNextTriggered())
-		{
-			++m_rewardSelection;
-			if (m_rewardSelection >= optionCount) m_rewardSelection = 0;
-			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
-		}
-
-		if (hasAnyOffer && IsKeyTrigger('R'))
-		{
-			if (tran.RerollUpgradeSelection())
+			else
 			{
-				m_rewardSelection = 0;
+				optionIds[optionCount++] = kRewardContinue;
+			}
+			if (optionCount <= 0)
+			{
+				optionIds[0] = kRewardContinue;
+				optionCount = 1;
+			}
+			if (m_rewardSelection < 0) m_rewardSelection = 0;
+			if (m_rewardSelection >= optionCount) m_rewardSelection = optionCount - 1;
+			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+
+			if (IsSelectionPrevTriggered())
+			{
+				--m_rewardSelection;
+				if (m_rewardSelection < 0) m_rewardSelection = optionCount - 1;
 				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
 			}
+			else if (IsSelectionNextTriggered())
+			{
+				++m_rewardSelection;
+				if (m_rewardSelection >= optionCount) m_rewardSelection = 0;
+				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+			}
+
+			if (hasAnyOffer && IsKeyTrigger('R'))
+			{
+				if (tran.RerollUpgradeSelection())
+				{
+					m_rewardSelection = 0;
+					tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+				}
+			}
+
+			if (IsResultConfirmTriggered())
+			{
+				const int selectedOption = optionIds[m_rewardSelection];
+				bool handled = false;
+				if (selectedOption == kRewardContinue)
+				{
+					handled = tran.AdvanceUpgradeSelectionPhase();
+				}
+				else if (selectedOption >= 0)
+				{
+					handled = tran.ApplyUpgradeSelection(selectedOption);
+				}
+				if (handled)
+				{
+					m_rewardSelection = 0;
+					tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+					if (tran.roguelike.selectionPending == 0)
+					{
+						if (tran.gameplayDebug.challengeReturnToGameAfterReward != 0)
+						{
+							tran.gameplayDebug.challengeReturnToGameAfterReward = 0;
+							SceneManager::ChangeResult(SceneManager::ResultType::None);
+							SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+							return;
+						}
+						if (returnToShopAfterSelection)
+						{
+							return;
+						}
+						if (!tran.BeginNextStageSelection())
+						{
+							SceneManager::ChangeResult(SceneManager::ResultType::None);
+							SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+						}
+					}
+					return;
+				}
+			}
+			return;
 		}
 
-		if (IsResultConfirmTriggered())
+		if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionMapSelect)
 		{
-			const int selectedOption = optionIds[m_rewardSelection];
-			if (selectedOption == kRewardBossBattle)
+			const int nextStageIndex = tran.roguelike.currentStageIndex + 1;
+			const int optionCount = tran.GetRunStageOptionCount(nextStageIndex);
+			if (m_rewardSelection < 0) m_rewardSelection = 0;
+			if (m_rewardSelection >= optionCount) m_rewardSelection = optionCount - 1;
+			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+
+			if (IsSelectionPrevTriggered())
 			{
-				StartBossBattleDebug(tran);
-				SceneManager::ChangeResult(SceneManager::ResultType::None);
-				SceneManager::ChangeScene(SceneManager::SCENE_GAME);
-				return;
+				--m_rewardSelection;
+				if (m_rewardSelection < 0) m_rewardSelection = optionCount - 1;
+				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
 			}
-			bool handled = false;
-			if (selectedOption == kRewardContinue)
+			else if (IsSelectionNextTriggered())
 			{
-				handled = tran.AdvanceUpgradeSelectionPhase();
+				++m_rewardSelection;
+				if (m_rewardSelection >= optionCount) m_rewardSelection = 0;
+				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
 			}
-			else if (selectedOption >= 0)
-			{
-				handled = tran.ApplyUpgradeSelection(selectedOption);
-			}
-			if (handled)
+
+			if (IsResultConfirmTriggered() && tran.SelectNextStage(m_rewardSelection))
 			{
 				m_rewardSelection = 0;
-				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
-				if (tran.roguelike.selectionPending == 0)
+				tran.gameplayDebug.rewardSelectionIndex = 0;
+				if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone)
 				{
 					SceneManager::ChangeResult(SceneManager::ResultType::None);
 					SceneManager::ChangeScene(SceneManager::SCENE_GAME);
 				}
-				return;
 			}
+			return;
 		}
-		return;
+
+		if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
+			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest)
+		{
+			const int optionIds[3] =
+			{
+				kStageShopBuyStatus,
+				kStageShopBuySkill,
+				kStageShopContinue
+			};
+			const int optionCount = 3;
+			if (m_rewardSelection < 0) m_rewardSelection = 0;
+			if (m_rewardSelection >= optionCount) m_rewardSelection = optionCount - 1;
+			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+
+			if (IsSelectionPrevTriggered())
+			{
+				--m_rewardSelection;
+				if (m_rewardSelection < 0) m_rewardSelection = optionCount - 1;
+				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+			}
+			else if (IsSelectionNextTriggered())
+			{
+				++m_rewardSelection;
+				if (m_rewardSelection >= optionCount) m_rewardSelection = 0;
+				tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
+			}
+
+			if (IsResultConfirmTriggered())
+			{
+				const int selectedOption = optionIds[m_rewardSelection];
+				const int shopCost = GetCurrentShopCost(tran);
+				if (selectedOption == kStageShopBuyStatus)
+				{
+					if (tran.PurchaseRandomUpgrade(Transfer::RoguelikeUpgrade::SelectionStatus, shopCost))
+					{
+						m_rewardSelection = 0;
+						tran.gameplayDebug.rewardSelectionIndex = 0;
+					}
+				}
+				else if (selectedOption == kStageShopBuySkill)
+				{
+					if (tran.PurchaseRandomUpgrade(Transfer::RoguelikeUpgrade::SelectionSkill, shopCost))
+					{
+						m_rewardSelection = 0;
+						tran.gameplayDebug.rewardSelectionIndex = 0;
+					}
+				}
+				else if (selectedOption == kStageShopContinue && tran.ContinueFromCurrentNonCombatStage())
+				{
+					m_rewardSelection = 0;
+					tran.gameplayDebug.rewardSelectionIndex = 0;
+					if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone)
+					{
+						SceneManager::ChangeResult(SceneManager::ResultType::None);
+						SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+					}
+				}
+			}
+			return;
+		}
 	}
 
 	if (IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A') || IsKeyTrigger(VK_UP) || IsKeyTrigger('W'))
@@ -271,7 +376,7 @@ void SceneResult::Draw()
 	}
 
 	TRAN_INS;
-	if (m_current == SceneManager::ResultType::Win && tran.roguelike.selectionPending != 0)
+	if (m_current == SceneManager::ResultType::Win && IsRunIntermissionActive(tran))
 	{
 		return;
 	}

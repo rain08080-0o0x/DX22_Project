@@ -11,6 +11,7 @@
 #include "SceneManager.h"
 #include "UIObject.h"
 #include "Collision.h"
+#include "ParticleEffectPreset.h"
 #include "Texture.h"
 #include "Sound.h"
 #include "imgui.h"
@@ -87,11 +88,8 @@ namespace
     const int kPauseOptionBack = 4;
     const int kPauseOptionCount = 5;
     const float kOptionVolumeStep = 0.05f;
-    const float kPlayerDamageBurstDuration = 0.18f;
-    const float kPlayerDamageBurstScale = 0.34f;
     const float kSkillShotRadius = 0.28f;
     const float kSkillShotSpeed = 11.5f;
-    const float kSkillShotMarkerLife = 0.16f;
     const float kSkillNovaRadiusScale = 2.6f;
     const float kSkillNovaHeightScale = 1.2f;
     const float kSkillNovaDamageScale = 1.8f;
@@ -102,6 +100,20 @@ namespace
     const float kSkillOrbitDamageScale = 1.0f;
     const float kSkillOrbitContactCooldown = 0.35f;
     const float kSkillOrbitBillboardScale = 0.75f;
+    const float kCombatEffectDuration = 0.22f;
+    const float kCombatEffectGrowScale = 1.12f;
+    const float kCombatEffectScale = 1.15f;
+    const float kCombatEffectMinSize = 0.8f;
+    const float kCombatEffectMaxSize = 8.0f;
+    const int kCombatEffectColumns = 5;
+    const int kCombatEffectRows = 1;
+    const int kCombatEffectFrameCount = kCombatEffectColumns * kCombatEffectRows;
+    const int kMaxHitEffectEmitters = 5;
+    const float kHitEffectCullMargin = 0.25f;
+    const DirectX::XMFLOAT4 kChallengeHazardColor = { 1.0f, 0.28f, 0.18f, 0.80f };
+    const DirectX::XMFLOAT4 kChallengeHazardResolvedColor = { 1.0f, 0.75f, 0.20f, 0.45f };
+    const DirectX::XMFLOAT4 kChallengeBeaconColor = { 0.20f, 1.0f, 0.65f, 0.85f };
+    const DirectX::XMFLOAT4 kChallengeBeaconCoreColor = { 0.85f, 1.0f, 0.25f, 0.95f };
 
     /**
      * @brief カメラモード値を有効な 2 値へ正規化します。
@@ -208,6 +220,14 @@ namespace
         return v;
     }
 
+    float MaxFloat3(const DirectX::XMFLOAT3& value)
+    {
+        float result = value.x;
+        if (result < value.y) result = value.y;
+        if (result < value.z) result = value.z;
+        return result;
+    }
+
     /**
      * @brief 3 次元ベクトルを線形補間します。
      * @param a 開始値です。
@@ -291,6 +311,40 @@ namespace
     float MaxFloat(float a, float b)
     {
         return (a > b) ? a : b;
+    }
+
+    bool IsPointOutsideCameraClip(Camera* camera, const DirectX::XMFLOAT3& pos, float margin)
+    {
+        if (!camera)
+        {
+            return false;
+        }
+
+        using namespace DirectX;
+        const XMFLOAT4X4 viewFloat = camera->GetViewMatrix(false);
+        const XMFLOAT4X4 projFloat = camera->GetProjectionMatrix(false);
+        const XMMATRIX view = XMLoadFloat4x4(&viewFloat);
+        const XMMATRIX proj = XMLoadFloat4x4(&projFloat);
+        const XMVECTOR worldPos = XMVectorSet(pos.x, pos.y, pos.z, 1.0f);
+        const XMVECTOR viewPos = XMVector4Transform(worldPos, view);
+        const XMVECTOR clipPos = XMVector4Transform(viewPos, proj);
+
+        XMFLOAT4 clip{};
+        XMStoreFloat4(&clip, clipPos);
+        if (clip.w <= 0.001f)
+        {
+            return true;
+        }
+
+        const float invW = 1.0f / clip.w;
+        const float ndcX = clip.x * invW;
+        const float ndcY = clip.y * invW;
+        const float ndcZ = clip.z * invW;
+        const float bound = 1.0f + margin;
+        return
+            ndcX < -bound || ndcX > bound ||
+            ndcY < -bound || ndcY > bound ||
+            ndcZ < 0.0f || ndcZ > bound;
     }
 
     /**
@@ -785,6 +839,48 @@ namespace
         Sprite::Draw();
     }
 
+    void DrawBillboardMarkerTintFrame(Texture* texture,
+                                      Camera* camera,
+                                      const DirectX::XMFLOAT3& pos,
+                                      const DirectX::XMFLOAT3& size,
+                                      const DirectX::XMFLOAT4& color,
+                                      const DirectX::XMFLOAT2& uvPos,
+                                      const DirectX::XMFLOAT2& uvScale)
+    {
+        if (!texture) return;
+        using namespace DirectX;
+
+        XMMATRIX billboard = XMMatrixIdentity();
+        if (camera)
+        {
+            XMFLOAT4X4 viewFloat = camera->GetViewMatrix(false);
+            XMMATRIX viewMat = XMLoadFloat4x4(&viewFloat);
+            XMMATRIX invView = XMMatrixInverse(nullptr, viewMat);
+            XMFLOAT4X4 invViewFloat{};
+            XMStoreFloat4x4(&invViewFloat, invView);
+            invViewFloat._41 = 0.0f;
+            invViewFloat._42 = 0.0f;
+            invViewFloat._43 = 0.0f;
+            billboard = XMLoadFloat4x4(&invViewFloat);
+        }
+
+        const XMMATRIX t = billboard * XMMatrixTranslation(
+            pos.x,
+            pos.y + size.y * 0.5f,
+            pos.z);
+        XMFLOAT4X4 world{};
+        XMStoreFloat4x4(&world, XMMatrixTranspose(t));
+
+        Sprite::SetWorld(world);
+        Sprite::SetSize({ size.x, size.y });
+        Sprite::SetOffset({ 0.0f, 0.0f });
+        Sprite::SetUVPos(uvPos);
+        Sprite::SetUVScale(uvScale);
+        Sprite::SetColor(color);
+        Sprite::SetTexture(texture);
+        Sprite::Draw();
+    }
+
     /**
      * @brief 既定色の攻撃マーカーを描画します。
      * @param texture マーカー画像です。
@@ -808,11 +904,14 @@ SceneGame::SceneGame()
     , m_pPlayer(nullptr)
     , m_enemies()
     , m_markerEffects()
+    , m_hitEffectEmitters()
+    , m_challengeHazards()
     , m_enemyProjectiles()
     , m_skillProjectiles()
     , m_boss()
     , m_pShadow(nullptr)
     , m_pAttackMarker(nullptr)
+    , m_pCombatEffectTexture(nullptr)
     , m_pSkillTexture(nullptr)
     , m_pBossAttackRangeMarker(nullptr)
     , m_pGroundTexture(nullptr)
@@ -853,6 +952,7 @@ SceneGame::SceneGame()
     , m_skill1CooldownDuration(0.0f)
     , m_skill2CooldownDuration(0.0f)
     , m_attackSwingId(0)
+    , m_nextHitEffectEmitter(0)
     , m_skillProjectileSerial(0)
     , m_attackHitCountThisSwing(0)
     , m_hitStopTimer(0.0f)
@@ -871,6 +971,19 @@ SceneGame::SceneGame()
     , m_attackCenter(0.0f, 0.0f, 0.0f)
     , m_attackSize(0.0f, 0.0f, 0.0f)
     , m_orbitSkill()
+    , m_hitEffectPreset()
+    , m_challengeType(ChallengeNone)
+    , m_challengeActive(false)
+    , m_challengeTimer(0.0f)
+    , m_challengeDuration(0.0f)
+    , m_challengeNoDamageSpawnTimer(0.0f)
+    , m_challengeDefenseSpawnTimer(0.0f)
+    , m_challengeBeaconHp(0.0f)
+    , m_challengeBeaconMaxHp(0.0f)
+    , m_challengeHitCount(0)
+    , m_challengeSpawnSerial(0)
+    , m_challengeBeaconPos(0.0f, 0.0f, 0.0f)
+    , m_challengeBeaconSize(1.0f, 1.0f, 1.0f)
     , m_lastBossSkillProjectileId(-1)
     , m_isPaused(false)
     , m_pauseTabIndex(kPauseTabGame)
@@ -919,11 +1032,14 @@ SceneGame::SceneGame()
     tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
     tran.gameplayDebug.titleDifficultyOpen = 0;
     tran.gameplayDebug.titleDifficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
-    m_isBossBattleDebug = (tran.gameplayDebug.requestBossBattle != 0);
+    m_isBossBattleDebug = (tran.GetCurrentRunStageType() == Transfer::RoguelikeUpgrade::StageBoss);
     tran.gameplayDebug.requestBossBattle = 0;
     tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
     tran.gameplayDebug.showBossResultTimer = 0;
     tran.gameplayDebug.runTimerRunning = 1;
+    ResetChallengeState();
+    tran.gameplayDebug.challengeSuccess = 0;
+    tran.gameplayDebug.challengeRewardCount = 0;
 
     m_pPlayer = new Player(m_pCamera);
     {
@@ -1063,6 +1179,8 @@ SceneGame::SceneGame()
     }
 
     LoadBossResources();
+    LoadHitEffectPreset();
+    InitializeHitEffectEmitters();
 
     m_pAttackSe = LoadSound("Assets/Sound/SE/attack.mp3", false);
     m_pPlayerHitSe = LoadSound("Assets/Sound/SE/player_hit.mp3", false);
@@ -1186,6 +1304,7 @@ SceneGame::~SceneGame()
         }
     }
     m_enemies.clear();
+    ReleaseHitEffectEmitters();
     if (m_pShadow)
     {
         delete m_pShadow;
@@ -1195,6 +1314,11 @@ SceneGame::~SceneGame()
     {
         delete m_pAttackMarker;
         m_pAttackMarker = nullptr;
+    }
+    if (m_pCombatEffectTexture)
+    {
+        delete m_pCombatEffectTexture;
+        m_pCombatEffectTexture = nullptr;
     }
     if (m_pSkillTexture)
     {
@@ -1238,6 +1362,557 @@ SceneGame::~SceneGame()
         m_pCameraDebug = nullptr;
     }
     m_pCamera = nullptr;
+}
+
+void SceneGame::LoadHitEffectPreset()
+{
+    m_hitEffectPreset = ParticleEffectPreset::MakeDefaultSettings();
+    ParticleEffectPreset::Load(m_hitEffectPreset);
+    m_hitEffectPreset.loop = false;
+    m_hitEffectPreset.worldSpace = true;
+    m_hitEffectPreset.billboard = true;
+}
+
+void SceneGame::InitializeHitEffectEmitters()
+{
+    ReleaseHitEffectEmitters();
+    m_hitEffectEmitters.reserve(kMaxHitEffectEmitters);
+    for (int i = 0; i < kMaxHitEffectEmitters; ++i)
+    {
+        ParticleEmitter2D* emitter = new ParticleEmitter2D();
+        if (!emitter)
+        {
+            continue;
+        }
+        emitter->SetSettings(m_hitEffectPreset);
+        emitter->Stop(true);
+        m_hitEffectEmitters.push_back(emitter);
+    }
+    m_nextHitEffectEmitter = 0;
+}
+
+void SceneGame::ReleaseHitEffectEmitters()
+{
+    for (ParticleEmitter2D* emitter : m_hitEffectEmitters)
+    {
+        delete emitter;
+    }
+    m_hitEffectEmitters.clear();
+    m_nextHitEffectEmitter = 0;
+}
+
+void SceneGame::UpdateHitEffectEmitters(float dt)
+{
+    for (ParticleEmitter2D* emitter : m_hitEffectEmitters)
+    {
+        if (!emitter)
+        {
+            continue;
+        }
+
+        if (!emitter->IsPlaying() && emitter->GetAliveParticleCount() <= 0)
+        {
+            continue;
+        }
+
+        const ParticleEmitter2D::Settings& settings = emitter->GetSettings();
+        if (IsPointOutsideCameraClip(m_pCamera, settings.position, kHitEffectCullMargin))
+        {
+            emitter->Stop(true);
+            continue;
+        }
+
+        emitter->Update(dt);
+        if (!emitter->IsPlaying() && emitter->GetAliveParticleCount() <= 0)
+        {
+            emitter->Stop(true);
+        }
+    }
+}
+
+void SceneGame::DrawHitEffectEmitters() const
+{
+    for (ParticleEmitter2D* emitter : m_hitEffectEmitters)
+    {
+        if (!emitter)
+        {
+            continue;
+        }
+        if (!emitter->IsPlaying() && emitter->GetAliveParticleCount() <= 0)
+        {
+            continue;
+        }
+        emitter->Draw(m_pCamera);
+    }
+}
+
+void SceneGame::SpawnHitEffect(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& size, bool spawnParticle)
+{
+    (void)size;
+
+    if (!spawnParticle || m_hitEffectEmitters.empty())
+    {
+        return;
+    }
+
+    if (IsPointOutsideCameraClip(m_pCamera, pos, kHitEffectCullMargin))
+    {
+        return;
+    }
+
+    ParticleEmitter2D* emitter = nullptr;
+    for (ParticleEmitter2D* candidate : m_hitEffectEmitters)
+    {
+        if (!candidate)
+        {
+            continue;
+        }
+        if (!candidate->IsPlaying() && candidate->GetAliveParticleCount() <= 0)
+        {
+            emitter = candidate;
+            break;
+        }
+    }
+    if (!emitter)
+    {
+        emitter = m_hitEffectEmitters[m_nextHitEffectEmitter % static_cast<int>(m_hitEffectEmitters.size())];
+        ++m_nextHitEffectEmitter;
+    }
+    if (!emitter)
+    {
+        return;
+    }
+
+    ParticleEmitter2D::Settings settings = m_hitEffectPreset;
+    settings.position = pos;
+    settings.loop = false;
+    settings.worldSpace = true;
+    settings.billboard = true;
+    emitter->SetSettings(settings);
+    emitter->Play(true);
+}
+
+void SceneGame::ResetChallengeState()
+{
+    m_challengeActive = false;
+    m_challengeType = ChallengeNone;
+    m_challengeTimer = 0.0f;
+    m_challengeDuration = 0.0f;
+    m_challengeNoDamageSpawnTimer = 0.0f;
+    m_challengeDefenseSpawnTimer = 0.0f;
+    m_challengeBeaconHp = 0.0f;
+    m_challengeBeaconMaxHp = 0.0f;
+    m_challengeHitCount = 0;
+    m_challengeSpawnSerial = 0;
+    m_challengeBeaconPos = { 0.0f, 0.0f, 0.0f };
+    m_challengeBeaconSize = { 1.0f, 1.0f, 1.0f };
+    m_challengeHazards.clear();
+
+    auto& tran = Transfer::GetInstance();
+    tran.gameplayDebug.challengeActive = 0;
+    tran.gameplayDebug.challengeType = 0;
+    tran.gameplayDebug.challengeHitCount = 0;
+    tran.gameplayDebug.challengeElapsedSec = 0.0f;
+    tran.gameplayDebug.challengeDurationSec = 0.0f;
+    tran.gameplayDebug.challengeBeaconHp = 0.0f;
+    tran.gameplayDebug.challengeBeaconMaxHp = 0.0f;
+}
+
+void SceneGame::UpdateChallengeDebugSetup(float stageSize)
+{
+    auto& tran = Transfer::GetInstance();
+    const int requestType = ClampInt(tran.gameplayDebug.requestChallengeType, 0, ChallengeDefense);
+    if (requestType != ChallengeNone)
+    {
+        tran.gameplayDebug.requestChallengeType = 0;
+        StartChallenge(requestType, stageSize);
+    }
+
+    tran.gameplayDebug.challengeActive = m_challengeActive ? 1 : 0;
+    tran.gameplayDebug.challengeType = m_challengeType;
+    tran.gameplayDebug.challengeHitCount = m_challengeHitCount;
+    tran.gameplayDebug.challengeElapsedSec = m_challengeTimer;
+    tran.gameplayDebug.challengeDurationSec = m_challengeDuration;
+    tran.gameplayDebug.challengeBeaconHp = m_challengeBeaconHp;
+    tran.gameplayDebug.challengeBeaconMaxHp = m_challengeBeaconMaxHp;
+    if (m_challengeActive)
+    {
+        tran.gameplayDebug.challengeRewardCount =
+            (m_challengeTimer >= m_challengeDuration)
+            ? 3
+            : CalcChallengeFailureRewardCount();
+    }
+}
+
+void SceneGame::StartChallenge(int challengeType, float stageSize)
+{
+    auto& tran = Transfer::GetInstance();
+    ResetChallengeState();
+
+    m_challengeType = ClampInt(challengeType, ChallengeNoDamage, ChallengeDefense);
+    m_challengeActive = true;
+    m_isBossBattleDebug = false;
+    m_requestedEnemyCount = 0;
+    m_currentWave = 1;
+    m_waveMax = 1;
+    m_attackActive = false;
+    m_attackTimer = 0.0f;
+    m_attackWindupTimer = 0.0f;
+    m_attackRecoveryTimer = 0.0f;
+    m_enemyProjectiles.clear();
+    m_skillProjectiles.clear();
+    m_markerEffects.clear();
+    m_orbitSkill.active = false;
+    m_lastBossSkillProjectileId = -1;
+    m_bossSkillContactCooldownTimer = 0.0f;
+    m_boss.attackZones.clear();
+    m_boss.fallingRocks.clear();
+    m_boss.requiresArenaReset = false;
+    EnsureEnemyCount(0, stageSize);
+
+    m_cameraIntroActive = false;
+    m_cameraIntroTimer = ClampRange(tran.gameplay.cameraIntroDuration, kCameraIntroDurationMin, kCameraIntroDurationMax);
+
+    tran.gameplayDebug.bossBattleActive = 0;
+    tran.gameplayDebug.showBossResultTimer = 0;
+    tran.gameplayDebug.challengeSuccess = 0;
+    tran.gameplayDebug.challengeRewardCount = 0;
+    tran.gameplayDebug.challengeReturnToGameAfterReward = 1;
+
+    if (m_challengeType == ChallengeNoDamage)
+    {
+        m_challengeDuration = ClampRange(tran.gameplay.challengeNoDamageDuration, 5.0f, 120.0f);
+        m_challengeNoDamageSpawnTimer = 0.0f;
+    }
+    else
+    {
+        m_challengeDuration = ClampRange(tran.gameplay.challengeDefenseDuration, 5.0f, 180.0f);
+        m_challengeDefenseSpawnTimer = 0.0f;
+        m_challengeBeaconMaxHp = ClampRange(tran.gameplay.challengeDefenseBeaconMaxHp, 1.0f, 500.0f);
+        m_challengeBeaconHp = m_challengeBeaconMaxHp;
+        const float beaconRadius = ClampRange(tran.gameplay.challengeDefenseBeaconRadius, 0.30f, 6.0f);
+        m_challengeBeaconPos = { 0.0f, 0.0f, 0.0f };
+        m_challengeBeaconSize = { beaconRadius * 2.0f, tran.player.size.y * 1.25f, beaconRadius * 2.0f };
+    }
+
+    UpdateChallengeDebugSetup(stageSize);
+}
+
+int SceneGame::CalcChallengeFailureRewardCount() const
+{
+    if (m_challengeDuration <= 0.0f)
+    {
+        return 1;
+    }
+
+    const float progress = Clamp01(m_challengeTimer / m_challengeDuration);
+    return (progress >= (2.0f / 3.0f)) ? 2 : 1;
+}
+
+void SceneGame::FinishChallenge(bool success)
+{
+    auto& tran = Transfer::GetInstance();
+    const int rewardCount = success ? 3 : CalcChallengeFailureRewardCount();
+
+    tran.gameplayDebug.challengeSuccess = success ? 1 : 0;
+    tran.gameplayDebug.challengeRewardCount = rewardCount;
+    tran.gameplayDebug.challengeReturnToGameAfterReward = 1;
+    tran.gameplayDebug.runTimerRunning = 0;
+    tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+    tran.gameplayDebug.bossBattleActive = 0;
+
+    EnsureEnemyCount(0, m_stageSize);
+    m_enemyProjectiles.clear();
+    m_skillProjectiles.clear();
+    m_markerEffects.clear();
+    m_orbitSkill.active = false;
+    ResetChallengeState();
+
+    tran.BeginChallengeRewardSelection(rewardCount);
+    SceneManager::ChangeResult(SceneManager::ResultType::Win);
+    SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+}
+
+bool SceneGame::UpdateChallengeNoDamage(float stageSize)
+{
+    if (!m_challengeActive || m_challengeType != ChallengeNoDamage || !m_pPlayer)
+    {
+        return false;
+    }
+
+    auto& tran = Transfer::GetInstance();
+    const float duration = ClampRange(tran.gameplay.challengeNoDamageDuration, 5.0f, 120.0f);
+    const float attackInterval = ClampRange(tran.gameplay.challengeNoDamageAttackInterval, 0.20f, 10.0f);
+    const float telegraph = ClampRange(tran.gameplay.challengeNoDamageTelegraph, 0.10f, 8.0f);
+    const float radius = ClampRange(tran.gameplay.challengeNoDamageRadius, 0.20f, 8.0f);
+    const float damage = ClampRange(tran.gameplay.challengeNoDamageDamage, 0.0f, 20.0f);
+    const int burstCount = ClampInt(tran.gameplay.challengeNoDamageBurstCount, 1, 8);
+    const float safeStage = (stageSize > 1.0f) ? stageSize : 5.0f;
+    const float stageHalf = safeStage * 0.5f;
+    const float margin = radius + 0.25f;
+    const float limit = (stageHalf > margin) ? (stageHalf - margin) : 0.0f;
+
+    m_challengeDuration = duration;
+    m_requestedEnemyCount = 0;
+    m_challengeTimer += kFixedDt;
+    m_challengeNoDamageSpawnTimer -= kFixedDt;
+
+    auto clampHazardPos = [&](DirectX::XMFLOAT3 pos)
+    {
+        pos.x = ClampRange(pos.x, -limit, limit);
+        pos.z = ClampRange(pos.z, -limit, limit);
+        pos.y = 0.0f;
+        return pos;
+    };
+
+    if (m_challengeNoDamageSpawnTimer <= 0.0f)
+    {
+        for (int i = 0; i < burstCount; ++i)
+        {
+            DirectX::XMFLOAT3 center = tran.player.pos;
+            if (i != 0)
+            {
+                const float rx = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 2.0f - 1.0f;
+                const float rz = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 2.0f - 1.0f;
+                center.x = rx * limit;
+                center.z = rz * limit;
+            }
+            ChallengeHazard hazard{};
+            hazard.center = clampHazardPos(center);
+            hazard.radius = radius;
+            hazard.telegraphDuration = telegraph;
+            m_challengeHazards.push_back(hazard);
+        }
+        m_challengeNoDamageSpawnTimer += attackInterval;
+    }
+
+    const Collision::Box playerBox = MakeAabb(
+        {
+            tran.player.pos.x,
+            tran.player.pos.y + tran.player.size.y * 0.5f,
+            tran.player.pos.z
+        },
+        tran.player.size);
+
+    for (ChallengeHazard& hazard : m_challengeHazards)
+    {
+        hazard.timer += kFixedDt;
+        if (!hazard.resolved && hazard.timer >= hazard.telegraphDuration)
+        {
+            hazard.resolved = true;
+            const Collision::Box hazardBox = MakeAabb(
+                { hazard.center.x, playerBox.center.y, hazard.center.z },
+                { hazard.radius * 2.0f, playerBox.size.y, hazard.radius * 2.0f });
+            if (HitAabb(playerBox, hazardBox))
+            {
+                ++m_challengeHitCount;
+                if (m_pPlayerHitSe) PlaySound(m_pPlayerHitSe);
+                if (m_playerDamageInvincibleTimer < tran.gameplay.playerDamageInvincible)
+                {
+                    m_playerDamageInvincibleTimer = tran.gameplay.playerDamageInvincible;
+                }
+                SpawnHitEffect(
+                    {
+                        tran.player.pos.x,
+                        tran.player.pos.y + tran.player.size.y * 0.5f,
+                        tran.player.pos.z
+                    },
+                    tran.player.size,
+                    false);
+                tran.player.hp -= damage;
+                if (tran.player.hp < 1.0f)
+                {
+                    tran.player.hp = 1.0f;
+                }
+                FinishChallenge(false);
+                return true;
+            }
+        }
+    }
+
+    m_challengeHazards.erase(
+        std::remove_if(
+            m_challengeHazards.begin(),
+            m_challengeHazards.end(),
+            [](const ChallengeHazard& hazard)
+            {
+                return hazard.timer >= (hazard.telegraphDuration + 0.20f);
+            }),
+        m_challengeHazards.end());
+
+    if (m_challengeTimer >= m_challengeDuration)
+    {
+        FinishChallenge(true);
+        return true;
+    }
+
+    return false;
+}
+
+void SceneGame::SpawnDefenseEnemy(float stageSize)
+{
+    auto& tran = Transfer::GetInstance();
+    Enemy* enemy = new Enemy();
+    if (!enemy)
+    {
+        return;
+    }
+
+    const int serial = m_challengeSpawnSerial++;
+    Enemy::Type enemyType = Enemy::Type::Speed;
+    float hpBonusRate = ClampRange(tran.gameplay.challengeDefenseSpeedHpBonusRate, 0.0f, 5.0f);
+    switch ((serial % 3 + 3) % 3)
+    {
+    case 0:
+        enemyType = Enemy::Type::Speed;
+        hpBonusRate = ClampRange(tran.gameplay.challengeDefenseSpeedHpBonusRate, 0.0f, 5.0f);
+        break;
+    case 1:
+        enemyType = Enemy::Type::Ranged;
+        hpBonusRate = ClampRange(tran.gameplay.challengeDefenseRangedHpBonusRate, 0.0f, 5.0f);
+        break;
+    default:
+        enemyType = Enemy::Type::Tank;
+        hpBonusRate = ClampRange(tran.gameplay.challengeDefenseTankHpBonusRate, 0.0f, 5.0f);
+        break;
+    }
+
+    enemy->SetCamera(m_pCamera);
+    enemy->SetSize(tran.player.size);
+    enemy->SetStageSize(stageSize);
+    enemy->SetType(enemyType);
+    enemy->SetForceChase(true);
+    enemy->SetMoveSpeed(ClampRange(tran.gameplay.challengeDefenseEnemyMoveSpeed, 0.05f, 4.0f));
+    enemy->SetTargetPos(m_challengeBeaconPos);
+
+    const int difficultyPreset = ClampInt(tran.gameplayDebug.difficultyPreset, 0, 2);
+    const float baseHpScale =
+        tran.GetEnemyHpScaleByDifficulty(difficultyPreset) *
+        tran.GetEnemyHpScaleByUpgradeProgress();
+    enemy->SetHpScale(baseHpScale * (1.0f + hpBonusRate));
+
+    const float safeStage = (stageSize > 1.0f) ? stageSize : 5.0f;
+    const float stageHalf = safeStage * 0.5f;
+    const float halfX = tran.player.size.x * 0.5f;
+    const float halfZ = tran.player.size.z * 0.5f;
+    const float edgeX = MaxFloat(0.0f, stageHalf - halfX);
+    const float edgeZ = MaxFloat(0.0f, stageHalf - halfZ);
+    const float laneRange = safeStage * 0.35f;
+    const float laneRand = ((static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 2.0f - 1.0f) * laneRange;
+
+    DirectX::XMFLOAT3 spawnPos = { edgeX, 0.0f, laneRand };
+    switch ((serial % 4 + 4) % 4)
+    {
+    case 0: spawnPos = { -edgeX, 0.0f, laneRand }; break;
+    case 1: spawnPos = { edgeX, 0.0f, laneRand }; break;
+    case 2: spawnPos = { laneRand, 0.0f, -edgeZ }; break;
+    default: spawnPos = { laneRand, 0.0f, edgeZ }; break;
+    }
+    enemy->SetPos(spawnPos);
+
+    EnemySlot slot{};
+    slot.enemy = enemy;
+    m_enemies.push_back(slot);
+}
+
+bool SceneGame::UpdateChallengeDefense(float stageSize)
+{
+    if (!m_challengeActive || m_challengeType != ChallengeDefense)
+    {
+        return false;
+    }
+
+    auto& tran = Transfer::GetInstance();
+    m_challengeDuration = ClampRange(tran.gameplay.challengeDefenseDuration, 5.0f, 180.0f);
+    const float beaconMaxHp = ClampRange(tran.gameplay.challengeDefenseBeaconMaxHp, 1.0f, 500.0f);
+    const float beaconRadius = ClampRange(tran.gameplay.challengeDefenseBeaconRadius, 0.30f, 6.0f);
+    const float spawnInterval = ClampRange(tran.gameplay.challengeDefenseSpawnInterval, 0.20f, 15.0f);
+    const int enemyCap = ClampInt(tran.gameplay.challengeDefenseEnemyCap, 1, 16);
+
+    m_requestedEnemyCount = enemyCap;
+    if (m_challengeBeaconMaxHp <= 0.0f)
+    {
+        m_challengeBeaconMaxHp = beaconMaxHp;
+        m_challengeBeaconHp = beaconMaxHp;
+    }
+    else if (std::fabs(m_challengeBeaconMaxHp - beaconMaxHp) > 0.001f)
+    {
+        const float hpRate = Clamp01(m_challengeBeaconHp / m_challengeBeaconMaxHp);
+        m_challengeBeaconMaxHp = beaconMaxHp;
+        m_challengeBeaconHp = m_challengeBeaconMaxHp * hpRate;
+    }
+
+    m_challengeBeaconPos = { 0.0f, 0.0f, 0.0f };
+    m_challengeBeaconSize = { beaconRadius * 2.0f, tran.player.size.y * 1.25f, beaconRadius * 2.0f };
+    m_challengeTimer += kFixedDt;
+    m_challengeDefenseSpawnTimer -= kFixedDt;
+
+    if (m_challengeDefenseSpawnTimer <= 0.0f &&
+        static_cast<int>(m_enemies.size()) < enemyCap)
+    {
+        SpawnDefenseEnemy(stageSize);
+        m_challengeDefenseSpawnTimer += spawnInterval;
+    }
+
+    if (m_challengeBeaconHp <= 0.0f)
+    {
+        m_challengeBeaconHp = 0.0f;
+        FinishChallenge(false);
+        return true;
+    }
+
+    if (m_challengeTimer >= m_challengeDuration)
+    {
+        FinishChallenge(true);
+        return true;
+    }
+
+    return false;
+}
+
+void SceneGame::DrawChallengeMarkers() const
+{
+    if (!m_challengeActive)
+    {
+        return;
+    }
+
+    if (m_challengeType == ChallengeNoDamage)
+    {
+        for (const ChallengeHazard& hazard : m_challengeHazards)
+        {
+            const DirectX::XMFLOAT3 size = { hazard.radius * 2.0f, 0.05f, hazard.radius * 2.0f };
+            DrawAttackMarkerTint(
+                m_pBossAttackRangeMarker ? m_pBossAttackRangeMarker : m_pAttackMarker,
+                hazard.center,
+                size,
+                hazard.resolved ? kChallengeHazardResolvedColor : kChallengeHazardColor);
+        }
+        return;
+    }
+
+    if (m_challengeType == ChallengeDefense)
+    {
+        DrawAttackMarkerTint(
+            m_pBossAttackRangeMarker ? m_pBossAttackRangeMarker : m_pAttackMarker,
+            m_challengeBeaconPos,
+            m_challengeBeaconSize,
+            kChallengeBeaconColor);
+        DrawBillboardMarkerTint(
+            m_pAttackMarker,
+            m_pCamera,
+            {
+                m_challengeBeaconPos.x,
+                m_challengeBeaconPos.y + m_challengeBeaconSize.y * 0.7f,
+                m_challengeBeaconPos.z
+            },
+            {
+                MaxFloat(0.8f, m_challengeBeaconSize.x * 0.65f),
+                MaxFloat(0.8f, m_challengeBeaconSize.y * 0.65f),
+                1.0f
+            },
+            kChallengeBeaconCoreColor);
+    }
 }
 
 /**
@@ -1456,23 +2131,6 @@ bool SceneGame::ActivateSkillSlot(int slotIndex, int playerAttackDamage, float s
         };
         m_skillProjectiles.push_back(shot);
 
-        MarkerEffect fx{};
-        fx.pos = shot.pos;
-        fx.size = {
-            tran.player.size.x * 0.9f * shotRangeScale,
-            tran.player.size.y * 0.9f * shotRangeScale,
-            tran.player.size.z * 0.9f * shotRangeScale
-        };
-        fx.color = { 0.45f, 0.95f, 1.0f, 0.90f };
-        fx.timer = kSkillShotMarkerLife;
-        fx.duration = kSkillShotMarkerLife;
-        fx.growScale = 1.2f;
-        fx.billboard = true;
-        fx.texture = m_pSkillTexture;
-        if (m_markerEffects.size() < 96)
-        {
-            m_markerEffects.push_back(fx);
-        }
         return true;
     }
     case Transfer::RoguelikeUpgrade::SkillNova:
@@ -1496,8 +2154,8 @@ bool SceneGame::ActivateSkillSlot(int slotIndex, int playerAttackDamage, float s
             if (!slot.enemy) continue;
             const Collision::Box enemyBox = slot.enemy->GetCollision();
             if (!HitAabb(hitBox, enemyBox)) continue;
+            SpawnHitEffect(enemyBox.center, enemyBox.size);
             slot.enemy->Damage(skillDamage);
-            slot.hitFlashTimer = MaxFloat(slot.hitFlashTimer, tran.gameplay.attackHitFlash);
             const DirectX::XMFLOAT3 knockDir = NormalizeXZ({
                 enemyBox.center.x - playerPos.x,
                 0.0f,
@@ -1526,23 +2184,12 @@ bool SceneGame::ActivateSkillSlot(int slotIndex, int playerAttackDamage, float s
             if (HitAabb(hitBox, bossBox))
             {
                 hitSomething = true;
+                SpawnHitEffect(bossBox.center, bossBox.size);
                 if (ApplySkillDamageToBoss(skillDamage))
                 {
                     return true;
                 }
             }
-        }
-
-        MarkerEffect fx{};
-        fx.pos = { tran.player.pos.x, 0.0f, tran.player.pos.z };
-        fx.size = { hitSize.x, hitSize.y, hitSize.z };
-        fx.color = { 1.0f, 0.48f, 0.22f, 0.88f };
-        fx.timer = 0.18f;
-        fx.duration = 0.18f;
-        fx.growScale = 1.3f;
-        if (m_markerEffects.size() < 96)
-        {
-            m_markerEffects.push_back(fx);
         }
 
         if (hitSomething)
@@ -2173,14 +2820,10 @@ void SceneGame::Update()
     const float attackDepthScale = (tran.gameplay.attackDepthScale < 0.1f) ? 0.1f : tran.gameplay.attackDepthScale;
     const float attackHitStop = (tran.gameplay.attackHitStop < 0.0f) ? 0.0f : tran.gameplay.attackHitStop;
     const float attackKnockback = (tran.gameplay.attackKnockback < 0.0f) ? 0.0f : tran.gameplay.attackKnockback;
-    const float attackHitFlash = (tran.gameplay.attackHitFlash < 0.0f) ? 0.0f : tran.gameplay.attackHitFlash;
     const float attackTrailInterval = (tran.gameplay.attackTrailInterval < 0.0f) ? 0.0f : tran.gameplay.attackTrailInterval;
     const float attackTrailLife = (tran.gameplay.attackTrailLife < 0.0f) ? 0.0f : tran.gameplay.attackTrailLife;
-    const float attackTrailScale = (tran.gameplay.attackTrailScale < 0.1f) ? 0.1f : tran.gameplay.attackTrailScale;
-    const float playerDamageFlash = (tran.gameplay.playerDamageFlash < 0.0f) ? 0.0f : tran.gameplay.playerDamageFlash;
     const float playerDamageInvincible = (tran.gameplay.playerDamageInvincible < 0.0f) ? 0.0f : tran.gameplay.playerDamageInvincible;
     const float enemyDefeatFlash = (tran.gameplay.enemyDefeatFlash < 0.0f) ? 0.0f : tran.gameplay.enemyDefeatFlash;
-    const float enemyDefeatFlashScale = (tran.gameplay.enemyDefeatFlashScale < 0.1f) ? 0.1f : tran.gameplay.enemyDefeatFlashScale;
 
     const float enemyAttackWindup = (tran.gameplay.enemyAttackWindup < 0.0f) ? 0.0f : tran.gameplay.enemyAttackWindup;
     const float enemyAttackCooldown = (tran.gameplay.enemyAttackCooldown < 0.0f) ? 0.0f : tran.gameplay.enemyAttackCooldown;
@@ -2391,6 +3034,7 @@ void SceneGame::Update()
         tran.gameplayDebug.maxWave = m_waveMax;
         tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
         tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+        UpdateChallengeDebugSetup(stageSize);
         UpdateHpGauge();
         UpdateCooldownGauges();
         m_uiManager.Update(UIObjectManager::Layer::Game);
@@ -2412,6 +3056,7 @@ void SceneGame::Update()
     {
         return;
     }
+    UpdateChallengeDebugSetup(stageSize);
 
     if (m_hitStopTimer > 0.0f)
     {
@@ -2424,6 +3069,7 @@ void SceneGame::Update()
         tran.gameplayDebug.maxWave = m_waveMax;
         tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
         tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
+        UpdateChallengeDebugSetup(stageSize);
         UpdateHpGauge();
         UpdateCooldownGauges();
         m_uiManager.Update(UIObjectManager::Layer::Game);
@@ -2482,18 +3128,7 @@ void SceneGame::Update()
         m_playerDamageInvincibleTimer -= kFixedDt;
         if (m_playerDamageInvincibleTimer < 0.0f) m_playerDamageInvincibleTimer = 0.0f;
     }
-    for (auto& fx : m_markerEffects)
-    {
-        if (fx.timer > 0.0f)
-        {
-            fx.timer -= kFixedDt;
-            if (fx.timer < 0.0f) fx.timer = 0.0f;
-        }
-    }
-    m_markerEffects.erase(
-        std::remove_if(m_markerEffects.begin(), m_markerEffects.end(),
-                       [](const MarkerEffect& fx) { return fx.timer <= 0.0f || fx.duration <= 0.0f; }),
-        m_markerEffects.end());
+    UpdateHitEffectEmitters(kFixedDt);
 
     if (m_attackCooldownUiTimer > 0.0f)
     {
@@ -2570,42 +3205,14 @@ void SceneGame::Update()
         {
             m_playerDamageInvincibleTimer = playerDamageInvincible;
         }
-        if (m_playerDamageFlashTimer < playerDamageFlash)
-        {
-            m_playerDamageFlashTimer = playerDamageFlash;
-        }
-        if (m_markerEffects.size() + 3 <= 96)
-        {
-            const DirectX::XMFLOAT3 burstOffsets[3] =
+        SpawnHitEffect(
             {
-                { -tran.player.size.x * 0.24f, tran.player.size.y * 0.72f, 0.0f },
-                { 0.0f, tran.player.size.y * 0.92f, tran.player.size.z * 0.10f },
-                { tran.player.size.x * 0.24f, tran.player.size.y * 0.80f, 0.0f }
-            };
-            const DirectX::XMFLOAT4 burstColors[3] =
-            {
-                { 1.0f, 0.92f, 0.45f, 0.95f },
-                { 1.0f, 0.76f, 0.30f, 0.95f },
-                { 1.0f, 0.88f, 0.55f, 0.95f }
-            };
-            const float burstSize = ((tran.player.size.x > tran.player.size.z) ? tran.player.size.x : tran.player.size.z) * kPlayerDamageBurstScale;
-            for (int i = 0; i < 3; ++i)
-            {
-                MarkerEffect fx{};
-                fx.pos = {
-                    tran.player.pos.x + burstOffsets[i].x,
-                    tran.player.pos.y + burstOffsets[i].y,
-                    tran.player.pos.z + burstOffsets[i].z
-                };
-                fx.size = { burstSize, burstSize, burstSize };
-                fx.color = burstColors[i];
-                fx.timer = kPlayerDamageBurstDuration;
-                fx.duration = kPlayerDamageBurstDuration;
-                fx.growScale = 1.18f;
-                fx.billboard = true;
-                m_markerEffects.push_back(fx);
-            }
-        }
+                tran.player.pos.x,
+                tran.player.pos.y + tran.player.size.y * 0.5f,
+                tran.player.pos.z
+            },
+            tran.player.size,
+            false);
         if (tran.player.hp < 0.0f) tran.player.hp = 0.0f;
         if (tran.player.hp <= 0.0f)
         {
@@ -2675,13 +3282,29 @@ void SceneGame::Update()
             m_enemyProjectiles.end());
     }
 
-    if (UpdateBossBattle(stageSize, playerAttackDamage, applyPlayerDamage))
+    if (m_challengeActive && m_challengeType == ChallengeDefense)
+    {
+        if (UpdateChallengeDefense(stageSize))
+        {
+            return;
+        }
+    }
+    if (m_challengeActive && m_challengeType == ChallengeNoDamage)
+    {
+        if (UpdateChallengeNoDamage(stageSize))
+        {
+            return;
+        }
+    }
+
+    if (!m_challengeActive && UpdateBossBattle(stageSize, playerAttackDamage, applyPlayerDamage))
     {
         // Boss update can end the run immediately, so stop further processing when it does.
         return;
     }
 
     const int enemyTotal = static_cast<int>(m_enemies.size());
+    const bool isDefenseChallenge = (m_challengeActive && m_challengeType == ChallengeDefense);
     const bool heavyEnemyLoad = (enemyTotal >= 8);
     const bool runFullEnemyPairWork = !heavyEnemyLoad || ((m_enemyPerfPhase & 1u) == 0u);
     const int perfPhaseParity = static_cast<int>(m_enemyPerfPhase & 1u);
@@ -2695,10 +3318,16 @@ void SceneGame::Update()
         // Enemy tuning is refreshed every frame so live ImGui edits take effect immediately.
         slot.enemy->SetSize(tran.player.size);
         slot.enemy->SetStageSize(stageSize);
-        slot.enemy->SetMoveSpeed(enemyMoveSpeed);
+        slot.enemy->SetMoveSpeed(isDefenseChallenge
+            ? ClampRange(tran.gameplay.challengeDefenseEnemyMoveSpeed, 0.05f, 4.0f)
+            : enemyMoveSpeed);
+        slot.enemy->SetForceChase(isDefenseChallenge);
 
-        DirectX::XMFLOAT3 targetPos = m_pPlayer ? m_pPlayer->GetPos() : slot.enemy->GetPos();
-        if (enemySeparationRadius > 0.0f && enemySeparationWeight > 0.0f)
+        DirectX::XMFLOAT3 targetPos =
+            isDefenseChallenge
+            ? m_challengeBeaconPos
+            : (m_pPlayer ? m_pPlayer->GetPos() : slot.enemy->GetPos());
+        if (!isDefenseChallenge && enemySeparationRadius > 0.0f && enemySeparationWeight > 0.0f)
         {
             const bool runSeparationThisEnemy = runFullEnemyPairWork || (((i + perfPhaseParity) & 1) == 0);
             if (runSeparationThisEnemy)
@@ -2865,17 +3494,6 @@ void SceneGame::Update()
         {
             if (attackTrailInterval <= 0.0f || m_attackTrailSpawnTimer <= 0.0f)
             {
-                MarkerEffect fx{};
-                fx.pos = m_attackCenter;
-                fx.size = { m_attackSize.x * attackTrailScale, m_attackSize.y, m_attackSize.z * attackTrailScale };
-                fx.color = { 1.0f, 0.35f, 0.20f, 0.50f };
-                fx.timer = attackTrailLife;
-                fx.duration = attackTrailLife;
-                fx.growScale = 1.20f;
-                if (m_markerEffects.size() < 96)
-                {
-                    m_markerEffects.push_back(fx);
-                }
                 m_attackTrailSpawnTimer = attackTrailInterval;
             }
         }
@@ -2902,19 +3520,7 @@ void SceneGame::Update()
             if (!HitAabb(shotBox, bossBox)) continue;
 
             m_lastBossSkillProjectileId = shot.projectileId;
-            MarkerEffect fx{};
-            fx.pos = shot.pos;
-            fx.size = { m_boss.size.x * 0.5f, m_boss.size.y * 0.5f, m_boss.size.z * 0.5f };
-            fx.color = { 0.45f, 0.95f, 1.0f, 0.85f };
-            fx.timer = 0.15f;
-            fx.duration = 0.15f;
-            fx.growScale = 1.18f;
-            fx.billboard = true;
-            fx.texture = m_pSkillTexture;
-            if (m_markerEffects.size() < 96)
-            {
-                m_markerEffects.push_back(fx);
-            }
+            SpawnHitEffect(bossBox.center, bossBox.size);
             if (ApplySkillDamageToBoss(shot.damage))
             {
                 return;
@@ -2942,19 +3548,7 @@ void SceneGame::Update()
                 if (!HitAabb(orbitBox, bossBox)) continue;
 
                 m_bossSkillContactCooldownTimer = kSkillOrbitContactCooldown;
-                MarkerEffect fx{};
-                fx.pos = orbitPos;
-                fx.size = m_orbitSkill.size;
-                fx.color = { 1.0f, 0.90f, 0.35f, 0.90f };
-                fx.timer = 0.12f;
-                fx.duration = 0.12f;
-                fx.growScale = 1.15f;
-                fx.billboard = true;
-                fx.texture = m_pSkillTexture;
-                if (m_markerEffects.size() < 96)
-                {
-                    m_markerEffects.push_back(fx);
-                }
+                SpawnHitEffect(bossBox.center, bossBox.size);
                 if (ApplySkillDamageToBoss(m_orbitSkill.damage))
                 {
                     return;
@@ -3109,6 +3703,33 @@ void SceneGame::Update()
             }
 
             enemyBox = slot.enemy->GetCollision();
+            if (isDefenseChallenge)
+            {
+                const float beaconReach =
+                    (m_challengeBeaconSize.x > m_challengeBeaconSize.z)
+                    ? m_challengeBeaconSize.x * 0.5f
+                    : m_challengeBeaconSize.z * 0.5f;
+                if (DistSqXZ(enemyBox.center, m_challengeBeaconPos) <= beaconReach * beaconReach)
+                {
+                    m_challengeBeaconHp -= ClampRange(tran.gameplay.challengeDefenseBeaconContactDamage, 0.1f, 100.0f);
+                    if (m_challengeBeaconHp < 0.0f)
+                    {
+                        m_challengeBeaconHp = 0.0f;
+                    }
+                    delete slot.enemy;
+                    slot.enemy = nullptr;
+                    slot.attackWindupTimer = 0.0f;
+                    slot.attackCooldownTimer = 0.0f;
+                    slot.debugInAttackRange = false;
+                    slot.debugAttackRange = 0.0f;
+                    if (m_challengeBeaconHp <= 0.0f)
+                    {
+                        FinishChallenge(false);
+                        return;
+                    }
+                    continue;
+                }
+            }
             if (slot.attackCooldownTimer > 0.0f)
             {
                 slot.attackCooldownTimer -= kFixedDt;
@@ -3131,7 +3752,12 @@ void SceneGame::Update()
             slot.debugInAttackRange = inAttackRange;
             slot.debugAttackRange = attackRange;
 
-            if (slot.attackWindupTimer > 0.0f)
+            if (isDefenseChallenge)
+            {
+                slot.attackWindupTimer = 0.0f;
+                slot.attackCooldownTimer = 0.0f;
+            }
+            else if (slot.attackWindupTimer > 0.0f)
             {
                 slot.attackWindupTimer -= kFixedDt;
                 if (slot.attackWindupTimer <= 0.0f)
@@ -3193,6 +3819,7 @@ void SceneGame::Update()
                 attackBox.size = m_attackSize;
                 if (HitAabb(attackBox, enemyBox))
                 {
+                    SpawnHitEffect(enemyBox.center, enemyBox.size);
                     slot.enemy->Damage(playerAttackDamage);
                     slot.lastHitSwingId = m_attackSwingId;
                     ++m_attackHitCountThisSwing;
@@ -3211,7 +3838,6 @@ void SceneGame::Update()
                         }
                         m_screenShakePhase = 0.0f;
                     }
-                    slot.hitFlashTimer = attackHitFlash;
                     if (m_pAttackSe) PlaySound(m_pAttackSe);
 
                     const DirectX::XMFLOAT3 knockDir = NormalizeXZ({
@@ -3240,8 +3866,8 @@ void SceneGame::Update()
                 if (!HitAabb(shotBox, enemyBox)) continue;
 
                 slot.lastSkillProjectileId = skillShot.projectileId;
+                SpawnHitEffect(enemyBox.center, enemyBox.size);
                 slot.enemy->Damage(skillShot.damage);
-                slot.hitFlashTimer = MaxFloat(slot.hitFlashTimer, attackHitFlash);
                 const DirectX::XMFLOAT3 knockDir = NormalizeXZ(skillShot.dir, m_lastMoveDir);
                 enemyBox.center.x += knockDir.x * attackKnockback * 0.8f;
                 enemyBox.center.z += knockDir.z * attackKnockback * 0.8f;
@@ -3251,20 +3877,6 @@ void SceneGame::Update()
                 if (m_hitStopTimer < attackHitStop * 0.7f)
                 {
                     m_hitStopTimer = attackHitStop * 0.7f;
-                }
-
-                MarkerEffect fx{};
-                fx.pos = skillShot.pos;
-                fx.size = { enemyBox.size.x * 0.75f, enemyBox.size.y * 0.75f, enemyBox.size.z * 0.75f };
-                fx.color = { 0.45f, 0.95f, 1.0f, 0.90f };
-                fx.timer = 0.12f;
-                fx.duration = 0.12f;
-                fx.growScale = 1.16f;
-                fx.billboard = true;
-                fx.texture = m_pSkillTexture;
-                if (m_markerEffects.size() < 96)
-                {
-                    m_markerEffects.push_back(fx);
                 }
             }
 
@@ -3290,8 +3902,8 @@ void SceneGame::Update()
                 if (orbitHit)
                 {
                     slot.skillContactCooldownTimer = kSkillOrbitContactCooldown;
+                    SpawnHitEffect(enemyBox.center, enemyBox.size);
                     slot.enemy->Damage(m_orbitSkill.damage);
-                    slot.hitFlashTimer = MaxFloat(slot.hitFlashTimer, attackHitFlash);
                     const DirectX::XMFLOAT3 knockDir = NormalizeXZ({
                         enemyBox.center.x - orbitHitPos.x,
                         0.0f,
@@ -3307,19 +3919,6 @@ void SceneGame::Update()
                         m_hitStopTimer = attackHitStop * 0.5f;
                     }
 
-                    MarkerEffect fx{};
-                    fx.pos = orbitHitPos;
-                    fx.size = m_orbitSkill.size;
-                    fx.color = { 1.0f, 0.90f, 0.35f, 0.90f };
-                    fx.timer = 0.10f;
-                    fx.duration = 0.10f;
-                    fx.growScale = 1.12f;
-                    fx.billboard = true;
-                    fx.texture = m_pSkillTexture;
-                    if (m_markerEffects.size() < 96)
-                    {
-                        m_markerEffects.push_back(fx);
-                    }
                 }
             }
 
@@ -3327,22 +3926,6 @@ void SceneGame::Update()
             {
                 if (enemyDefeatFlash > 0.0f)
                 {
-                    const Collision::Box deadBox = slot.enemy->GetCollision();
-                    MarkerEffect fx{};
-                    fx.pos = deadBox.center;
-                    fx.size = {
-                        deadBox.size.x * enemyDefeatFlashScale,
-                        deadBox.size.y,
-                        deadBox.size.z * enemyDefeatFlashScale
-                    };
-                    fx.color = { 1.0f, 0.80f, 0.20f, 0.95f };
-                    fx.timer = enemyDefeatFlash;
-                    fx.duration = enemyDefeatFlash;
-                    fx.growScale = 1.35f;
-                    if (m_markerEffects.size() < 96)
-                    {
-                        m_markerEffects.push_back(fx);
-                    }
                 }
                 delete slot.enemy;
                 slot.enemy = nullptr;
@@ -3367,7 +3950,8 @@ void SceneGame::Update()
             std::remove_if(m_enemies.begin(), m_enemies.end(), [](const EnemySlot& slot) { return slot.enemy == nullptr; }),
             m_enemies.end());
 
-        if (!m_isBossBattleDebug && m_enemies.empty())
+        const bool isCombatStage = (tran.GetCurrentRunStageType() == Transfer::RoguelikeUpgrade::StageCombat);
+        if (isCombatStage && !m_isBossBattleDebug && !m_challengeActive && m_enemies.empty())
         {
             // Clearing all enemies advances the wave, or finishes the stage on the final wave.
             m_enemyProjectiles.clear();
@@ -3447,6 +4031,7 @@ void SceneGame::Update()
     tran.gameplayDebug.enemiesAlive = static_cast<int>(m_enemies.size());
     tran.gameplayDebug.enemiesTarget = m_requestedEnemyCount;
     tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
+    UpdateChallengeDebugSetup(stageSize);
 
     // Final UI state is refreshed after all gameplay mutations for the frame are complete.
     UpdateHpGauge();
@@ -3589,6 +4174,7 @@ void SceneGame::Draw()
         }
     }
     DrawBossTelegraphMarker();
+    DrawChallengeMarkers();
 
     static std::vector<DrawEntry> drawEntries;
     drawEntries.clear();
@@ -3655,31 +4241,60 @@ void SceneGame::Draw()
         }
     }
     DrawBossFallingObjects();
+    DrawHitEffectEmitters();
     if (m_pPlayer)
     {
         m_pPlayer->DrawDirectionMarker();
     }
 
-    if (m_pAttackMarker)
+    if (!m_markerEffects.empty())
     {
         TRAN_INS;
-        // Marker effects cover floor flashes and small billboard bursts for hits.
         for (const auto& fx : m_markerEffects)
         {
             if (fx.timer <= 0.0f || fx.duration <= 0.0f) continue;
             const float t = Clamp01(fx.timer / fx.duration);
             const float growT = 1.0f + (1.0f - t) * (fx.growScale - 1.0f);
-            DirectX::XMFLOAT4 color = fx.color;
-            color.w *= t;
             Texture* effectTexture = fx.texture ? fx.texture : m_pAttackMarker;
+            const bool isCombatEffect = (effectTexture == m_pCombatEffectTexture);
+            DirectX::XMFLOAT4 color = fx.color;
+            color.w *= isCombatEffect ? 1.0f : t;
             if (fx.billboard)
             {
-                DrawBillboardMarkerTint(
-                    effectTexture,
-                    m_pCamera,
-                    fx.pos,
-                    { fx.size.x * growT, fx.size.y * growT, fx.size.z },
-                    color);
+                if (isCombatEffect)
+                {
+                    const float frameProgress = 1.0f - t;
+                    int frameIndex = static_cast<int>(frameProgress * static_cast<float>(kCombatEffectFrameCount));
+                    if (frameIndex < 0) frameIndex = 0;
+                    if (frameIndex >= kCombatEffectFrameCount) frameIndex = kCombatEffectFrameCount - 1;
+                    const DirectX::XMFLOAT2 uvScale =
+                    {
+                        1.0f / static_cast<float>(kCombatEffectColumns),
+                        1.0f / static_cast<float>(kCombatEffectRows)
+                    };
+                    const DirectX::XMFLOAT2 uvPos =
+                    {
+                        uvScale.x * static_cast<float>(frameIndex % kCombatEffectColumns),
+                        uvScale.y * static_cast<float>(frameIndex / kCombatEffectColumns)
+                    };
+                    DrawBillboardMarkerTintFrame(
+                        effectTexture,
+                        m_pCamera,
+                        fx.pos,
+                        { fx.size.x * growT, fx.size.y * growT, fx.size.z },
+                        color,
+                        uvPos,
+                        uvScale);
+                }
+                else
+                {
+                    DrawBillboardMarkerTint(
+                        effectTexture,
+                        m_pCamera,
+                        fx.pos,
+                        { fx.size.x * growT, fx.size.y * growT, fx.size.z },
+                        color);
+                }
             }
             else
             {
@@ -3689,42 +4304,6 @@ void SceneGame::Draw()
                     { fx.size.x * growT, fx.size.y, fx.size.z * growT },
                     color);
             }
-        }
-
-        const float flashDuration = (tran.gameplay.attackHitFlash > 0.0f) ? tran.gameplay.attackHitFlash : 0.001f;
-        for (const auto& slot : m_enemies)
-        {
-            if (!slot.enemy || slot.hitFlashTimer <= 0.0f) continue;
-
-            const Collision::Box enemyBox = slot.enemy->GetCollision();
-            const float t = Clamp01(slot.hitFlashTimer / flashDuration);
-            const float scale = 0.4f + t * 0.9f;
-            DrawAttackMarkerTint(
-                m_pAttackMarker,
-                enemyBox.center,
-                { enemyBox.size.x * scale, enemyBox.size.y, enemyBox.size.z * scale },
-                { 1.0f, 0.35f, 0.25f, 0.80f * t + 0.10f });
-        }
-
-        const float playerFlashDuration = (tran.gameplay.playerDamageFlash > 0.0f) ? tran.gameplay.playerDamageFlash : 0.001f;
-        const float playerFlashScale = (tran.gameplay.playerDamageFlashScale < 0.1f) ? 0.1f : tran.gameplay.playerDamageFlashScale;
-        if (m_playerDamageFlashTimer > 0.0f)
-        {
-            const float t = Clamp01(m_playerDamageFlashTimer / playerFlashDuration);
-            const float scale = playerFlashScale * (1.0f + (1.0f - t) * 0.25f);
-            DrawAttackMarkerTint(
-                m_pAttackMarker,
-                {
-                    tran.player.pos.x,
-                    tran.player.pos.y + tran.player.size.y * 0.5f,
-                    tran.player.pos.z
-                },
-                {
-                    tran.player.size.x * scale,
-                    tran.player.size.y,
-                    tran.player.size.z * scale
-                },
-                { 1.0f, 0.1f, 0.1f, 0.55f * t + 0.10f });
         }
     }
 

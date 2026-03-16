@@ -8,6 +8,9 @@
 HRESULT InitInput(HWND hWnd);
 void UninitInput();
 void UpdateInput();
+float GetInputKeyboardMouseMs();
+float GetInputXInputMs();
+float GetInputDirectInputMs();
 
 bool IsKeyPress(BYTE key);
 bool IsKeyTrigger(BYTE key);
