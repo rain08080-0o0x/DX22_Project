@@ -1,5 +1,7 @@
 ﻿#include "CameraDebug.h"
 #include "Transfer.h"
+#include "SceneManager.h"
+#include "imgui.h"
 #include <cmath>
 const float CameraSpeed = 0.1f;
 const float CameraDebugRotate = 0.1f;
@@ -59,15 +61,44 @@ void CameraDebug::Update()
         XMVECTOR right = XMVector3Normalize(XMVector3Cross(up, forward));
 
         XMVECTOR delta = XMVectorZero();
+        const POINT mouseDelta = GetMouseDelta();
+        float mouseWheel = 0.0f;
+        bool allowMouseCamera = true;
+        if (ImGui::GetCurrentContext())
+        {
+            ImGuiIO& io = ImGui::GetIO();
+            mouseWheel = io.MouseWheel;
+            allowMouseCamera = !io.WantCaptureMouse;
+        }
 
-        if (IsRawKeyPress(VK_UP))    delta += forward * CameraSpeed;
-        if (IsRawKeyPress(VK_DOWN))  delta -= forward * CameraSpeed;
-        if (IsRawKeyPress(VK_RIGHT)) delta += right * CameraSpeed;
-        if (IsRawKeyPress(VK_LEFT))  delta -= right * CameraSpeed;
+        if (allowMouseCamera)
+        {
+            if (IsMouseRightPress())
+            {
+                OrbitCamera(static_cast<float>(mouseDelta.x), static_cast<float>(mouseDelta.y));
+            }
+            if (IsMouseMiddlePress())
+            {
+                PanCamera(static_cast<float>(mouseDelta.x), static_cast<float>(mouseDelta.y));
+            }
+            if (std::fabs(mouseWheel) > 0.001f)
+            {
+                ZoomCamera(mouseWheel);
+            }
+        }
 
-         //上下移動（ワールドY）
-        if (IsRawKeyPress(VK_LSHIFT) || IsRawKeyPress(VK_RSHIFT)) delta += up * CameraSpeed;
-        if (IsRawKeyPress(VK_LCONTROL) || IsRawKeyPress(VK_RCONTROL)) delta -= up * CameraSpeed;
+        //if (IsRawKeyPress(VK_UP))    delta += forward * CameraSpeed;
+        //if (IsRawKeyPress(VK_DOWN))  delta -= forward * CameraSpeed;
+        //if (IsRawKeyPress(VK_RIGHT)) delta += right * CameraSpeed;
+        //if (IsRawKeyPress(VK_LEFT))  delta -= right * CameraSpeed;
+
+        const bool allowVerticalMove = (SceneManager::GetCurrent() != SceneManager::SceneType::SCENE_GAME);
+        if (allowVerticalMove)
+        {
+            // 上下移動（ワールドY）
+            if (IsRawKeyPress(VK_PRIOR)) delta += up * CameraSpeed;
+            if (IsRawKeyPress(VK_NEXT))  delta -= up * CameraSpeed;
+        }
 
         // 視線を維持したまま平行移動：pos と look を同じだけ動かす
         pos += delta;
@@ -76,8 +107,7 @@ void CameraDebug::Update()
         // m_posについては後でlook基準に動かすので消す
         //XMStoreFloat3(&m_pos, pos);
         XMStoreFloat3(&m_look, look);
-        //--- カメラ位置の移動 
-        // 回り込み
+        //--- カメラ位置の移動
         if (IsRawKeyPress('J')) { m_radXZ += CameraDebugRotate; }
         if (IsRawKeyPress('L')) { m_radXZ -= CameraDebugRotate; }
         if (IsRawKeyPress('I')) { m_radY -= CameraDebugRotate; }
@@ -109,6 +139,70 @@ void CameraDebug::Update()
         tran.camera.eye = m_pos;
         tran.camera.look = m_look;
     }
+}
+
+void CameraDebug::OrbitCamera(float deltaX, float deltaY)
+{
+    m_radXZ += deltaX * 0.01f;
+    const float nextPitch = m_radY + deltaY * 0.01f;
+    if (nextPitch < -1.35f)
+    {
+        m_radY = -1.35f;
+    }
+    else if (nextPitch > 1.35f)
+    {
+        m_radY = 1.35f;
+    }
+    else
+    {
+        m_radY = nextPitch;
+    }
+}
+
+void CameraDebug::PanCamera(float deltaX, float deltaY)
+{
+    using namespace DirectX;
+    const XMVECTOR eye = XMLoadFloat3(&m_pos);
+    const XMVECTOR look = XMLoadFloat3(&m_look);
+    XMVECTOR forward = look - eye;
+    if (XMVectorGetX(XMVector3LengthSq(forward)) < 1.0e-6f)
+    {
+        forward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+    }
+    forward = XMVector3Normalize(forward);
+
+    const XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMVECTOR right = XMVector3Cross(worldUp, forward);
+    if (XMVectorGetX(XMVector3LengthSq(right)) < 1.0e-6f)
+    {
+        right = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+    }
+    right = XMVector3Normalize(right);
+    XMVECTOR cameraUp = XMVector3Normalize(XMVector3Cross(forward, right));
+
+    const float distance = std::fabs((m_radius != 0.0f) ? m_radius : CameraDefaultDistance);
+    const float panScaleX = (distance * 0.15f > 1.0f) ? (distance * 0.15f) : 1.0f;
+    const float panScaleY = (distance * 0.10f > 1.0f) ? (distance * 0.10f) : 1.0f;
+    const XMVECTOR delta =
+        right * (-deltaX * 0.01f * panScaleX) +
+        cameraUp * (deltaY * 0.01f * panScaleY);
+
+    XMVECTOR newLook = look + delta;
+    XMStoreFloat3(&m_look, newLook);
+}
+
+void CameraDebug::ZoomCamera(float delta)
+{
+    float nextRadius = m_radius + delta;
+    if (nextRadius > -2.5f)
+    {
+        nextRadius = -2.5f;
+    }
+    else if (nextRadius < -80.0f)
+    {
+        nextRadius = -80.0f;
+    }
+    m_radius = nextRadius;
 }
 
 void CameraDebug::SetLook(DirectX::XMFLOAT3 set)

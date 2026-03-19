@@ -33,6 +33,13 @@ bool IsPadRightShoulderTrigger();
 bool IsMouseLeftPress();
 bool IsMouseLeftTrigger();
 bool IsMouseLeftRelease();
+bool IsMouseRightPress();
+bool IsMouseRightTrigger();
+bool IsMouseRightRelease();
+bool IsMouseMiddlePress();
+bool IsMouseMiddleTrigger();
+bool IsMouseMiddleRelease();
 POINT GetMousePosition();
+POINT GetMouseDelta();
 
 #endif // __INPUT_H__

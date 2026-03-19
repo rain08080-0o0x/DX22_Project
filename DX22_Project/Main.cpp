@@ -84,8 +84,105 @@ namespace
 			return "CastleEditor";
 		case SceneManager::SceneType::SCENE_EFFECT_DEBUG:
 			return "EffectDebug";
+		case SceneManager::SceneType::SCENE_BOSS_EDITOR:
+			return "BossEditor";
 		default:
 			return "Unknown";
+		}
+	}
+
+	const char* GetWeaponTypeLabel(int weaponType)
+	{
+		switch (weaponType)
+		{
+		case Transfer::RoguelikeUpgrade::WeaponBasic:
+			return u8"基本型";
+		case Transfer::RoguelikeUpgrade::WeaponHeavy:
+			return u8"一撃型";
+		case Transfer::RoguelikeUpgrade::WeaponRapid:
+			return u8"手数型";
+		case Transfer::RoguelikeUpgrade::WeaponRanged:
+			return u8"遠距離型";
+		default:
+			return u8"未設定";
+		}
+	}
+
+	const char* GetActionSkillLabel(int skillType)
+	{
+		switch (skillType)
+		{
+		case Transfer::RoguelikeUpgrade::ActionSkillWhirl:
+			return u8"薙ぎ払い";
+		case Transfer::RoguelikeUpgrade::ActionSkillRush:
+			return u8"突進";
+		case Transfer::RoguelikeUpgrade::ActionSkillAmbush:
+			return u8"奇襲";
+		case Transfer::RoguelikeUpgrade::ActionSkillChainThrow:
+			return u8"鎖投げ";
+		case Transfer::RoguelikeUpgrade::ActionSkillFireball:
+			return u8"火球";
+		case Transfer::RoguelikeUpgrade::ActionSkillBloodSlash:
+			return u8"出血斬";
+		default:
+			return u8"未選択";
+		}
+	}
+
+	const char* GetTraitLabel(int traitType)
+	{
+		switch (traitType)
+		{
+		case Transfer::RoguelikeUpgrade::TraitCooldown:
+			return u8"クールタイム";
+		case Transfer::RoguelikeUpgrade::TraitWeapon:
+			return u8"武器";
+		case Transfer::RoguelikeUpgrade::TraitChain:
+			return u8"鎖";
+		case Transfer::RoguelikeUpgrade::TraitBlood:
+			return u8"血";
+		case Transfer::RoguelikeUpgrade::TraitFire:
+			return u8"炎";
+		default:
+			return u8"未定";
+		}
+	}
+
+	const char* GetArtifactLabel(int artifactType)
+	{
+		switch (artifactType)
+		{
+		case Transfer::RoguelikeUpgrade::ArtifactBarbarianNecklace:
+			return u8"蛮族の首飾り";
+		case Transfer::RoguelikeUpgrade::ArtifactGreatShieldCrest:
+			return u8"大盾の紋章";
+		case Transfer::RoguelikeUpgrade::ArtifactGlassShoes:
+			return u8"ガラスの靴";
+		case Transfer::RoguelikeUpgrade::ArtifactMagicPiggyBank:
+			return u8"魔法の貯金箱";
+		case Transfer::RoguelikeUpgrade::ArtifactDiceBox:
+			return u8"サイコロのでる箱";
+		default:
+			return u8"未定";
+		}
+	}
+
+	const char* GetBossArchetypeLabel(int bossType)
+	{
+		switch (bossType)
+		{
+		case Transfer::RoguelikeUpgrade::BossHeavyMelee:
+			return u8"近距離鈍重型";
+		case Transfer::RoguelikeUpgrade::BossLightRanged:
+			return u8"遠距離軽装型";
+		case Transfer::RoguelikeUpgrade::BossBalancedMid:
+			return u8"中距離バランス型";
+		case Transfer::RoguelikeUpgrade::BossSwiftDebuff:
+			return u8"近距離俊敏デバフ型";
+		case Transfer::RoguelikeUpgrade::BossFinalBarrage:
+			return u8"ラスボス";
+		default:
+			return u8"未定";
 		}
 	}
 
@@ -648,6 +745,9 @@ void Draw()
 		case SceneManager::SceneType::SCENE_EFFECT_DEBUG:
 			sceneTxt = u8"エフェクト確認";
 			break;
+		case SceneManager::SceneType::SCENE_BOSS_EDITOR:
+			sceneTxt = u8"ボス攻撃エディタ";
+			break;
 		default:
 			sceneTxt = u8"不明";
 			break;
@@ -674,7 +774,8 @@ void Draw()
 			u8"ゲーム",
 			u8"リザルト",
 			u8"城エディタ",
-			u8"エフェクト確認"
+			u8"エフェクト確認",
+			u8"ボス攻撃エディタ",
 		};
 		const char* debugResultItems[] =
 		{
@@ -903,7 +1004,7 @@ void Draw()
 
 				DragInt(u8"最大Wave", &tran.gameplay.waveMax, 1.0f, 1, 32);
 				DragInt(u8"Wave毎の敵追加数", &tran.gameplay.waveEnemyAddPerWave, 1.0f, 0, 16);
-				DragInt(u8"進行ごとのリロール獲得数", &tran.roguelike.rerollMaxPerStage, 1.0f, 0, 9);
+				DragInt(u8"進行配布リロール数(現在未使用)", &tran.roguelike.rerollMaxPerStage, 1.0f, 0, 9);
 				ImGui::TextDisabled(u8"初期値: 最大Wave3 / Wave追加1");
 				ImGui::SeparatorText(u8"開始カメラ演出");
 				ImGui::TextDisabled(u8"初期値: 演出時間1.20秒 / フォーカス距離2.80");
@@ -1226,7 +1327,51 @@ void Draw()
 					tran.roguelike.skillOrbitCountLevel = tran.ClampUpgradeLevel(tran.roguelike.skillOrbitCountLevel);
 				}
 				ImGui::Text(u8"強化選択待ち: %s", tran.roguelike.selectionPending ? u8"あり" : u8"なし");
-				ImGui::Text(u8"リロール残り: %d / %d", tran.roguelike.rerollRemain, tran.roguelike.rerollMaxPerStage);
+				ImGui::Text(u8"リロール残り: %d", tran.roguelike.rerollRemain);
+				ImGui::Text(u8"復活残り: %d / %d", tran.roguelike.reviveRemain, tran.roguelike.reviveMax);
+				ImGui::SeparatorText(u8"新仕様データ");
+				ImGui::Text(u8"武器: %s", GetWeaponTypeLabel(tran.roguelike.loadoutWeaponType));
+				ImGui::Text(u8"スキル1: %s", GetActionSkillLabel(tran.roguelike.loadoutSkills[0]));
+				ImGui::Text(u8"スキル2: %s", GetActionSkillLabel(tran.roguelike.loadoutSkills[1]));
+				ImGui::Text(u8"通常ボス順: 1:%s / 2:%s / 3:%s",
+					GetBossArchetypeLabel(tran.roguelike.regularBossOrder[0]),
+					GetBossArchetypeLabel(tran.roguelike.regularBossOrder[1]),
+					GetBossArchetypeLabel(tran.roguelike.regularBossOrder[2]));
+				ImGui::Text(u8"最終ボス: %s", GetBossArchetypeLabel(tran.roguelike.finalBossType));
+				for (int traitType = 0; traitType < Transfer::RoguelikeUpgrade::TraitTypeCount; ++traitType)
+				{
+					ImGui::Text(u8"%s特性 Lv: %d", GetTraitLabel(traitType), tran.roguelike.traitLevels[traitType]);
+				}
+				{
+					char disabledTagText[256]{};
+					bool hasDisabledTag = false;
+					for (int tagType = 0; tagType < Transfer::RoguelikeUpgrade::TagTypeCount; ++tagType)
+					{
+						if (tran.roguelike.disabledTags[tagType] == 0) continue;
+						if (hasDisabledTag)
+						{
+							strcat_s(disabledTagText, sizeof(disabledTagText), u8", ");
+						}
+						strcat_s(disabledTagText, sizeof(disabledTagText), GetTraitLabel(tagType));
+						hasDisabledTag = true;
+					}
+					ImGui::Text(u8"解除済みタグ: %s", hasDisabledTag ? disabledTagText : u8"なし");
+				}
+				{
+					char artifactText[256]{};
+					bool hasArtifact = false;
+					for (int artifactType = 0; artifactType < Transfer::RoguelikeUpgrade::ArtifactTypeCount; ++artifactType)
+					{
+						if (tran.roguelike.ownedArtifacts[artifactType] == 0) continue;
+						if (hasArtifact)
+						{
+							strcat_s(artifactText, sizeof(artifactText), u8", ");
+						}
+						strcat_s(artifactText, sizeof(artifactText), GetArtifactLabel(artifactType));
+						hasArtifact = true;
+					}
+					ImGui::Text(u8"所持魔道具: %s", hasArtifact ? artifactText : u8"なし");
+				}
 				ImGui::SeparatorText(u8"現在の候補");
 				char offerText0[64]{}, offerText1[64]{}, offerText2[64]{};
 				FormatUpgradeLabel(tran, tran.roguelike.offers[0], offerText0, sizeof(offerText0));
@@ -1449,7 +1594,7 @@ void Draw()
 					sceneNum--;
 				if (sceneNum < 0)sceneNum = static_cast<int>(SceneManager::SceneType::SCENE_MAX) - 1;
 				sceneNum = sceneNum % static_cast<int>(SceneManager::SceneType::SCENE_MAX);
-				SceneManager::SceneType changeScene;
+				SceneManager::SceneType changeScene = SceneManager::GetCurrent();
 				switch (sceneNum)
 				{
 				case 0:
@@ -1467,6 +1612,14 @@ void Draw()
 				case 3:
 					sceneTxt = u8"城エディタ";
 					changeScene = SceneManager::SceneType::SCENE_ENGINE_EDITOR;
+					break;
+				case 4:
+					sceneTxt = u8"エフェクト確認";
+					changeScene = SceneManager::SceneType::SCENE_EFFECT_DEBUG;
+					break;
+				case 5:
+					sceneTxt = u8"ボス攻撃エディタ";
+					changeScene = SceneManager::SceneType::SCENE_BOSS_EDITOR;
 					break;
 				default:
 					sceneTxt = u8"不明";
@@ -1879,7 +2032,8 @@ void Draw()
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
 		tran.gameplayDebug.titleOptionOpen == 0 &&
 		tran.gameplayDebug.titleKeyConfigOpen == 0 &&
-		tran.gameplayDebug.titleDifficultyOpen == 0)
+		tran.gameplayDebug.titleDifficultyOpen == 0 &&
+		tran.gameplayDebug.titlePreparationOpen == 0)
 	{
 		ImGuiViewport* vp = ImGui::GetMainViewport();
 		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
@@ -1998,7 +2152,8 @@ void Draw()
 		if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_TITLE &&
 			tran.gameplayDebug.titleOptionOpen == 0 &&
 			tran.gameplayDebug.titleKeyConfigOpen == 0 &&
-			tran.gameplayDebug.titleDifficultyOpen == 0)
+			tran.gameplayDebug.titleDifficultyOpen == 0 &&
+			tran.gameplayDebug.titlePreparationOpen == 0)
 		{
 			ImGuiViewport* vp = ImGui::GetMainViewport();
 			ImDrawList* dl = ImGui::GetForegroundDrawList(vp);

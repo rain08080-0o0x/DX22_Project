@@ -30,4 +30,8 @@ private:
     bool m_isKeyConfigCapturing;
     bool m_isDifficultyOpen;
     int m_difficultySelection;
+    bool m_isPreparationOpen;
+    int m_preparationSelection;
+    int m_preparationWeaponType;
+    int m_preparationSkillSlots[2];
 };

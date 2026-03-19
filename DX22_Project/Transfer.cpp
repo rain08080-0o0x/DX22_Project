@@ -11,6 +11,13 @@ namespace
 	const char* kMirrorGameplayTuningPath = "DX22_Project/Assets/gameplay_tuning.cfg";
 	const char* kDebugGameplayTuningPath = "x64/Debug/Assets/gameplay_tuning.cfg";
 	const char* kUpstreamMirrorGameplayTuningPath = "../../DX22_Project/Assets/gameplay_tuning.cfg";
+	constexpr int kInitialRunRerollCount = 5;
+	constexpr int kDefaultRunReviveCount = 1;
+	constexpr float kRestStageHealRatio = 0.25f;
+	constexpr int kDiceRewardGain = 3;
+	constexpr int kShopBaseCost = 2;
+	constexpr int kShopCostPerPurchase = 1;
+	constexpr float kDefaultPlayerMaxHp = 100.0f;
 
 	/**
 	 * @brief 呼び出し側が既定パスを使いたい指定かどうかを判定します。
@@ -319,7 +326,7 @@ namespace
 		roguelike.skillOrbitRangeLevel = 0;
 		roguelike.skillOrbitCooldownLevel = 5;
 		roguelike.skillOrbitCountLevel = 5;
-		roguelike.rerollMaxPerStage = 1;
+		roguelike.rerollMaxPerStage = 0;
 		InitializeRunStageRoute(roguelike);
 	}
 
@@ -386,42 +393,901 @@ namespace
 		return ClampInt(
 			stageType,
 			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageBoss);
+			Transfer::RoguelikeUpgrade::StageFinalBoss);
+	}
+
+	int NormalizeRewardTypeValue(int rewardType)
+	{
+		return ClampInt(
+			rewardType,
+			Transfer::RoguelikeUpgrade::RewardUnknown,
+			Transfer::RoguelikeUpgrade::RewardFinalBoss);
+	}
+
+	int PackOfferValue(int offerType, int primaryValue, int secondaryValue = 0)
+	{
+		return
+			(offerType * Transfer::RoguelikeUpgrade::kOfferTypeStride) +
+			(primaryValue * Transfer::RoguelikeUpgrade::kOfferPrimaryStride) +
+			secondaryValue;
+	}
+
+	int GetOfferTypeValue(int packedOffer)
+	{
+		if (packedOffer < 0)
+		{
+			return Transfer::RoguelikeUpgrade::OfferNone;
+		}
+		return packedOffer / Transfer::RoguelikeUpgrade::kOfferTypeStride;
+	}
+
+	int GetOfferPrimaryValue(int packedOffer)
+	{
+		if (packedOffer < 0)
+		{
+			return 0;
+		}
+		return (packedOffer % Transfer::RoguelikeUpgrade::kOfferTypeStride) /
+			Transfer::RoguelikeUpgrade::kOfferPrimaryStride;
+	}
+
+	int GetOfferSecondaryValue(int packedOffer)
+	{
+		if (packedOffer < 0)
+		{
+			return 0;
+		}
+		return packedOffer % Transfer::RoguelikeUpgrade::kOfferPrimaryStride;
+	}
+
+	int GetWeaponUpgradeTagType(int weaponUpgradeType)
+	{
+		switch (weaponUpgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeCooldownBurst:
+			return Transfer::RoguelikeUpgrade::TagCooldown;
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeChainOnCrit:
+			return Transfer::RoguelikeUpgrade::TagChain;
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeBloodOnCrit:
+			return Transfer::RoguelikeUpgrade::TagBlood;
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeFireOnCrit:
+			return Transfer::RoguelikeUpgrade::TagFire;
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeCritNeedReduce:
+		default:
+			return Transfer::RoguelikeUpgrade::TagWeapon;
+		}
+	}
+
+	int GetSkillEnhancementTagType(int enhancementType)
+	{
+		switch (enhancementType)
+		{
+		case Transfer::RoguelikeUpgrade::SkillEnhanceCooldown:
+			return Transfer::RoguelikeUpgrade::TagCooldown;
+		case Transfer::RoguelikeUpgrade::SkillEnhanceChain:
+			return Transfer::RoguelikeUpgrade::TagChain;
+		case Transfer::RoguelikeUpgrade::SkillEnhanceBlood:
+			return Transfer::RoguelikeUpgrade::TagBlood;
+		case Transfer::RoguelikeUpgrade::SkillEnhanceFire:
+			return Transfer::RoguelikeUpgrade::TagFire;
+		case Transfer::RoguelikeUpgrade::SkillEnhanceWeapon:
+		default:
+			return Transfer::RoguelikeUpgrade::TagWeapon;
+		}
+	}
+
+	bool HasLoadoutActionSkill(const Transfer::RoguelikeUpgrade& roguelike, int actionSkillType)
+	{
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kSkillSlotCount; ++i)
+		{
+			if (roguelike.loadoutSkills[i] == actionSkillType)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	int GetSkillEnhancementTypeFromTraitType(int traitType)
+	{
+		switch (traitType)
+		{
+		case Transfer::RoguelikeUpgrade::TraitCooldown:
+			return Transfer::RoguelikeUpgrade::SkillEnhanceCooldown;
+		case Transfer::RoguelikeUpgrade::TraitWeapon:
+			return Transfer::RoguelikeUpgrade::SkillEnhanceWeapon;
+		case Transfer::RoguelikeUpgrade::TraitChain:
+			return Transfer::RoguelikeUpgrade::SkillEnhanceChain;
+		case Transfer::RoguelikeUpgrade::TraitBlood:
+			return Transfer::RoguelikeUpgrade::SkillEnhanceBlood;
+		case Transfer::RoguelikeUpgrade::TraitFire:
+			return Transfer::RoguelikeUpgrade::SkillEnhanceFire;
+		default:
+			return -1;
+		}
+	}
+
+	void RebuildDerivedTraitLevelsInternal(Transfer::RoguelikeUpgrade& roguelike)
+	{
+		for (int traitType = 0; traitType < Transfer::RoguelikeUpgrade::TraitTypeCount; ++traitType)
+		{
+			int skillContribution = 0;
+			const int enhancementType = GetSkillEnhancementTypeFromTraitType(traitType);
+			if (enhancementType >= 0)
+			{
+				for (int slotIndex = 0; slotIndex < Transfer::RoguelikeUpgrade::kSkillSlotCount; ++slotIndex)
+				{
+					const int actionSkillType = roguelike.loadoutSkills[slotIndex];
+					if (actionSkillType <= Transfer::RoguelikeUpgrade::ActionSkillNone ||
+						actionSkillType >= Transfer::RoguelikeUpgrade::ActionSkillTypeCount)
+					{
+						continue;
+					}
+					if (roguelike.actionSkillEnhancements[actionSkillType][enhancementType] != 0)
+					{
+						++skillContribution;
+					}
+				}
+			}
+
+			int weaponContribution = 0;
+			for (int weaponUpgradeType = 0;
+				 weaponUpgradeType < Transfer::RoguelikeUpgrade::kWeaponUpgradeTypeCount;
+				 ++weaponUpgradeType)
+			{
+				if (roguelike.weaponUpgradeOwned[weaponUpgradeType] == 0)
+				{
+					continue;
+				}
+				if (GetWeaponUpgradeTagType(weaponUpgradeType) == traitType)
+				{
+					weaponContribution = 1;
+					break;
+				}
+			}
+
+			const int nodeContribution = ClampInt(roguelike.traitNodeLevels[traitType], 0, 4);
+			roguelike.traitLevels[traitType] = ClampInt(
+				nodeContribution + skillContribution + weaponContribution,
+				0,
+				Transfer::RoguelikeUpgrade::kTraitLevelMax);
+		}
+	}
+
+	int CountOwnedWeaponUpgrades(const Transfer::RoguelikeUpgrade& roguelike)
+	{
+		int count = 0;
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kWeaponUpgradeTypeCount; ++i)
+		{
+			if (roguelike.weaponUpgradeOwned[i] != 0)
+			{
+				++count;
+			}
+		}
+		return count;
+	}
+
+	int CountOwnedSkillEnhancements(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int actionSkillType)
+	{
+		if (actionSkillType <= Transfer::RoguelikeUpgrade::ActionSkillNone ||
+			actionSkillType >= Transfer::RoguelikeUpgrade::ActionSkillTypeCount)
+		{
+			return 0;
+		}
+
+		int count = 0;
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kSkillEnhancementTypeCount; ++i)
+		{
+			if (roguelike.actionSkillEnhancements[actionSkillType][i] != 0)
+			{
+				++count;
+			}
+		}
+		return count;
+	}
+
+	void AddPackedOfferUnique(int packedOffer, int available[], int& availableCount, int maxCount)
+	{
+		if (packedOffer < 0 || !available || availableCount < 0 || availableCount >= maxCount)
+		{
+			return;
+		}
+
+		for (int i = 0; i < availableCount; ++i)
+		{
+			if (available[i] == packedOffer)
+			{
+				return;
+			}
+		}
+
+		available[availableCount++] = packedOffer;
+	}
+
+	bool CanOfferTraitLevel(const Transfer::RoguelikeUpgrade& roguelike, int traitType)
+	{
+		if (traitType < 0 || traitType >= Transfer::RoguelikeUpgrade::TraitTypeCount)
+		{
+			return false;
+		}
+
+		if (roguelike.disabledTags[traitType] != 0)
+		{
+			return false;
+		}
+
+		return ClampInt(roguelike.traitNodeLevels[traitType], 0, 4) < 4;
+	}
+
+	bool CanOfferWeaponUpgradeType(const Transfer::RoguelikeUpgrade& roguelike, int weaponUpgradeType)
+	{
+		if (weaponUpgradeType < 0 || weaponUpgradeType >= Transfer::RoguelikeUpgrade::kWeaponUpgradeTypeCount)
+		{
+			return false;
+		}
+		if (CountOwnedWeaponUpgrades(roguelike) >= 4)
+		{
+			return false;
+		}
+		if (roguelike.weaponUpgradeOwned[weaponUpgradeType] != 0)
+		{
+			return false;
+		}
+
+		const int tagType = GetWeaponUpgradeTagType(weaponUpgradeType);
+		if (tagType >= 0 &&
+			tagType < Transfer::RoguelikeUpgrade::TagTypeCount &&
+			roguelike.disabledTags[tagType] != 0)
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	bool CanOfferSkillEnhancementType(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int actionSkillType,
+		int enhancementType)
+	{
+		if (actionSkillType <= Transfer::RoguelikeUpgrade::ActionSkillNone ||
+			actionSkillType >= Transfer::RoguelikeUpgrade::ActionSkillTypeCount)
+		{
+			return false;
+		}
+		if (enhancementType < 0 ||
+			enhancementType >= Transfer::RoguelikeUpgrade::kSkillEnhancementTypeCount)
+		{
+			return false;
+		}
+		if (!HasLoadoutActionSkill(roguelike, actionSkillType))
+		{
+			return false;
+		}
+		if (CountOwnedSkillEnhancements(roguelike, actionSkillType) >= 4)
+		{
+			return false;
+		}
+		if (roguelike.actionSkillEnhancements[actionSkillType][enhancementType] != 0)
+		{
+			return false;
+		}
+
+		const int tagType = GetSkillEnhancementTagType(enhancementType);
+		if (tagType >= 0 &&
+			tagType < Transfer::RoguelikeUpgrade::TagTypeCount &&
+			roguelike.disabledTags[tagType] != 0)
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	bool CanOfferSkillChangeType(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int slotIndex,
+		int actionSkillType)
+	{
+		if (slotIndex < 0 || slotIndex >= Transfer::RoguelikeUpgrade::kSkillSlotCount)
+		{
+			return false;
+		}
+		if (actionSkillType <= Transfer::RoguelikeUpgrade::ActionSkillNone ||
+			actionSkillType >= Transfer::RoguelikeUpgrade::ActionSkillTypeCount)
+		{
+			return false;
+		}
+
+		const int currentSkill = roguelike.loadoutSkills[slotIndex];
+		if (currentSkill <= Transfer::RoguelikeUpgrade::ActionSkillNone)
+		{
+			return false;
+		}
+		if (currentSkill == actionSkillType)
+		{
+			return false;
+		}
+
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kSkillSlotCount; ++i)
+		{
+			if (i != slotIndex && roguelike.loadoutSkills[i] == actionSkillType)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool CanOfferTagDisableType(const Transfer::RoguelikeUpgrade& roguelike, int tagType)
+	{
+		if (tagType < 0 || tagType >= Transfer::RoguelikeUpgrade::TagTypeCount)
+		{
+			return false;
+		}
+		return roguelike.disabledTags[tagType] == 0;
+	}
+
+	bool CanOfferArtifactType(const Transfer::RoguelikeUpgrade& roguelike, int artifactType)
+	{
+		if (artifactType < 0 || artifactType >= Transfer::RoguelikeUpgrade::ArtifactTypeCount)
+		{
+			return false;
+		}
+		return roguelike.ownedArtifacts[artifactType] == 0;
+	}
+
+	void AppendTraitOffers(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int available[],
+		int& availableCount,
+		int maxCount)
+	{
+		for (int traitType = 0; traitType < Transfer::RoguelikeUpgrade::TraitTypeCount; ++traitType)
+		{
+			if (CanOfferTraitLevel(roguelike, traitType))
+			{
+				AddPackedOfferUnique(
+					PackOfferValue(Transfer::RoguelikeUpgrade::OfferTrait, traitType),
+					available,
+					availableCount,
+					maxCount);
+			}
+		}
+	}
+
+	void AppendWeaponUpgradeOffers(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int available[],
+		int& availableCount,
+		int maxCount)
+	{
+		for (int weaponUpgradeType = 0;
+			 weaponUpgradeType < Transfer::RoguelikeUpgrade::kWeaponUpgradeTypeCount;
+			 ++weaponUpgradeType)
+		{
+			if (CanOfferWeaponUpgradeType(roguelike, weaponUpgradeType))
+			{
+				AddPackedOfferUnique(
+					PackOfferValue(Transfer::RoguelikeUpgrade::OfferWeaponUpgrade, weaponUpgradeType),
+					available,
+					availableCount,
+					maxCount);
+			}
+		}
+	}
+
+	void AppendSkillEnhancementOffers(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int available[],
+		int& availableCount,
+		int maxCount)
+	{
+		for (int slotIndex = 0; slotIndex < Transfer::RoguelikeUpgrade::kSkillSlotCount; ++slotIndex)
+		{
+			const int actionSkillType = roguelike.loadoutSkills[slotIndex];
+			for (int enhancementType = 0;
+				 enhancementType < Transfer::RoguelikeUpgrade::kSkillEnhancementTypeCount;
+				 ++enhancementType)
+			{
+				if (CanOfferSkillEnhancementType(roguelike, actionSkillType, enhancementType))
+				{
+					AddPackedOfferUnique(
+						PackOfferValue(
+							Transfer::RoguelikeUpgrade::OfferSkillEnhance,
+							actionSkillType,
+							enhancementType),
+						available,
+						availableCount,
+						maxCount);
+				}
+			}
+		}
+	}
+
+	void AppendSkillChangeOffers(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int available[],
+		int& availableCount,
+		int maxCount)
+	{
+		for (int slotIndex = 0; slotIndex < Transfer::RoguelikeUpgrade::kSkillSlotCount; ++slotIndex)
+		{
+			for (int actionSkillType = Transfer::RoguelikeUpgrade::ActionSkillWhirl;
+				 actionSkillType < Transfer::RoguelikeUpgrade::ActionSkillTypeCount;
+				 ++actionSkillType)
+			{
+				if (CanOfferSkillChangeType(roguelike, slotIndex, actionSkillType))
+				{
+					AddPackedOfferUnique(
+						PackOfferValue(
+							Transfer::RoguelikeUpgrade::OfferSkillChange,
+							slotIndex,
+							actionSkillType),
+						available,
+						availableCount,
+						maxCount);
+				}
+			}
+		}
+	}
+
+	void AppendTagDisableOffers(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int available[],
+		int& availableCount,
+		int maxCount)
+	{
+		for (int tagType = 0; tagType < Transfer::RoguelikeUpgrade::TagTypeCount; ++tagType)
+		{
+			if (CanOfferTagDisableType(roguelike, tagType))
+			{
+				AddPackedOfferUnique(
+					PackOfferValue(Transfer::RoguelikeUpgrade::OfferTagDisable, tagType),
+					available,
+					availableCount,
+					maxCount);
+			}
+		}
+	}
+
+	void AppendArtifactOffers(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int available[],
+		int& availableCount,
+		int maxCount)
+	{
+		for (int artifactType = 0; artifactType < Transfer::RoguelikeUpgrade::ArtifactTypeCount; ++artifactType)
+		{
+			if (CanOfferArtifactType(roguelike, artifactType))
+			{
+				AddPackedOfferUnique(
+					PackOfferValue(Transfer::RoguelikeUpgrade::OfferArtifact, artifactType),
+					available,
+					availableCount,
+					maxCount);
+			}
+		}
+	}
+
+	void FillPackedOfferArrayFromAvailable(
+		int offers[kUpgradeOfferCount],
+		int available[],
+		int availableCount)
+	{
+		if (availableCount <= 0)
+		{
+			for (int i = 0; i < kUpgradeOfferCount; ++i)
+			{
+				offers[i] = kUpgradeOfferNone;
+			}
+			return;
+		}
+
+		for (int i = 0; i < availableCount; ++i)
+		{
+			const int j = RandRangeInt(i, availableCount - 1);
+			const int tmp = available[i];
+			available[i] = available[j];
+			available[j] = tmp;
+		}
+
+		for (int i = 0; i < kUpgradeOfferCount; ++i)
+		{
+			offers[i] = (i < availableCount)
+				? available[i]
+				: available[RandRangeInt(0, availableCount - 1)];
+		}
+	}
+
+	void BuildOffersForSelectionPhase(
+		const Transfer::RoguelikeUpgrade& roguelike,
+		int selectionPhase,
+		int offers[kUpgradeOfferCount])
+	{
+		constexpr int kMaxAvailableOffers = 64;
+		int available[kMaxAvailableOffers]{};
+		int availableCount = 0;
+
+		switch (NormalizeSelectionPhaseValue(selectionPhase))
+		{
+		case Transfer::RoguelikeUpgrade::SelectionRewardSkill:
+		case Transfer::RoguelikeUpgrade::SelectionShopSkillEnhance:
+			AppendSkillEnhancementOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			if (availableCount <= 0)
+			{
+				AppendWeaponUpgradeOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			}
+			if (availableCount <= 0)
+			{
+				AppendTraitOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			}
+			break;
+
+		case Transfer::RoguelikeUpgrade::SelectionRewardTrait:
+		case Transfer::RoguelikeUpgrade::SelectionShopTrait:
+			AppendTraitOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			if (availableCount <= 0)
+			{
+				AppendWeaponUpgradeOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			}
+			if (availableCount <= 0)
+			{
+				AppendSkillEnhancementOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			}
+			break;
+
+		case Transfer::RoguelikeUpgrade::SelectionRewardTag:
+			AppendTagDisableOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			if (availableCount <= 0)
+			{
+				AppendTraitOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			}
+			break;
+
+		case Transfer::RoguelikeUpgrade::SelectionRewardWeapon:
+			AppendWeaponUpgradeOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			if (availableCount <= 0)
+			{
+				AppendTraitOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			}
+			break;
+
+		case Transfer::RoguelikeUpgrade::SelectionRewardArtifact:
+			AppendArtifactOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			if (availableCount <= 0)
+			{
+				AppendTraitOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			}
+			break;
+
+		case Transfer::RoguelikeUpgrade::SelectionShopSkillChange:
+			AppendSkillChangeOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			break;
+
+		case Transfer::RoguelikeUpgrade::SelectionMixed:
+			AppendSkillEnhancementOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			AppendTraitOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			AppendWeaponUpgradeOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			AppendTagDisableOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			AppendArtifactOffers(roguelike, available, availableCount, kMaxAvailableOffers);
+			break;
+
+		default:
+			for (int i = 0; i < kUpgradeOfferCount; ++i)
+			{
+				offers[i] = kUpgradeOfferNone;
+			}
+			return;
+		}
+
+		FillPackedOfferArrayFromAvailable(offers, available, availableCount);
+	}
+
+	void MoveSkillEnhancementsToNewSkill(
+		Transfer::RoguelikeUpgrade& roguelike,
+		int oldSkillType,
+		int newSkillType)
+	{
+		if (oldSkillType <= Transfer::RoguelikeUpgrade::ActionSkillNone ||
+			oldSkillType >= Transfer::RoguelikeUpgrade::ActionSkillTypeCount ||
+			newSkillType <= Transfer::RoguelikeUpgrade::ActionSkillNone ||
+			newSkillType >= Transfer::RoguelikeUpgrade::ActionSkillTypeCount ||
+			oldSkillType == newSkillType)
+		{
+			return;
+		}
+
+		for (int enhancementType = 0;
+			 enhancementType < Transfer::RoguelikeUpgrade::kSkillEnhancementTypeCount;
+			 ++enhancementType)
+		{
+			if (roguelike.actionSkillEnhancements[oldSkillType][enhancementType] != 0)
+			{
+				roguelike.actionSkillEnhancements[newSkillType][enhancementType] = 1;
+				roguelike.actionSkillEnhancements[oldSkillType][enhancementType] = 0;
+			}
+		}
+	}
+
+	bool ApplyPackedOffer(Transfer::RoguelikeUpgrade& roguelike, int packedOffer)
+	{
+		const int offerType = GetOfferTypeValue(packedOffer);
+		const int primaryValue = GetOfferPrimaryValue(packedOffer);
+		const int secondaryValue = GetOfferSecondaryValue(packedOffer);
+
+		switch (offerType)
+		{
+		case Transfer::RoguelikeUpgrade::OfferTrait:
+			if (!CanOfferTraitLevel(roguelike, primaryValue))
+			{
+				return false;
+			}
+			roguelike.traitNodeLevels[primaryValue] = ClampInt(
+				roguelike.traitNodeLevels[primaryValue] + 1,
+				0,
+				4);
+			RebuildDerivedTraitLevelsInternal(roguelike);
+			return true;
+
+		case Transfer::RoguelikeUpgrade::OfferWeaponUpgrade:
+			if (!CanOfferWeaponUpgradeType(roguelike, primaryValue))
+			{
+				return false;
+			}
+			roguelike.weaponUpgradeOwned[primaryValue] = 1;
+			RebuildDerivedTraitLevelsInternal(roguelike);
+			return true;
+
+		case Transfer::RoguelikeUpgrade::OfferSkillEnhance:
+			if (!CanOfferSkillEnhancementType(roguelike, primaryValue, secondaryValue))
+			{
+				return false;
+			}
+			roguelike.actionSkillEnhancements[primaryValue][secondaryValue] = 1;
+			RebuildDerivedTraitLevelsInternal(roguelike);
+			return true;
+
+		case Transfer::RoguelikeUpgrade::OfferSkillChange:
+			if (!CanOfferSkillChangeType(roguelike, primaryValue, secondaryValue))
+			{
+				return false;
+			}
+			MoveSkillEnhancementsToNewSkill(
+				roguelike,
+				roguelike.loadoutSkills[primaryValue],
+				secondaryValue);
+			roguelike.loadoutSkills[primaryValue] = secondaryValue;
+			RebuildDerivedTraitLevelsInternal(roguelike);
+			return true;
+
+		case Transfer::RoguelikeUpgrade::OfferTagDisable:
+			if (!CanOfferTagDisableType(roguelike, primaryValue))
+			{
+				return false;
+			}
+			roguelike.disabledTags[primaryValue] = 1;
+			return true;
+
+		case Transfer::RoguelikeUpgrade::OfferArtifact:
+			if (!CanOfferArtifactType(roguelike, primaryValue))
+			{
+				return false;
+			}
+			roguelike.ownedArtifacts[primaryValue] = 1;
+			return true;
+
+		default:
+			return false;
+		}
+	}
+
+	void ResetStageOptionRow(int row[Transfer::RoguelikeUpgrade::kOfferCount])
+	{
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kOfferCount; ++i)
+		{
+			row[i] = Transfer::RoguelikeUpgrade::RewardUnknown;
+		}
+	}
+
+	void FillWeightedRewardOptions(
+		int out[Transfer::RoguelikeUpgrade::kOfferCount],
+		int optionCount,
+		int traitWeight,
+		int tagWeight,
+		int weaponWeight,
+		int diceWeight)
+	{
+		ResetStageOptionRow(out);
+		optionCount = ClampInt(optionCount, 1, Transfer::RoguelikeUpgrade::kOfferCount);
+
+		const int weights[][2] =
+		{
+			{ Transfer::RoguelikeUpgrade::RewardTrait, traitWeight },
+			{ Transfer::RoguelikeUpgrade::RewardTag, tagWeight },
+			{ Transfer::RoguelikeUpgrade::RewardWeapon, weaponWeight },
+			{ Transfer::RoguelikeUpgrade::RewardDice, diceWeight }
+		};
+
+		int pool[64]{};
+		int poolCount = 0;
+		for (const auto& entry : weights)
+		{
+			const int rewardType = entry[0];
+			const int weight = (entry[1] < 0) ? 0 : entry[1];
+			for (int i = 0; i < weight && poolCount < static_cast<int>(std::size(pool)); ++i)
+			{
+				pool[poolCount++] = rewardType;
+			}
+		}
+
+		for (int i = 0; i < poolCount; ++i)
+		{
+			const int j = RandRangeInt(i, poolCount - 1);
+			const int tmp = pool[i];
+			pool[i] = pool[j];
+			pool[j] = tmp;
+		}
+
+		int uniqueCount = 0;
+		for (int i = 0; i < poolCount && uniqueCount < optionCount; ++i)
+		{
+			const int rewardType = pool[i];
+			bool exists = false;
+			for (int j = 0; j < uniqueCount; ++j)
+			{
+				if (out[j] == rewardType)
+				{
+					exists = true;
+					break;
+				}
+			}
+			if (!exists)
+			{
+				out[uniqueCount++] = rewardType;
+			}
+		}
+
+		const int fallbacks[] =
+		{
+			Transfer::RoguelikeUpgrade::RewardTrait,
+			Transfer::RoguelikeUpgrade::RewardTag,
+			Transfer::RoguelikeUpgrade::RewardWeapon,
+			Transfer::RoguelikeUpgrade::RewardDice
+		};
+		for (int rewardType : fallbacks)
+		{
+			if (uniqueCount >= optionCount) break;
+			bool exists = false;
+			for (int j = 0; j < uniqueCount; ++j)
+			{
+				if (out[j] == rewardType)
+				{
+					exists = true;
+					break;
+				}
+			}
+			if (!exists)
+			{
+				out[uniqueCount++] = rewardType;
+			}
+		}
+
+		while (uniqueCount < optionCount)
+		{
+			out[uniqueCount++] = Transfer::RoguelikeUpgrade::RewardTrait;
+		}
+	}
+
+	void SetRunNode(
+		Transfer::RoguelikeUpgrade& roguelike,
+		int index,
+		int stageType,
+		int rewardType,
+		int mapNumber,
+		int stepNumber,
+		int optionCount)
+	{
+		if (index < 0 || index >= Transfer::RoguelikeUpgrade::kRunStageCount)
+		{
+			return;
+		}
+
+		roguelike.stageTypes[index] = NormalizeStageTypeValue(stageType);
+		roguelike.stageRewardTypes[index] = NormalizeRewardTypeValue(rewardType);
+		roguelike.stageMapNumbers[index] = ClampInt(mapNumber, 1, 3);
+		roguelike.stageStepNumbers[index] = (stepNumber < 0) ? 0 : stepNumber;
+		roguelike.stageOptionCounts[index] = ClampInt(optionCount, 1, Transfer::RoguelikeUpgrade::kOfferCount);
+		ResetStageOptionRow(roguelike.stageOptions[index]);
+		roguelike.stageOptions[index][0] = roguelike.stageRewardTypes[index];
 	}
 
 	void InitializeRunStageRoute(Transfer::RoguelikeUpgrade& roguelike)
 	{
-		const int defaultStageTypes[Transfer::RoguelikeUpgrade::kRunStageCount] =
-		{
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageShop,
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageShop,
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageCombat,
-			Transfer::RoguelikeUpgrade::StageRest,
-			Transfer::RoguelikeUpgrade::StageBoss
-		};
-
 		for (int i = 0; i < Transfer::RoguelikeUpgrade::kRunStageCount; ++i)
 		{
-			roguelike.stageTypes[i] = defaultStageTypes[i];
-			roguelike.stageOptionCounts[i] = 1;
+			SetRunNode(
+				roguelike,
+				i,
+				Transfer::RoguelikeUpgrade::StageCombat,
+				Transfer::RoguelikeUpgrade::RewardUnknown,
+				1,
+				0,
+				1);
 		}
 
-		roguelike.stageOptionCounts[1] = RandRangeInt(2, 3);
-		roguelike.stageOptionCounts[2] = RandRangeInt(2, 3);
-		roguelike.stageOptionCounts[4] = RandRangeInt(2, 3);
-		roguelike.stageOptionCounts[5] = RandRangeInt(2, 3);
-		roguelike.stageOptionCounts[6] = RandRangeInt(2, 3);
-		roguelike.stageOptionCounts[8] = RandRangeInt(2, 3);
-		roguelike.stageOptionCounts[9] = RandRangeInt(2, 3);
+		auto setupFiveStepMap = [&](int baseIndex, int mapNumber)
+		{
+			SetRunNode(roguelike, baseIndex + 0, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardSkill, mapNumber, 0, 1);
+			SetRunNode(roguelike, baseIndex + 1, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, mapNumber, 1, 2);
+			SetRunNode(roguelike, baseIndex + 2, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, mapNumber, 2, 2);
+			SetRunNode(roguelike, baseIndex + 3, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardArtifact, mapNumber, 3, 1);
+			SetRunNode(roguelike, baseIndex + 4, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, mapNumber, 4, 2);
+			SetRunNode(roguelike, baseIndex + 5, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, mapNumber, 5, 2);
+			SetRunNode(roguelike, baseIndex + 6, Transfer::RoguelikeUpgrade::StageRest, Transfer::RoguelikeUpgrade::RewardRest, mapNumber, 0, 1);
+			SetRunNode(roguelike, baseIndex + 7, Transfer::RoguelikeUpgrade::StageBoss, Transfer::RoguelikeUpgrade::RewardBoss, mapNumber, 0, 1);
+
+			FillWeightedRewardOptions(roguelike.stageOptions[baseIndex + 1], 2, 6, 2, 1, 1);
+			FillWeightedRewardOptions(roguelike.stageOptions[baseIndex + 2], 2, 6, 2, 1, 1);
+			FillWeightedRewardOptions(roguelike.stageOptions[baseIndex + 4], 2, 6, 2, 1, 1);
+			FillWeightedRewardOptions(roguelike.stageOptions[baseIndex + 5], 2, 6, 2, 1, 1);
+		};
+
+		setupFiveStepMap(0, 1);
+		setupFiveStepMap(8, 2);
+
+		SetRunNode(roguelike, 16, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardSkill, 3, 0, 1);
+		SetRunNode(roguelike, 17, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardSkill, 3, 0, 1);
+		SetRunNode(roguelike, 18, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, 3, 1, 2);
+		SetRunNode(roguelike, 19, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, 3, 2, 2);
+		SetRunNode(roguelike, 20, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, 3, 3, 2);
+		SetRunNode(roguelike, 21, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, 3, 4, 2);
+		SetRunNode(roguelike, 22, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, 3, 5, 2);
+		SetRunNode(roguelike, 23, Transfer::RoguelikeUpgrade::StageCombat, Transfer::RoguelikeUpgrade::RewardUnknown, 3, 6, 2);
+		SetRunNode(roguelike, 24, Transfer::RoguelikeUpgrade::StageShop, Transfer::RoguelikeUpgrade::RewardShop, 3, 0, 1);
+		SetRunNode(roguelike, 25, Transfer::RoguelikeUpgrade::StageRest, Transfer::RoguelikeUpgrade::RewardRest, 3, 0, 1);
+		SetRunNode(roguelike, 26, Transfer::RoguelikeUpgrade::StageBoss, Transfer::RoguelikeUpgrade::RewardBoss, 3, 0, 1);
+		SetRunNode(roguelike, 27, Transfer::RoguelikeUpgrade::StageFinalBoss, Transfer::RoguelikeUpgrade::RewardFinalBoss, 3, 0, 1);
+
+		FillWeightedRewardOptions(roguelike.stageOptions[18], 2, 7, 2, 2, 1);
+		FillWeightedRewardOptions(roguelike.stageOptions[19], 2, 7, 2, 2, 1);
+		FillWeightedRewardOptions(roguelike.stageOptions[20], 2, 7, 2, 2, 1);
+		FillWeightedRewardOptions(roguelike.stageOptions[21], 2, 7, 2, 2, 1);
+		FillWeightedRewardOptions(roguelike.stageOptions[22], 2, 7, 2, 2, 1);
+		FillWeightedRewardOptions(roguelike.stageOptions[23], 2, 7, 2, 2, 1);
+
+		const bool artifactAtStep3 = (RandRangeInt(0, 1) == 0);
+		const int artifactIndex = artifactAtStep3 ? 20 : 21;
+		roguelike.stageRewardTypes[artifactIndex] = Transfer::RoguelikeUpgrade::RewardArtifact;
+		roguelike.stageOptionCounts[artifactIndex] = 1;
+		ResetStageOptionRow(roguelike.stageOptions[artifactIndex]);
+		roguelike.stageOptions[artifactIndex][0] = Transfer::RoguelikeUpgrade::RewardArtifact;
+
+		int bossPool[4] =
+		{
+			Transfer::RoguelikeUpgrade::BossHeavyMelee,
+			Transfer::RoguelikeUpgrade::BossLightRanged,
+			Transfer::RoguelikeUpgrade::BossBalancedMid,
+			Transfer::RoguelikeUpgrade::BossSwiftDebuff
+		};
+		for (int i = 0; i < 4; ++i)
+		{
+			const int j = RandRangeInt(i, 3);
+			const int tmp = bossPool[i];
+			bossPool[i] = bossPool[j];
+			bossPool[j] = tmp;
+		}
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kRegularBossSlotCount; ++i)
+		{
+			roguelike.regularBossOrder[i] = bossPool[i];
+		}
+		roguelike.finalBossType = Transfer::RoguelikeUpgrade::BossFinalBarrage;
+
 		roguelike.currentStageIndex = 0;
-		roguelike.currentStageType = Transfer::RoguelikeUpgrade::StageCombat;
+		roguelike.currentStageType = roguelike.stageTypes[0];
 		roguelike.intermissionMode = Transfer::RoguelikeUpgrade::IntermissionNone;
 		roguelike.shopPurchaseCount = 0;
 	}
@@ -895,21 +1761,7 @@ namespace
 							   const Transfer::RoguelikeUpgrade& roguelike,
 							   int selectionPhase)
 	{
-		switch (NormalizeSelectionPhaseValue(selectionPhase))
-		{
-		case Transfer::RoguelikeUpgrade::SelectionStatus:
-			GenerateStatusOffers(offers, roguelike);
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionSkill:
-			GenerateRewardFollowupOffers(offers, roguelike);
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionMixed:
-			GenerateMixedOffers(offers, roguelike);
-			break;
-		default:
-			ResetOffers(offers);
-			break;
-		}
+		BuildOffersForSelectionPhase(roguelike, selectionPhase, offers);
 	}
 
 	void ApplyUpgradeType(Transfer::RoguelikeUpgrade& roguelike,
@@ -997,6 +1849,24 @@ void Transfer::ResetRoguelikeUpgrade()
 	// 選択候補や残リロールも含めて、すべて初期化します。
 	roguelike = RoguelikeUpgrade{};
 	InitializeRunStageRoute(roguelike);
+	RebuildDerivedTraitLevels();
+	roguelike.rerollMaxPerStage = 0;
+	roguelike.rerollRemain = kInitialRunRerollCount;
+	roguelike.reviveMax = ClampInt(roguelike.reviveMax, 0, 99);
+	if (roguelike.reviveMax <= 0)
+	{
+		roguelike.reviveMax = kDefaultRunReviveCount;
+	}
+	roguelike.reviveRemain = roguelike.reviveMax;
+
+	const float defaultMaxHp = (player.maxHp > 0.0f) ? player.maxHp : kDefaultPlayerMaxHp;
+	player.maxHp = defaultMaxHp;
+	player.hp = defaultMaxHp;
+}
+
+void Transfer::RebuildDerivedTraitLevels()
+{
+	RebuildDerivedTraitLevelsInternal(roguelike);
 }
 
 /**
@@ -1086,15 +1956,74 @@ void Transfer::BeginUpgradeSelection()
 {
 	++roguelike.stageClearCount;
 	roguelike.selectionPending = 1;
-	roguelike.selectionPhase =
-		HasEmptySkillSlot(roguelike.skillSlot1, roguelike.skillSlot2)
-		? RoguelikeUpgrade::SelectionStatus
-		: RoguelikeUpgrade::SelectionSkill;
-	roguelike.selectionRoundsRemaining = 2;
-	GrantStageProgressRerollItems();
+	roguelike.selectionPhase = RoguelikeUpgrade::SelectionMixed;
+	roguelike.selectionRoundsRemaining = 1;
 	ResetOffers(roguelike.offers);
 	gameplayDebug.rewardSelectionIndex = 0;
 	RefreshUpgradeSelectionState();
+}
+
+void Transfer::BeginCurrentStageRewardSelection()
+{
+	++roguelike.stageClearCount;
+
+	switch (GetCurrentRunRewardType())
+	{
+	case RoguelikeUpgrade::RewardDice:
+		FinishUpgradeSelection();
+		roguelike.rerollRemain = ClampInt(roguelike.rerollRemain + kDiceRewardGain, 0, 999);
+		gameplayDebug.rewardSelectionIndex = 0;
+		BeginNextStageSelection();
+		break;
+	case RoguelikeUpgrade::RewardSkill:
+		roguelike.selectionPending = 1;
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionRewardSkill;
+		roguelike.selectionRoundsRemaining = 1;
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		RefreshUpgradeSelectionState();
+		break;
+	case RoguelikeUpgrade::RewardTrait:
+		roguelike.selectionPending = 1;
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionRewardTrait;
+		roguelike.selectionRoundsRemaining = 1;
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		RefreshUpgradeSelectionState();
+		break;
+	case RoguelikeUpgrade::RewardWeapon:
+		roguelike.selectionPending = 1;
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionRewardWeapon;
+		roguelike.selectionRoundsRemaining = 1;
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		RefreshUpgradeSelectionState();
+		break;
+	case RoguelikeUpgrade::RewardTag:
+		roguelike.selectionPending = 1;
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionRewardTag;
+		roguelike.selectionRoundsRemaining = 1;
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		RefreshUpgradeSelectionState();
+		break;
+	case RoguelikeUpgrade::RewardArtifact:
+		roguelike.selectionPending = 1;
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionRewardArtifact;
+		roguelike.selectionRoundsRemaining = 1;
+		ResetOffers(roguelike.offers);
+		gameplayDebug.rewardSelectionIndex = 0;
+		RefreshUpgradeSelectionState();
+		break;
+	case RoguelikeUpgrade::RewardUnknown:
+		BeginUpgradeSelection();
+		break;
+	default:
+		FinishUpgradeSelection();
+		gameplayDebug.rewardSelectionIndex = 0;
+		BeginNextStageSelection();
+		break;
+	}
 }
 
 void Transfer::BeginChallengeRewardSelection(int rewardCount)
@@ -1137,10 +2066,6 @@ bool Transfer::AdvanceUpgradeSelectionPhase()
 
 	if (roguelike.selectionRoundsRemaining > 0)
 	{
-		roguelike.selectionPhase =
-			(roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
-			? RoguelikeUpgrade::SelectionSkill
-			: NormalizeSelectionPhaseValue(roguelike.selectionPhase);
 		ResetOffers(roguelike.offers);
 		gameplayDebug.rewardSelectionIndex = 0;
 		RefreshUpgradeSelectionState();
@@ -1167,11 +2092,8 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 
 	const int selectedType = roguelike.offers[offerIndex];
 	// 候補が空か壊れている場合は適用しません。
-	if (selectedType < 0 || selectedType >= RoguelikeUpgrade::UpgradeTypeCount) return false;
-	int smallStep = 1;
-	int largeStep = 2;
-	GetUpgradeStepsForDifficulty(gameplayDebug.difficultyPreset, smallStep, largeStep);
-	ApplyUpgradeType(roguelike, selectedType, smallStep, largeStep);
+	if (selectedType < 0) return false;
+	if (!ApplyPackedOffer(roguelike, selectedType)) return false;
 	roguelike.lastUpgradeType = selectedType;
 	if (roguelike.selectionRoundsRemaining > 0)
 	{
@@ -1180,10 +2102,6 @@ bool Transfer::ApplyUpgradeSelection(int offerIndex)
 
 	if (roguelike.selectionRoundsRemaining > 0)
 	{
-		roguelike.selectionPhase =
-			(roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
-			? RoguelikeUpgrade::SelectionSkill
-			: NormalizeSelectionPhaseValue(roguelike.selectionPhase);
 		ResetOffers(roguelike.offers);
 		gameplayDebug.rewardSelectionIndex = 0;
 		RefreshUpgradeSelectionState();
@@ -1205,7 +2123,7 @@ bool Transfer::RefreshUpgradeSelectionState()
 	roguelike.selectionPhase = NormalizeSelectionPhaseValue(roguelike.selectionPhase);
 	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionNone)
 	{
-		roguelike.selectionPhase = RoguelikeUpgrade::SelectionStatus;
+		roguelike.selectionPhase = RoguelikeUpgrade::SelectionMixed;
 	}
 
 	if (HasAnyOffer(roguelike.offers))
@@ -1213,25 +2131,8 @@ bool Transfer::RefreshUpgradeSelectionState()
 		return true;
 	}
 
-	GenerateUpgradeOffers(roguelike.offers, roguelike, roguelike.selectionPhase);
-	if (HasAnyOffer(roguelike.offers))
-	{
-		return true;
-	}
-
-	if (roguelike.selectionPhase == RoguelikeUpgrade::SelectionStatus)
-	{
-		if (roguelike.selectionRoundsRemaining > 1)
-		{
-			--roguelike.selectionRoundsRemaining;
-		}
-		roguelike.selectionPhase = RoguelikeUpgrade::SelectionSkill;
-		ResetOffers(roguelike.offers);
-		gameplayDebug.rewardSelectionIndex = 0;
-		GenerateUpgradeOffers(roguelike.offers, roguelike, roguelike.selectionPhase);
-	}
-
-	return true;
+	GenerateOffersForSelectionPhase(roguelike.selectionPhase, roguelike.offers);
+	return HasAnyOffer(roguelike.offers);
 }
 
 bool Transfer::HasAnyUpgradeOffer() const
@@ -1264,6 +2165,29 @@ int Transfer::GetCurrentRunStageType() const
 	return NormalizeStageTypeValue(roguelike.currentStageType);
 }
 
+int Transfer::GetRunRewardTypeAt(int stageIndex) const
+{
+	const int clampedStageIndex = ClampInt(stageIndex, 0, RoguelikeUpgrade::kRunStageCount - 1);
+	return NormalizeRewardTypeValue(roguelike.stageRewardTypes[clampedStageIndex]);
+}
+
+int Transfer::GetCurrentRunRewardType() const
+{
+	return GetRunRewardTypeAt(roguelike.currentStageIndex);
+}
+
+int Transfer::GetRunStageMapNumberAt(int stageIndex) const
+{
+	const int clampedStageIndex = ClampInt(stageIndex, 0, RoguelikeUpgrade::kRunStageCount - 1);
+	return ClampInt(roguelike.stageMapNumbers[clampedStageIndex], 1, 3);
+}
+
+int Transfer::GetRunStageStepNumberAt(int stageIndex) const
+{
+	const int clampedStageIndex = ClampInt(stageIndex, 0, RoguelikeUpgrade::kRunStageCount - 1);
+	return (roguelike.stageStepNumbers[clampedStageIndex] < 0) ? 0 : roguelike.stageStepNumbers[clampedStageIndex];
+}
+
 int Transfer::GetRunStageOptionCount(int stageIndex) const
 {
 	const int clampedStageIndex = ClampInt(stageIndex, 0, RoguelikeUpgrade::kRunStageCount - 1);
@@ -1279,6 +2203,18 @@ bool Transfer::BeginNextStageSelection()
 		return false;
 	}
 
+	const int nextStageIndex = roguelike.currentStageIndex + 1;
+	const int optionCount = GetRunStageOptionCount(nextStageIndex);
+	const int nextRewardType = GetRunRewardTypeAt(nextStageIndex);
+	const bool forceMapSelect =
+		nextRewardType == RoguelikeUpgrade::RewardArtifact ||
+		nextRewardType == RoguelikeUpgrade::RewardShop ||
+		nextRewardType == RoguelikeUpgrade::RewardRest;
+	if (optionCount <= 1 && !forceMapSelect)
+	{
+		return SelectNextStage(0);
+	}
+
 	roguelike.intermissionMode = RoguelikeUpgrade::IntermissionMapSelect;
 	gameplayDebug.rewardSelectionIndex = 0;
 	return true;
@@ -1286,11 +2222,6 @@ bool Transfer::BeginNextStageSelection()
 
 bool Transfer::SelectNextStage(int optionIndex)
 {
-	if (roguelike.intermissionMode != RoguelikeUpgrade::IntermissionMapSelect)
-	{
-		return false;
-	}
-
 	const int nextStageIndex = roguelike.currentStageIndex + 1;
 	if (nextStageIndex < 0 || nextStageIndex >= RoguelikeUpgrade::kRunStageCount)
 	{
@@ -1298,11 +2229,23 @@ bool Transfer::SelectNextStage(int optionIndex)
 	}
 
 	const int optionCount = GetRunStageOptionCount(nextStageIndex);
+	const bool allowImplicitAdvance =
+		optionCount <= 1 &&
+		optionIndex == 0 &&
+		(roguelike.intermissionMode == RoguelikeUpgrade::IntermissionNone ||
+		 roguelike.intermissionMode == RoguelikeUpgrade::IntermissionShop ||
+		 roguelike.intermissionMode == RoguelikeUpgrade::IntermissionRest);
+	if (roguelike.intermissionMode != RoguelikeUpgrade::IntermissionMapSelect && !allowImplicitAdvance)
+	{
+		return false;
+	}
 	if (optionIndex < 0 || optionIndex >= optionCount)
 	{
 		return false;
 	}
 
+	roguelike.stageRewardTypes[nextStageIndex] =
+		NormalizeRewardTypeValue(roguelike.stageOptions[nextStageIndex][optionIndex]);
 	roguelike.currentStageIndex = nextStageIndex;
 	roguelike.currentStageType = GetRunStageTypeAt(nextStageIndex);
 	roguelike.shopPurchaseCount = 0;
@@ -1313,11 +2256,16 @@ bool Transfer::SelectNextStage(int optionIndex)
 		break;
 	case RoguelikeUpgrade::StageRest:
 		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionRest;
-		player.hp = player.maxHp;
+		HealPlayerByRatio(kRestStageHealRatio);
 		break;
 	default:
 		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionNone;
 		break;
+	}
+
+	if (GetCurrentRunRewardType() == RoguelikeUpgrade::RewardTag)
+	{
+		BeginCurrentStageRewardSelection();
 	}
 
 	gameplayDebug.rewardSelectionIndex = 0;
@@ -1333,7 +2281,6 @@ bool Transfer::ContinueFromCurrentNonCombatStage()
 		return false;
 	}
 
-	GrantStageProgressRerollItems();
 	roguelike.shopPurchaseCount = 0;
 	if (roguelike.currentStageIndex >= RoguelikeUpgrade::kRunStageCount - 1)
 	{
@@ -1342,17 +2289,59 @@ bool Transfer::ContinueFromCurrentNonCombatStage()
 	}
 
 	const int nextStageIndex = roguelike.currentStageIndex + 1;
-	if (GetRunStageTypeAt(nextStageIndex) == RoguelikeUpgrade::StageBoss)
+	const int optionCount = GetRunStageOptionCount(nextStageIndex);
+	const int nextRewardType = GetRunRewardTypeAt(nextStageIndex);
+	const bool forceMapSelect =
+		nextRewardType == RoguelikeUpgrade::RewardArtifact ||
+		nextRewardType == RoguelikeUpgrade::RewardShop ||
+		nextRewardType == RoguelikeUpgrade::RewardRest;
+	if (optionCount <= 1 && !forceMapSelect)
 	{
-		roguelike.currentStageIndex = nextStageIndex;
-		roguelike.currentStageType = RoguelikeUpgrade::StageBoss;
-		roguelike.intermissionMode = RoguelikeUpgrade::IntermissionNone;
-		gameplayDebug.rewardSelectionIndex = 0;
-		return true;
+		return SelectNextStage(0);
 	}
 
 	roguelike.intermissionMode = RoguelikeUpgrade::IntermissionMapSelect;
 	gameplayDebug.rewardSelectionIndex = 0;
+	return true;
+}
+
+int Transfer::GetRunStageOptionRewardType(int stageIndex, int optionIndex) const
+{
+	const int clampedStageIndex = ClampInt(stageIndex, 0, RoguelikeUpgrade::kRunStageCount - 1);
+	const int clampedOptionIndex = ClampInt(optionIndex, 0, RoguelikeUpgrade::kOfferCount - 1);
+	return NormalizeRewardTypeValue(roguelike.stageOptions[clampedStageIndex][clampedOptionIndex]);
+}
+
+int Transfer::GetCurrentShopCost() const
+{
+	const int purchaseCount = (roguelike.shopPurchaseCount < 0) ? 0 : roguelike.shopPurchaseCount;
+	return kShopBaseCost + (purchaseCount * kShopCostPerPurchase);
+}
+
+void Transfer::HealPlayerByRatio(float ratio)
+{
+	if (player.maxHp <= 0.0f)
+	{
+		player.maxHp = kDefaultPlayerMaxHp;
+	}
+
+	const float clampedRatio = ClampFloat(ratio, 0.0f, 1.0f);
+	player.hp = ClampFloat(player.hp + player.maxHp * clampedRatio, 0.0f, player.maxHp);
+}
+
+bool Transfer::TryConsumePlayerRevive()
+{
+	if (roguelike.reviveRemain <= 0)
+	{
+		return false;
+	}
+	if (player.maxHp <= 0.0f)
+	{
+		player.maxHp = kDefaultPlayerMaxHp;
+	}
+
+	--roguelike.reviveRemain;
+	player.hp = player.maxHp;
 	return true;
 }
 
@@ -1369,21 +2358,7 @@ bool Transfer::GenerateOffersForSelectionPhase(int selectionPhase, int offers[Ro
 		return false;
 	}
 
-	switch (NormalizeSelectionPhaseValue(selectionPhase))
-	{
-	case RoguelikeUpgrade::SelectionStatus:
-		GenerateStatusOffers(offers, roguelike);
-		break;
-	case RoguelikeUpgrade::SelectionSkill:
-		GenerateSkillOffers(offers, roguelike);
-		break;
-	case RoguelikeUpgrade::SelectionMixed:
-		GenerateMixedOffers(offers, roguelike);
-		break;
-	default:
-		ResetOffers(offers);
-		break;
-	}
+	BuildOffersForSelectionPhase(roguelike, selectionPhase, offers);
 	return HasAnyOffer(offers);
 }
 
@@ -2016,7 +2991,7 @@ bool Transfer::LoadGameplayTuning(const char* path)
 	loadedRogue.attackPowerLevel = ClampUpgradeTier(loadedRogue.attackPowerLevel);
 	loadedRogue.attackSpeedLevel = ClampUpgradeTier(loadedRogue.attackSpeedLevel);
 	loadedRogue.evadeCooldownLevel = ClampUpgradeTier(loadedRogue.evadeCooldownLevel);
-	loadedRogue.lastUpgradeType = ClampInt(loadedRogue.lastUpgradeType, -1, RoguelikeUpgrade::UpgradeTypeCount - 1);
+	loadedRogue.lastUpgradeType = ClampInt(loadedRogue.lastUpgradeType, -1, 999999);
 	loadedRogue.skillSlot1 = NormalizeSkillTypeValue(loadedRogue.skillSlot1);
 	loadedRogue.skillSlot2 = NormalizeSkillTypeValue(loadedRogue.skillSlot2);
 	loadedRogue.skillShotRangeLevel = ClampInt(loadedRogue.skillShotRangeLevel, 0, RoguelikeUpgrade::kLevelMax);

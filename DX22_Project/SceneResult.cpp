@@ -9,9 +9,10 @@ namespace
 	constexpr int kMenuRestart = 0;
 	constexpr int kMenuTitle = 1;
 	constexpr int kRewardContinue = 100;
-	constexpr int kStageShopBuyStatus = 200;
-	constexpr int kStageShopBuySkill = 201;
-	constexpr int kStageShopContinue = 202;
+	constexpr int kStageShopBuyTrait = 200;
+	constexpr int kStageShopChangeSkill = 201;
+	constexpr int kStageShopEnhanceSkill = 202;
+	constexpr int kStageShopContinue = 203;
 
 	bool IsResultConfirmTriggered()
 	{
@@ -35,10 +36,6 @@ namespace
 			tran.roguelike.intermissionMode != Transfer::RoguelikeUpgrade::IntermissionNone;
 	}
 
-	int GetCurrentShopCost(const Transfer& tran)
-	{
-		return 1 + ((tran.roguelike.shopPurchaseCount < 0) ? 0 : tran.roguelike.shopPurchaseCount);
-	}
 }
 
 SceneResult::SceneResult()
@@ -202,7 +199,11 @@ void SceneResult::Update()
 						{
 							return;
 						}
-						if (!tran.BeginNextStageSelection())
+						const bool advanced = tran.BeginNextStageSelection();
+						const bool shouldReturnToGame =
+							tran.roguelike.selectionPending == 0 &&
+							tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone;
+						if (!advanced || shouldReturnToGame)
 						{
 							SceneManager::ChangeResult(SceneManager::ResultType::None);
 							SceneManager::ChangeScene(SceneManager::SCENE_GAME);
@@ -239,7 +240,8 @@ void SceneResult::Update()
 			{
 				m_rewardSelection = 0;
 				tran.gameplayDebug.rewardSelectionIndex = 0;
-				if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone)
+				if (tran.roguelike.selectionPending == 0 &&
+					tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone)
 				{
 					SceneManager::ChangeResult(SceneManager::ResultType::None);
 					SceneManager::ChangeScene(SceneManager::SCENE_GAME);
@@ -251,13 +253,14 @@ void SceneResult::Update()
 		if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
 			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest)
 		{
-			const int optionIds[3] =
+			const int optionIds[4] =
 			{
-				kStageShopBuyStatus,
-				kStageShopBuySkill,
+				kStageShopBuyTrait,
+				kStageShopChangeSkill,
+				kStageShopEnhanceSkill,
 				kStageShopContinue
 			};
-			const int optionCount = 3;
+			const int optionCount = 4;
 			if (m_rewardSelection < 0) m_rewardSelection = 0;
 			if (m_rewardSelection >= optionCount) m_rewardSelection = optionCount - 1;
 			tran.gameplayDebug.rewardSelectionIndex = m_rewardSelection;
@@ -278,18 +281,26 @@ void SceneResult::Update()
 			if (IsResultConfirmTriggered())
 			{
 				const int selectedOption = optionIds[m_rewardSelection];
-				const int shopCost = GetCurrentShopCost(tran);
-				if (selectedOption == kStageShopBuyStatus)
+				const int shopCost = tran.GetCurrentShopCost();
+				if (selectedOption == kStageShopBuyTrait)
 				{
-					if (tran.PurchaseRandomUpgrade(Transfer::RoguelikeUpgrade::SelectionStatus, shopCost))
+					if (tran.PurchaseRandomUpgrade(Transfer::RoguelikeUpgrade::SelectionShopTrait, shopCost))
 					{
 						m_rewardSelection = 0;
 						tran.gameplayDebug.rewardSelectionIndex = 0;
 					}
 				}
-				else if (selectedOption == kStageShopBuySkill)
+				else if (selectedOption == kStageShopChangeSkill)
 				{
-					if (tran.PurchaseRandomUpgrade(Transfer::RoguelikeUpgrade::SelectionSkill, shopCost))
+					if (tran.PurchaseRandomUpgrade(Transfer::RoguelikeUpgrade::SelectionShopSkillChange, shopCost))
+					{
+						m_rewardSelection = 0;
+						tran.gameplayDebug.rewardSelectionIndex = 0;
+					}
+				}
+				else if (selectedOption == kStageShopEnhanceSkill)
+				{
+					if (tran.PurchaseRandomUpgrade(Transfer::RoguelikeUpgrade::SelectionShopSkillEnhance, shopCost))
 					{
 						m_rewardSelection = 0;
 						tran.gameplayDebug.rewardSelectionIndex = 0;
@@ -299,7 +310,8 @@ void SceneResult::Update()
 				{
 					m_rewardSelection = 0;
 					tran.gameplayDebug.rewardSelectionIndex = 0;
-					if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone)
+					if (tran.roguelike.selectionPending == 0 &&
+						tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone)
 					{
 						SceneManager::ChangeResult(SceneManager::ResultType::None);
 						SceneManager::ChangeScene(SceneManager::SCENE_GAME);

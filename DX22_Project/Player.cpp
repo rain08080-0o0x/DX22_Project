@@ -98,6 +98,15 @@ Player::Player(Camera*camera)
         MessageBox(NULL, "Texture load failed.\nPlayer.cpp", "Error", MB_OK);
     }
 
+    {
+        TRAN_INS;
+        if (tran.player.maxHp > 0.0f)
+        {
+            m_hp = ClampFloat(tran.player.hp, 0.0f, tran.player.maxHp);
+            m_maxHp = tran.player.maxHp;
+        }
+    }
+
     // 初期化直後の状態を Transfer へ反映し、他オブジェクトから参照できるようにします。
     SyncToTransfer();
 }

@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <commdlg.h>
+#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -55,8 +56,39 @@ const char* GetRunStageTypeName(int stageType)
 		return u8"休憩所";
 	case Transfer::RoguelikeUpgrade::StageBoss:
 		return u8"ボス";
+	case Transfer::RoguelikeUpgrade::StageFinalBoss:
+		return u8"ラスボス";
 	default:
 		return u8"戦闘";
+	}
+}
+
+const char* GetRunRewardTypeName(int rewardType)
+{
+	switch (rewardType)
+	{
+	case Transfer::RoguelikeUpgrade::RewardSkill:
+		return u8"魔法強化";
+	case Transfer::RoguelikeUpgrade::RewardTrait:
+		return u8"特性強化";
+	case Transfer::RoguelikeUpgrade::RewardTag:
+		return u8"タグ解除";
+	case Transfer::RoguelikeUpgrade::RewardWeapon:
+		return u8"武器強化";
+	case Transfer::RoguelikeUpgrade::RewardDice:
+		return u8"サイコロ";
+	case Transfer::RoguelikeUpgrade::RewardArtifact:
+		return u8"魔道具";
+	case Transfer::RoguelikeUpgrade::RewardShop:
+		return u8"ショップ";
+	case Transfer::RoguelikeUpgrade::RewardRest:
+		return u8"休憩所";
+	case Transfer::RoguelikeUpgrade::RewardBoss:
+		return u8"ボス";
+	case Transfer::RoguelikeUpgrade::RewardFinalBoss:
+		return u8"ラスボス";
+	default:
+		return u8"未定";
 	}
 }
 
@@ -663,9 +695,173 @@ static bool BrowseCastleEditorModelPath(char* outPath, size_t outPathSize)
 	return true;
 }
 
+namespace
+{
+	int GetPackedOfferType(int packedOffer)
+	{
+		if (packedOffer < 0)
+		{
+			return Transfer::RoguelikeUpgrade::OfferNone;
+		}
+		return packedOffer / Transfer::RoguelikeUpgrade::kOfferTypeStride;
+	}
+
+	int GetPackedOfferPrimary(int packedOffer)
+	{
+		if (packedOffer < 0)
+		{
+			return 0;
+		}
+		return (packedOffer % Transfer::RoguelikeUpgrade::kOfferTypeStride) /
+			Transfer::RoguelikeUpgrade::kOfferPrimaryStride;
+	}
+
+	int GetPackedOfferSecondary(int packedOffer)
+	{
+		if (packedOffer < 0)
+		{
+			return 0;
+		}
+		return packedOffer % Transfer::RoguelikeUpgrade::kOfferPrimaryStride;
+	}
+
+	const char* GetActionSkillLabelLocal(int skillType)
+	{
+		switch (skillType)
+		{
+		case Transfer::RoguelikeUpgrade::ActionSkillWhirl:
+			return u8"薙ぎ払い";
+		case Transfer::RoguelikeUpgrade::ActionSkillRush:
+			return u8"突進";
+		case Transfer::RoguelikeUpgrade::ActionSkillAmbush:
+			return u8"奇襲";
+		case Transfer::RoguelikeUpgrade::ActionSkillChainThrow:
+			return u8"鎖投げ";
+		case Transfer::RoguelikeUpgrade::ActionSkillFireball:
+			return u8"火球";
+		case Transfer::RoguelikeUpgrade::ActionSkillBloodSlash:
+			return u8"出血斬";
+		default:
+			return u8"未設定";
+		}
+	}
+
+	const char* GetTraitLabelLocal(int traitType)
+	{
+		switch (traitType)
+		{
+		case Transfer::RoguelikeUpgrade::TraitCooldown:
+			return u8"CT";
+		case Transfer::RoguelikeUpgrade::TraitWeapon:
+			return u8"武器";
+		case Transfer::RoguelikeUpgrade::TraitChain:
+			return u8"鎖";
+		case Transfer::RoguelikeUpgrade::TraitBlood:
+			return u8"血";
+		case Transfer::RoguelikeUpgrade::TraitFire:
+			return u8"炎";
+		default:
+			return u8"不明";
+		}
+	}
+
+	const char* GetWeaponUpgradeLabelLocal(int weaponUpgradeType)
+	{
+		switch (weaponUpgradeType)
+		{
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeCooldownBurst:
+			return u8"CRT時 CD短縮";
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeChainOnCrit:
+			return u8"CRT時 鎖付与";
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeBloodOnCrit:
+			return u8"CRT時 血生成";
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeFireOnCrit:
+			return u8"CRT時 燃焼";
+		case Transfer::RoguelikeUpgrade::WeaponUpgradeCritNeedReduce:
+			return u8"CRT必要回数 -1";
+		default:
+			return u8"不明";
+		}
+	}
+
+	const char* GetSkillEnhancementLabelLocal(int enhancementType)
+	{
+		switch (enhancementType)
+		{
+		case Transfer::RoguelikeUpgrade::SkillEnhanceCooldown:
+			return u8"CT強化";
+		case Transfer::RoguelikeUpgrade::SkillEnhanceWeapon:
+			return u8"武器強化";
+		case Transfer::RoguelikeUpgrade::SkillEnhanceChain:
+			return u8"鎖強化";
+		case Transfer::RoguelikeUpgrade::SkillEnhanceBlood:
+			return u8"血強化";
+		case Transfer::RoguelikeUpgrade::SkillEnhanceFire:
+			return u8"炎強化";
+		default:
+			return u8"不明";
+		}
+	}
+
+	const char* GetArtifactLabelLocal(int artifactType)
+	{
+		switch (artifactType)
+		{
+		case Transfer::RoguelikeUpgrade::ArtifactBarbarianNecklace:
+			return u8"蛮族の首飾り";
+		case Transfer::RoguelikeUpgrade::ArtifactGreatShieldCrest:
+			return u8"大盾の紋章";
+		case Transfer::RoguelikeUpgrade::ArtifactGlassShoes:
+			return u8"ガラスの靴";
+		case Transfer::RoguelikeUpgrade::ArtifactMagicPiggyBank:
+			return u8"魔法の貯金箱";
+		case Transfer::RoguelikeUpgrade::ArtifactDiceBox:
+			return u8"サイコロのでる箱";
+		default:
+			return u8"不明";
+		}
+	}
+}
+
 void FormatUpgradeLabel(const Transfer& tran, int upgradeType, char* out, size_t outSize)
 {
 	if (!out || outSize == 0) return;
+
+	if (upgradeType >= Transfer::RoguelikeUpgrade::kOfferTypeStride)
+	{
+		const int offerType = GetPackedOfferType(upgradeType);
+		const int primaryValue = GetPackedOfferPrimary(upgradeType);
+		const int secondaryValue = GetPackedOfferSecondary(upgradeType);
+		switch (offerType)
+		{
+		case Transfer::RoguelikeUpgrade::OfferTrait:
+			sprintf_s(out, outSize, u8"%s特性", GetTraitLabelLocal(primaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferWeaponUpgrade:
+			sprintf_s(out, outSize, u8"武器: %s", GetWeaponUpgradeLabelLocal(primaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferSkillEnhance:
+			sprintf_s(
+				out,
+				outSize,
+				u8"%s: %s",
+				GetActionSkillLabelLocal(primaryValue),
+				GetSkillEnhancementLabelLocal(secondaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferSkillChange:
+			sprintf_s(out, outSize, u8"スキル%d変更 -> %s", primaryValue + 1, GetActionSkillLabelLocal(secondaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferTagDisable:
+			sprintf_s(out, outSize, u8"タグ解除: %s", GetTraitLabelLocal(primaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferArtifact:
+			sprintf_s(out, outSize, u8"魔道具: %s", GetArtifactLabelLocal(primaryValue));
+			return;
+		default:
+			sprintf_s(out, outSize, "%s", u8"ここには何もないようだ");
+			return;
+		}
+	}
 
 	const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
 	const int amount = tran.GetUpgradeStepForType(upgradeType, difficultyPreset);
@@ -750,6 +946,87 @@ static void FormatUpgradeDescription(const Transfer& tran, int upgradeType, char
 {
 	if (!out || outSize == 0) return;
 
+	if (upgradeType >= Transfer::RoguelikeUpgrade::kOfferTypeStride)
+	{
+		const int offerType = GetPackedOfferType(upgradeType);
+		const int primaryValue = GetPackedOfferPrimary(upgradeType);
+		const int secondaryValue = GetPackedOfferSecondary(upgradeType);
+		switch (offerType)
+		{
+		case Transfer::RoguelikeUpgrade::OfferTrait:
+			switch (primaryValue)
+			{
+			case Transfer::RoguelikeUpgrade::TraitCooldown:
+				sprintf_s(out, outSize, u8"スキル全体CT -5%% / 偶数Lvで追加効果");
+				break;
+			case Transfer::RoguelikeUpgrade::TraitWeapon:
+				sprintf_s(out, outSize, u8"武器倍率 +10%% / 偶数Lvで追加効果");
+				break;
+			case Transfer::RoguelikeUpgrade::TraitChain:
+				sprintf_s(out, outSize, u8"鎖1つにつきHP上限の5%%を縛る");
+				break;
+			case Transfer::RoguelikeUpgrade::TraitBlood:
+				sprintf_s(out, outSize, u8"血ストック上限 +2");
+				break;
+			case Transfer::RoguelikeUpgrade::TraitFire:
+				sprintf_s(out, outSize, u8"燃焼量 +10%%");
+				break;
+			default:
+				sprintf_s(out, outSize, u8"特性を1段階強化");
+				break;
+			}
+			return;
+		case Transfer::RoguelikeUpgrade::OfferWeaponUpgrade:
+			sprintf_s(out, outSize, u8"武器強化を1つ取得 重複なし 最大4個");
+			return;
+		case Transfer::RoguelikeUpgrade::OfferSkillEnhance:
+			sprintf_s(
+				out,
+				outSize,
+				u8"%s に %s を追加",
+				GetActionSkillLabelLocal(primaryValue),
+				GetSkillEnhancementLabelLocal(secondaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferSkillChange:
+			sprintf_s(
+				out,
+				outSize,
+				u8"スキル%dを %s に交換 強化内容も引き継ぐ",
+				primaryValue + 1,
+				GetActionSkillLabelLocal(secondaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferTagDisable:
+			sprintf_s(out, outSize, u8"今後 %s 系の候補を出さない", GetTraitLabelLocal(primaryValue));
+			return;
+		case Transfer::RoguelikeUpgrade::OfferArtifact:
+			switch (primaryValue)
+			{
+			case Transfer::RoguelikeUpgrade::ArtifactBarbarianNecklace:
+				sprintf_s(out, outSize, u8"与ダメ+25%% / 被ダメ+30%%");
+				break;
+			case Transfer::RoguelikeUpgrade::ArtifactGreatShieldCrest:
+				sprintf_s(out, outSize, u8"被ダメ-20%% / 与ダメ-30%%");
+				break;
+			case Transfer::RoguelikeUpgrade::ArtifactGlassShoes:
+				sprintf_s(out, outSize, u8"CT-20%% / CTスキルダメージ-40%%");
+				break;
+			case Transfer::RoguelikeUpgrade::ArtifactMagicPiggyBank:
+				sprintf_s(out, outSize, u8"3戦報酬保留後にまとめ受取 + 追加2報酬");
+				break;
+			case Transfer::RoguelikeUpgrade::ArtifactDiceBox:
+				sprintf_s(out, outSize, u8"休憩所 / ボス突入時にサイコロ+1");
+				break;
+			default:
+				sprintf_s(out, outSize, u8"魔道具を取得");
+				break;
+			}
+			return;
+		default:
+			out[0] = '\0';
+			return;
+		}
+	}
+
 	const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
 	const int amount = tran.GetUpgradeStepForType(upgradeType, difficultyPreset);
 	switch (upgradeType)
@@ -808,7 +1085,13 @@ static void FormatUpgradeDescription(const Transfer& tran, int upgradeType, char
 	}
 }
 
-static void DrawCenteredOverlayText(const char* text, ImU32 fillColor, ImU32 borderColor)
+static void DrawCenteredOverlayText(
+	const char* text,
+	ImU32 fillColor,
+	ImU32 borderColor,
+	float widthRatio = 0.0f,
+	float minHeightRatio = 0.0f,
+	float emphasisScale = 1.0f)
 {
 	if (!text || text[0] == '\0') return;
 
@@ -817,15 +1100,39 @@ static void DrawCenteredOverlayText(const char* text, ImU32 fillColor, ImU32 bor
 	ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
 	if (!dl) return;
 
-	const ImVec2 pad(14.0f, 12.0f);
-	const ImVec2 textSize = ImGui::CalcTextSize(text);
-	const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - textSize.x) * 0.5f - pad.x,
-						vp->Pos.y + (vp->Size.y - textSize.y) * 0.5f - pad.y);
-	const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
+	ImFont* font = ImGui::GetFont();
+	if (!font) return;
 
-	dl->AddRectFilled(boxMin, boxMax, fillColor, 8.0f);
-	dl->AddRect(boxMin, boxMax, borderColor, 8.0f);
-	dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), text);
+	const float viewportScaleRaw = (vp->Size.x < vp->Size.y) ? (vp->Size.x / 1280.0f) : (vp->Size.y / 720.0f);
+	const float viewportScale = (viewportScaleRaw < 0.95f) ? 0.95f : ((viewportScaleRaw > 1.65f) ? 1.65f : viewportScaleRaw);
+	const float fontSize = ImGui::GetFontSize() * viewportScale * emphasisScale;
+	const ImVec2 pad(18.0f * viewportScale, 16.0f * viewportScale);
+	const float requestedWidth = (widthRatio > 0.0f) ? (vp->Size.x * widthRatio) : 0.0f;
+	const float maxBoxWidth = vp->Size.x * 0.88f;
+	float boxWidth = (requestedWidth > 0.0f) ? requestedWidth : maxBoxWidth;
+	if (boxWidth > maxBoxWidth) boxWidth = maxBoxWidth;
+	const float wrapWidth = boxWidth - pad.x * 2.0f;
+	const ImVec2 textSize = font->CalcTextSizeA(fontSize, FLT_MAX, wrapWidth, text);
+	if (requestedWidth <= 0.0f)
+	{
+		boxWidth = textSize.x + pad.x * 2.0f;
+		if (boxWidth > maxBoxWidth) boxWidth = maxBoxWidth;
+	}
+
+	float boxHeight = textSize.y + pad.y * 2.0f;
+	if (minHeightRatio > 0.0f)
+	{
+		const float minBoxHeight = vp->Size.y * minHeightRatio;
+		if (boxHeight < minBoxHeight) boxHeight = minBoxHeight;
+	}
+
+	const ImVec2 boxMin(vp->Pos.x + (vp->Size.x - boxWidth) * 0.5f,
+						vp->Pos.y + (vp->Size.y - boxHeight) * 0.5f);
+	const ImVec2 boxMax(boxMin.x + boxWidth, boxMin.y + boxHeight);
+
+	dl->AddRectFilled(boxMin, boxMax, fillColor, 10.0f * viewportScale);
+	dl->AddRect(boxMin, boxMax, borderColor, 10.0f * viewportScale);
+	dl->AddText(font, fontSize, ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), text, nullptr, wrapWidth);
 }
 
 static void FormatUpgradeTableValue(float value, const char* suffix, char* out, size_t outSize)
@@ -1010,15 +1317,12 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 			(tran.roguelike.offers[2] >= 0);
 		int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
 		if (optionIndex < 0) optionIndex = 0;
-		const bool isStatusPhase = (tran.roguelike.selectionPhase == Transfer::RoguelikeUpgrade::SelectionStatus);
-		const bool isMixedPhase = (tran.roguelike.selectionPhase == Transfer::RoguelikeUpgrade::SelectionMixed);
+		const int selectionPhase = tran.roguelike.selectionPhase;
 		const bool isShopSelection =
 			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
 			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest;
-		const bool hasEmptySkillSlot =
-			(tran.roguelike.skillSlot1 == Transfer::RoguelikeUpgrade::SkillNone) ||
-			(tran.roguelike.skillSlot2 == Transfer::RoguelikeUpgrade::SkillNone);
-		const char* overlayTitle = u8"ステータス強化";
+		const int currentRewardType = tran.GetCurrentRunRewardType();
+		const char* overlayTitle = GetRunRewardTypeName(currentRewardType);
 		const bool hasFollowupReward = (tran.roguelike.selectionRoundsRemaining > 1);
 		const char* continueLabel = hasFollowupReward ? u8"次の報酬へ" : u8"マップ選択へ";
 		if (!hasFollowupReward && tran.gameplayDebug.challengeReturnToGameAfterReward != 0)
@@ -1031,18 +1335,35 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 				tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest
 				? u8"休憩所へ戻る"
 				: u8"ショップへ戻る";
-			if (!isStatusPhase)
-			{
-				overlayTitle = hasEmptySkillSlot ? u8"スキル獲得 / 強化" : u8"スキル強化";
-			}
 		}
-		else if (isMixedPhase)
+
+		switch (selectionPhase)
 		{
-			overlayTitle = u8"挑戦報酬";
-		}
-		else if (!isStatusPhase)
-		{
-			overlayTitle = hasEmptySkillSlot ? u8"スキル獲得" : u8"ステータス / スキル強化";
+		case Transfer::RoguelikeUpgrade::SelectionRewardSkill:
+		case Transfer::RoguelikeUpgrade::SelectionShopSkillEnhance:
+			overlayTitle = u8"スキル強化";
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionRewardTrait:
+		case Transfer::RoguelikeUpgrade::SelectionShopTrait:
+			overlayTitle = u8"特性強化";
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionRewardTag:
+			overlayTitle = u8"タグ解除";
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionRewardWeapon:
+			overlayTitle = u8"武器強化";
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionRewardArtifact:
+			overlayTitle = u8"魔道具";
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionShopSkillChange:
+			overlayTitle = u8"スキル変更";
+			break;
+		case Transfer::RoguelikeUpgrade::SelectionMixed:
+			overlayTitle = u8"報酬";
+			break;
+		default:
+			break;
 		}
 
 		char upgradeHud[1024]{};
@@ -1088,26 +1409,33 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 			return;
 		}
 
-		char routeText[512]{};
-		size_t routeLen = 0;
-		for (int i = 0; i < tran.GetRunStageCount(); ++i)
-		{
-			const char* stageName = GetRunStageTypeName(tran.GetRunStageTypeAt(i));
-			char segment[64]{};
-			sprintf_s(segment, sizeof(segment), (i == tran.roguelike.currentStageIndex) ? u8"[%d:%s]" : u8"%d:%s", i + 1, stageName);
-			if (routeLen > 0)
-			{
-				sprintf_s(routeText + routeLen, sizeof(routeText) - routeLen, u8" -> ");
-				routeLen = strlen(routeText);
-			}
-			sprintf_s(routeText + routeLen, sizeof(routeText) - routeLen, "%s", segment);
-			routeLen = strlen(routeText);
-		}
-
 		const int optionCount = tran.GetRunStageOptionCount(nextStageIndex);
 		int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
 		if (optionIndex < 0) optionIndex = 0;
 		if (optionIndex >= optionCount) optionIndex = optionCount - 1;
+		char currentLabel[128]{};
+		char nextLabel[128]{};
+		const int currentMap = tran.GetRunStageMapNumberAt(tran.roguelike.currentStageIndex);
+		const int currentStep = tran.GetRunStageStepNumberAt(tran.roguelike.currentStageIndex);
+		const int nextMap = tran.GetRunStageMapNumberAt(nextStageIndex);
+		const int nextStep = tran.GetRunStageStepNumberAt(nextStageIndex);
+		if (currentStep > 0)
+		{
+			sprintf_s(currentLabel, sizeof(currentLabel), u8"Map%d Step%d %s", currentMap, currentStep, GetRunRewardTypeName(tran.GetCurrentRunRewardType()));
+		}
+		else
+		{
+			sprintf_s(currentLabel, sizeof(currentLabel), u8"Map%d %s", currentMap, GetRunRewardTypeName(tran.GetCurrentRunRewardType()));
+		}
+		if (nextStep > 0)
+		{
+			sprintf_s(nextLabel, sizeof(nextLabel), u8"Map%d Step%d", nextMap, nextStep);
+		}
+		else
+		{
+			sprintf_s(nextLabel, sizeof(nextLabel), u8"Map%d %s", nextMap, GetRunRewardTypeName(tran.GetRunRewardTypeAt(nextStageIndex)));
+		}
+
 		char optionsText[512]{};
 		size_t optionsLen = 0;
 		for (int i = 0; i < optionCount; ++i)
@@ -1119,25 +1447,21 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 				u8"%s 候補%d: %s\n",
 				(optionIndex == i) ? u8">" : u8" ",
 				i + 1,
-				GetRunStageTypeName(tran.GetRunStageTypeAt(nextStageIndex)));
+				GetRunRewardTypeName(tran.GetRunStageOptionRewardType(nextStageIndex, i)));
 			sprintf_s(optionsText + optionsLen, sizeof(optionsText) - optionsLen, "%s", line);
 			optionsLen = strlen(optionsText);
 		}
 
-		char mapHud[1536]{};
+		char mapHud[1024]{};
 		sprintf_s(
 			mapHud,
-			u8"次ステージ選択\n\n現在: %d / %d  %s\n次: %d / %d  %s\n所持リロール: %d\n\n%s\n\n%s\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
-			tran.roguelike.currentStageIndex + 1,
-			tran.GetRunStageCount(),
-			GetRunStageTypeName(tran.GetCurrentRunStageType()),
-			nextStageIndex + 1,
-			tran.GetRunStageCount(),
-			GetRunStageTypeName(tran.GetRunStageTypeAt(nextStageIndex)),
+			u8"次マス選択\n\n現在: %s\n次: %s\n所持リロール: %d\n復活残り: %d\n\n%s\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
+			currentLabel,
+			nextLabel,
 			tran.roguelike.rerollRemain,
-			optionsText,
-			routeText);
-		DrawCenteredOverlayText(mapHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+			tran.roguelike.reviveRemain,
+			optionsText);
+		DrawCenteredOverlayText(mapHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160), 0.48f, 0.30f, 1.18f);
 		return;
 	}
 
@@ -1145,12 +1469,13 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 		tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest)
 	{
 		const bool isRest = (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest);
-		const int optionIndex = (tran.gameplayDebug.rewardSelectionIndex < 0) ? 0 : tran.gameplayDebug.rewardSelectionIndex;
-		const int shopCost = 1 + ((tran.roguelike.shopPurchaseCount < 0) ? 0 : tran.roguelike.shopPurchaseCount);
+		int optionIndex = (tran.gameplayDebug.rewardSelectionIndex < 0) ? 0 : tran.gameplayDebug.rewardSelectionIndex;
+		if (optionIndex > 3) optionIndex = 3;
+		const int shopCost = tran.GetCurrentShopCost();
 		char stageHud[1024]{};
 		sprintf_s(
 			stageHud,
-			u8"%s\n\n現在: %d / %d\n所持リロール: %d\n購入コスト: %d\n%s ステータス強化を購入\n%s スキル強化を購入\n%s 次へ進む\n\n%s[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
+			u8"%s\n\n現在: %d / %d\n所持リロール: %d\n購入コスト: %d\n%s 特性強化を購入\n%s スキル変更を購入\n%s スキル強化を購入\n%s 次へ進む\n\n%s[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
 			isRest ? u8"休憩所" : u8"ショップ",
 			tran.roguelike.currentStageIndex + 1,
 			tran.GetRunStageCount(),
@@ -1159,8 +1484,9 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 			(optionIndex == 0) ? u8">" : u8" ",
 			(optionIndex == 1) ? u8">" : u8" ",
 			(optionIndex == 2) ? u8">" : u8" ",
-			isRest ? u8"HPを全回復しました。\n装備交換は今回未実装です。\n\n" : u8"");
-		DrawCenteredOverlayText(stageHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+			(optionIndex == 3) ? u8">" : u8" ",
+			isRest ? u8"最大HPの25%%を回復しました。\n\n" : u8"");
+		DrawCenteredOverlayText(stageHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160), 0.50f, 0.32f, 1.12f);
 	}
 }
 
@@ -1181,6 +1507,7 @@ static UINT g_engineEditorRTWidth = 0;
 static UINT g_engineEditorRTHeight = 0;
 static UINT g_engineEditorRequestWidth = 640;
 static UINT g_engineEditorRequestHeight = 360;
+static bool g_showCastleEditorModelViewWindow = false;
 
 void ReleaseEngineEditorRenderTargets()
 {
@@ -1219,6 +1546,185 @@ static bool EnsureEngineEditorRenderTarget(UINT width, UINT height)
 	g_engineEditorRTWidth = width;
 	g_engineEditorRTHeight = height;
 	return true;
+}
+
+static void DrawCastleEditorToolControls(SceneCastleEditor* editor)
+{
+	if (!editor) return;
+
+	const int selectedAssetIndex = editor->GetSelectedAssetIndex();
+	const SceneCastleEditor::ToolMode toolMode = editor->GetToolMode();
+
+	ImGui::SeparatorText(u8"ツール");
+	if (ImGui::RadioButton(u8"Select", toolMode == SceneCastleEditor::ToolMode::SelectSingle))
+	{
+		editor->SetToolMode(SceneCastleEditor::ToolMode::SelectSingle);
+	}
+	ImGui::SameLine();
+	if (ImGui::RadioButton(u8"Select Fill", toolMode == SceneCastleEditor::ToolMode::SelectFill))
+	{
+		editor->SetToolMode(SceneCastleEditor::ToolMode::SelectFill);
+	}
+	if (selectedAssetIndex >= 0)
+	{
+		if (ImGui::RadioButton(u8"Place", toolMode == SceneCastleEditor::ToolMode::PlaceSingle))
+		{
+			editor->SetToolMode(SceneCastleEditor::ToolMode::PlaceSingle);
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton(u8"Paint", toolMode == SceneCastleEditor::ToolMode::PlacePaint))
+		{
+			editor->SetToolMode(SceneCastleEditor::ToolMode::PlacePaint);
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton(u8"Fill", toolMode == SceneCastleEditor::ToolMode::PlaceFill))
+		{
+			editor->SetToolMode(SceneCastleEditor::ToolMode::PlaceFill);
+		}
+	}
+}
+
+static void DrawCastleEditorOperationGuide(SceneCastleEditor* editor)
+{
+	if (!editor) return;
+
+	const int selectedAssetIndex = editor->GetSelectedAssetIndex();
+	const SceneCastleEditor::ToolMode toolMode = editor->GetToolMode();
+
+	ImGui::SeparatorText(u8"操作");
+	if (toolMode == SceneCastleEditor::ToolMode::SelectSingle)
+	{
+		ImGui::TextUnformatted(u8"左クリック: 選択 / Ctrl+クリック: 追加解除 / Shift+クリック: 追加");
+		if (editor->IsSelectFillStartActive())
+		{
+			ImGui::TextDisabled(u8"Select Fill の始点設定が残っています。");
+		}
+	}
+	else if (toolMode == SceneCastleEditor::ToolMode::SelectFill)
+	{
+		ImGui::TextUnformatted(u8"LMB: 始点選択 -> LMB: 終点選択で3D範囲選択");
+		ImGui::TextDisabled(u8"Ctrlを押しながら確定すると既存選択へ追加");
+		ImGui::TextDisabled(u8"空セルも指定可能 / Shift押下中はアクティブレイヤーへスナップ");
+		if (editor->IsSelectFillStartActive())
+		{
+			ImGui::TextDisabled(u8"始点設定済み / 終点までの直方体を選択");
+		}
+	}
+	else if (toolMode == SceneCastleEditor::ToolMode::PlacePaint)
+	{
+		ImGui::TextUnformatted(u8"LMB Drag: 連続配置");
+	}
+	else if (toolMode == SceneCastleEditor::ToolMode::PlaceFill)
+	{
+		ImGui::TextUnformatted(u8"LMB: 始点選択 -> LMB: 終点選択で範囲配置");
+		ImGui::TextDisabled(u8"Shift+Wheel: 始点からの高さオフセット変更");
+		ImGui::TextDisabled(u8"Shift中も水平面配置は可能 / 高さ差をつけると縦面配置");
+		if (editor->IsFillStartActive())
+		{
+			ImGui::TextDisabled(u8"始点設定済み / 終点は同一平面上で指定");
+		}
+	}
+	else
+	{
+		ImGui::TextUnformatted(u8"左クリック: 面の隣に配置");
+	}
+	ImGui::TextUnformatted(u8"右ドラッグ: 回転");
+	ImGui::TextUnformatted(u8"中ドラッグ: 平行移動");
+	ImGui::TextUnformatted(u8"ホイール: ズーム");
+	ImGui::TextUnformatted(u8"R / Shift+R: 選択中オブジェクト回転");
+	ImGui::TextUnformatted(u8"Delete: 選択中オブジェクト削除");
+	ImGui::TextUnformatted(u8"Ctrl+Z / Ctrl+Y: Undo / Redo");
+	if (toolMode == SceneCastleEditor::ToolMode::SelectSingle)
+	{
+		ImGui::TextDisabled(u8"現在: Select ツール");
+	}
+	else if (toolMode == SceneCastleEditor::ToolMode::SelectFill)
+	{
+		ImGui::TextDisabled(u8"現在: Select Fill ツール");
+	}
+	else if (toolMode == SceneCastleEditor::ToolMode::PlacePaint)
+	{
+		const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
+		ImGui::TextDisabled(u8"現在: Paint (%s)", asset ? asset->name.c_str() : u8"Unknown");
+	}
+	else if (toolMode == SceneCastleEditor::ToolMode::PlaceFill)
+	{
+		const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
+		ImGui::TextDisabled(u8"現在: Fill (%s)", asset ? asset->name.c_str() : u8"Unknown");
+	}
+	else
+	{
+		const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
+		ImGui::TextDisabled(u8"現在: Place (%s)", asset ? asset->name.c_str() : u8"Unknown");
+	}
+}
+
+static void DrawCastleEditorModelViewWindow(SceneCastleEditor* editor)
+{
+	if (!editor || !g_showCastleEditorModelViewWindow) return;
+
+	ImGui::SetNextWindowSize(ImVec2(420.0f, 520.0f), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin(u8"ModelView", &g_showCastleEditorModelViewWindow))
+	{
+		ImGui::End();
+		return;
+	}
+
+	const int selectedIndex =
+		(editor->GetSelectedPlacementCount() == 1) ? editor->GetSelectedPlacementIndex() : -1;
+	const int modelViewAssetIndex =
+		(editor->GetSelectedAssetIndex() >= 0)
+		? editor->GetSelectedAssetIndex()
+		: ((selectedIndex >= 0 && editor->GetPlacement(selectedIndex))
+			? editor->GetPlacement(selectedIndex)->assetIndex
+			: -1);
+
+	if (modelViewAssetIndex >= 0)
+	{
+		const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(modelViewAssetIndex);
+		if (asset)
+		{
+			ImGui::Text(u8"表示中: %s", asset->name.c_str());
+		}
+
+		const float viewSize = (ImGui::GetContentRegionAvail().x < 180.0f)
+			? 180.0f
+			: ImGui::GetContentRegionAvail().x;
+		const ImVec2 imagePos = ImGui::GetCursorScreenPos();
+		void* textureId = editor->GetModelViewTextureId(static_cast<unsigned int>(viewSize));
+		if (textureId)
+		{
+			ImGui::Image(textureId, ImVec2(viewSize, viewSize));
+		}
+		else
+		{
+			ImGui::InvisibleButton("##model_view_dummy_window", ImVec2(viewSize, viewSize));
+		}
+
+		const bool hovered = ImGui::IsItemHovered();
+		ImGuiIO& io = ImGui::GetIO();
+		editor->HandleModelViewInput(
+			hovered,
+			hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Right),
+			io.MouseDelta.x,
+			io.MouseDelta.y,
+			hovered ? io.MouseWheel : 0.0f);
+
+		ImGui::GetWindowDrawList()->AddText(
+			ImVec2(imagePos.x + 10.0f, imagePos.y + 10.0f),
+			IM_COL32(240, 245, 255, 255),
+			u8"RMB: Orbit  Wheel: Zoom");
+		if (ImGui::Button(u8"ModelViewリセット"))
+		{
+			editor->ResetModelViewCamera();
+		}
+	}
+	else
+	{
+		ImGui::TextDisabled(u8"アセットか配置オブジェクトを選択すると表示されます。");
+	}
+
+	ImGui::End();
 }
 
 static void DrawCastleEditorPaletteWindow(SceneCastleEditor* editor)
@@ -1418,102 +1924,6 @@ static void DrawCastleEditorPaletteWindow(SceneCastleEditor* editor)
 		editor->RotatePreview(1);
 	}
 
-	ImGui::SeparatorText(u8"ツール");
-	if (ImGui::RadioButton(u8"Select", toolMode == SceneCastleEditor::ToolMode::SelectSingle))
-	{
-		editor->SetToolMode(SceneCastleEditor::ToolMode::SelectSingle);
-	}
-	ImGui::SameLine();
-	if (ImGui::RadioButton(u8"Select Fill", toolMode == SceneCastleEditor::ToolMode::SelectFill))
-	{
-		editor->SetToolMode(SceneCastleEditor::ToolMode::SelectFill);
-	}
-	if (selectedAssetIndex >= 0)
-	{
-		ImGui::SameLine();
-		if (ImGui::RadioButton(u8"Place", toolMode == SceneCastleEditor::ToolMode::PlaceSingle))
-		{
-			editor->SetToolMode(SceneCastleEditor::ToolMode::PlaceSingle);
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton(u8"Paint", toolMode == SceneCastleEditor::ToolMode::PlacePaint))
-		{
-			editor->SetToolMode(SceneCastleEditor::ToolMode::PlacePaint);
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton(u8"Fill", toolMode == SceneCastleEditor::ToolMode::PlaceFill))
-		{
-			editor->SetToolMode(SceneCastleEditor::ToolMode::PlaceFill);
-		}
-	}
-
-	ImGui::SeparatorText(u8"操作");
-	if (toolMode == SceneCastleEditor::ToolMode::SelectSingle)
-	{
-		ImGui::TextUnformatted(u8"左クリック: 選択 / Ctrl+クリック: 追加解除 / Shift+クリック: 追加");
-		if (editor->IsSelectFillStartActive())
-		{
-			ImGui::TextDisabled(u8"Select Fill の始点設定が残っています。");
-		}
-	}
-	else if (toolMode == SceneCastleEditor::ToolMode::SelectFill)
-	{
-		ImGui::TextUnformatted(u8"LMB: 始点選択 -> LMB: 終点選択で3D範囲選択");
-		ImGui::TextDisabled(u8"Ctrlを押しながら確定すると既存選択へ追加");
-		ImGui::TextDisabled(u8"空セルも指定可能 / Shift押下中はアクティブレイヤーへスナップ");
-		if (editor->IsSelectFillStartActive())
-		{
-			ImGui::TextDisabled(u8"始点設定済み / 終点までの直方体を選択");
-		}
-	}
-	else if (toolMode == SceneCastleEditor::ToolMode::PlacePaint)
-	{
-		ImGui::TextUnformatted(u8"LMB Drag: 連続配置");
-	}
-	else if (toolMode == SceneCastleEditor::ToolMode::PlaceFill)
-	{
-		ImGui::TextUnformatted(u8"LMB: 始点選択 -> LMB: 終点選択で範囲配置");
-		ImGui::TextDisabled(u8"Shift+Wheel: 始点からの高さオフセット変更");
-		ImGui::TextDisabled(u8"Shift中も水平面配置は可能 / 高さ差をつけると縦面配置");
-		if (editor->IsFillStartActive())
-		{
-			ImGui::TextDisabled(u8"始点設定済み / 終点は同一平面上で指定");
-		}
-	}
-	else
-	{
-		ImGui::TextUnformatted(u8"左クリック: 面の隣に配置");
-	}
-	ImGui::TextUnformatted(u8"右ドラッグ: 回転");
-	ImGui::TextUnformatted(u8"中ドラッグ: 平行移動");
-	ImGui::TextUnformatted(u8"ホイール: ズーム");
-	ImGui::TextUnformatted(u8"R / Shift+R: 選択中オブジェクト回転");
-	ImGui::TextUnformatted(u8"Delete: 選択中オブジェクト削除");
-	ImGui::TextUnformatted(u8"Ctrl+Z / Ctrl+Y: Undo / Redo");
-	if (toolMode == SceneCastleEditor::ToolMode::SelectSingle)
-	{
-		ImGui::TextDisabled(u8"現在: Select ツール");
-	}
-	else if (toolMode == SceneCastleEditor::ToolMode::SelectFill)
-	{
-		ImGui::TextDisabled(u8"現在: Select Fill ツール");
-	}
-	else if (toolMode == SceneCastleEditor::ToolMode::PlacePaint)
-	{
-		const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
-		ImGui::TextDisabled(u8"現在: Paint (%s)", asset ? asset->name.c_str() : u8"Unknown");
-	}
-	else if (toolMode == SceneCastleEditor::ToolMode::PlaceFill)
-	{
-		const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
-		ImGui::TextDisabled(u8"現在: Fill (%s)", asset ? asset->name.c_str() : u8"Unknown");
-	}
-	else
-	{
-		const SceneCastleEditor::AssetInfo* asset = editor->GetAssetInfo(selectedAssetIndex);
-		ImGui::TextDisabled(u8"現在: Place (%s)", asset ? asset->name.c_str() : u8"Unknown");
-	}
-
 	ImGui::End();
 }
 
@@ -1671,50 +2081,27 @@ static void DrawCastleEditorInspectorWindow(SceneCastleEditor* editor)
 		}
 	}
 
-	const int modelViewAssetIndex =
-		(editor->GetSelectedAssetIndex() >= 0)
-		? editor->GetSelectedAssetIndex()
-		: ((selectedIndex >= 0 && editor->GetPlacement(selectedIndex))
-			? editor->GetPlacement(selectedIndex)->assetIndex
-			: -1);
-
 	ImGui::SeparatorText(u8"ModelView");
-	if (modelViewAssetIndex >= 0)
+	const bool canOpenModelView =
+		(editor->GetSelectedAssetIndex() >= 0) ||
+		(selectedIndex >= 0 && editor->GetPlacement(selectedIndex));
+	const bool canToggleModelView = g_showCastleEditorModelViewWindow || canOpenModelView;
+	if (!canToggleModelView) ImGui::BeginDisabled();
+	if (ImGui::Button(g_showCastleEditorModelViewWindow ? u8"ModelViewを閉じる" : u8"ModelViewを開く"))
 	{
-		const float viewSize = ImGui::GetContentRegionAvail().x;
-		const float clampedSize = (viewSize < 180.0f) ? 180.0f : viewSize;
-		const ImVec2 imagePos = ImGui::GetCursorScreenPos();
-		void* textureId = editor->GetModelViewTextureId(static_cast<unsigned int>(clampedSize));
-		if (textureId)
-		{
-			ImGui::Image(textureId, ImVec2(clampedSize, clampedSize));
-		}
-		else
-		{
-			ImGui::InvisibleButton("##model_view_dummy", ImVec2(clampedSize, clampedSize));
-		}
-
-		const bool hovered = ImGui::IsItemHovered();
-		ImGuiIO& io = ImGui::GetIO();
-		editor->HandleModelViewInput(
-			hovered,
-			hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Right),
-			io.MouseDelta.x,
-			io.MouseDelta.y,
-			hovered ? io.MouseWheel : 0.0f);
-
-		ImGui::GetWindowDrawList()->AddText(
-			ImVec2(imagePos.x + 10.0f, imagePos.y + 10.0f),
-			IM_COL32(240, 245, 255, 255),
-			u8"RMB: Orbit  Wheel: Zoom");
-		if (ImGui::Button(u8"ModelViewリセット"))
-		{
-			editor->ResetModelViewCamera();
-		}
+		g_showCastleEditorModelViewWindow = !g_showCastleEditorModelViewWindow;
+	}
+	if (!canToggleModelView) ImGui::EndDisabled();
+	if (canOpenModelView)
+	{
+		ImGui::TextDisabled(
+			g_showCastleEditorModelViewWindow
+				? u8"専用ウィンドウで表示中です。"
+				: u8"ボタンを押すと専用ウィンドウで表示します。");
 	}
 	else
 	{
-		ImGui::TextDisabled(u8"アセットか配置オブジェクトを選択すると表示されます。");
+		ImGui::TextDisabled(u8"アセットか配置オブジェクトを選択すると開けます。");
 	}
 
 	ImGui::End();
@@ -1750,6 +2137,8 @@ static void DrawCastleEditorCameraWindow(SceneCastleEditor* editor)
 		editor->SetActiveLayer(activeLayer);
 	}
 	ImGui::TextDisabled(u8"Shift+Wheel: アクティブレイヤー変更");
+	DrawCastleEditorToolControls(editor);
+	DrawCastleEditorOperationGuide(editor);
 
 	ImGui::End();
 }
@@ -1832,6 +2221,7 @@ void DrawEngineEditorWindows()
 	DrawCastleEditorHierarchyWindow(editor);
 	DrawCastleEditorInspectorWindow(editor);
 	DrawCastleEditorCameraWindow(editor);
+	DrawCastleEditorModelViewWindow(editor);
 	DrawEngineEditorSceneViewWindow(editor);
 
 	ImGuiIO& io = ImGui::GetIO();

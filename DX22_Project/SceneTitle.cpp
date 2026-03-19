@@ -1,4 +1,4 @@
-#include "SceneTitle.h"
+﻿#include "SceneTitle.h"
 #include "SceneManager.h"
 #include "Input.h"
 #include "Transfer.h"
@@ -34,6 +34,12 @@ namespace
     constexpr float kDifficultyBackHeight = 68.0f;
     constexpr float kHoveredScale = 1.12f;
     constexpr float kDifficultyPanelOffsetY = kDifficultyFrameHeight * 0.5f;
+    constexpr int kPreparationRowWeapon = 0;
+    constexpr int kPreparationRowSkill1 = 1;
+    constexpr int kPreparationRowSkill2 = 2;
+    constexpr int kPreparationRowStart = 3;
+    constexpr int kPreparationRowBack = 4;
+    constexpr int kPreparationRowCount = 5;
 
     struct KeyConfigEntry
     {
@@ -59,6 +65,229 @@ namespace
     constexpr int kKeyConfigRowBack = kKeyConfigEntryCount + 1;
     constexpr int kKeyConfigRowCount = kKeyConfigEntryCount + 2;
 
+    const char* GetPreparationWeaponLabel(int weaponType)
+    {
+        switch (weaponType)
+        {
+        case Transfer::RoguelikeUpgrade::WeaponHeavy:
+            return u8"\u4E00\u6483\u578B";
+        case Transfer::RoguelikeUpgrade::WeaponRapid:
+            return u8"\u624B\u6570\u578B";
+        case Transfer::RoguelikeUpgrade::WeaponRanged:
+            return u8"\u9060\u8DDD\u96E2\u578B";
+        case Transfer::RoguelikeUpgrade::WeaponBasic:
+        default:
+            return u8"\u57FA\u672C\u578B";
+        }
+    }
+
+    const char* GetPreparationWeaponNote(int weaponType)
+    {
+        switch (weaponType)
+        {
+        case Transfer::RoguelikeUpgrade::WeaponHeavy:
+            return u8"\u5E83\u3081\u306E\u8FD1\u63A5\u653B\u6483\u3002\u653B\u6483\u901F\u5EA6\u306F\u9045\u3081\u3067\u3001\u5F37\u3044\u30CE\u30C3\u30AF\u30D0\u30C3\u30AF\u304C\u767A\u751F\u3002CRT\u306F2\u56DE\u3054\u3068\u3002";
+        case Transfer::RoguelikeUpgrade::WeaponRapid:
+            return u8"\u3084\u3084\u77ED\u3044\u8FD1\u63A5\u653B\u6483\u3002\u653B\u6483\u901F\u5EA6\u304C\u304B\u306A\u308A\u901F\u3044\u3002CRT\u306F2\u56DE\u3054\u3068\u3002";
+        case Transfer::RoguelikeUpgrade::WeaponRanged:
+            return u8"\u6700\u3082\u5F37\u3044\u6575\u3078\u8CAB\u901A\u5F3E\u3092\u6483\u3064\u3002\u521D\u671F3\u30B9\u30C8\u30C3\u30AF\u30011\u79D2\u30671\u56DE\u5FA9\u3001CRT\u306F\u6BCE\u56DE\u767A\u751F\u3002";
+        case Transfer::RoguelikeUpgrade::WeaponBasic:
+        default:
+            return u8"\u524D\u65B9\u3078\u6A19\u6E96\u7684\u306A\u8FD1\u63A5\u653B\u6483\u3002\u6271\u3044\u3084\u3059\u3044\u57FA\u6E96\u6B66\u5668\u3002CRT\u306F3\u56DE\u3054\u3068\u3002";
+        }
+    }
+
+    const char* GetPreparationSkillLabel(int skillType)
+    {
+        switch (skillType)
+        {
+        case Transfer::RoguelikeUpgrade::ActionSkillWhirl:
+            return u8"\u8599\u304E\u6255\u3044";
+        case Transfer::RoguelikeUpgrade::ActionSkillRush:
+            return u8"\u7A81\u9032";
+        case Transfer::RoguelikeUpgrade::ActionSkillAmbush:
+            return u8"\u5947\u8972";
+        case Transfer::RoguelikeUpgrade::ActionSkillChainThrow:
+            return u8"\u9396\u6295\u3052";
+        case Transfer::RoguelikeUpgrade::ActionSkillFireball:
+            return u8"\u706B\u7403";
+        case Transfer::RoguelikeUpgrade::ActionSkillBloodSlash:
+            return u8"\u51FA\u8840\u65AC";
+        case Transfer::RoguelikeUpgrade::ActionSkillNone:
+        default:
+            return u8"\u306A\u3057";
+        }
+    }
+
+    const char* GetPreparationSkillNote(int skillType)
+    {
+        switch (skillType)
+        {
+        case Transfer::RoguelikeUpgrade::ActionSkillWhirl:
+            return u8"\u81EA\u5206\u4E2D\u5FC3\u306E\u5168\u65B9\u4F4D\u653B\u6483\u3002";
+        case Transfer::RoguelikeUpgrade::ActionSkillRush:
+            return u8"\u5411\u3044\u3066\u3044\u308B\u65B9\u5411\u3078\u7A81\u9032\u3057\u3001\u9032\u8DEF\u4E0A\u306E\u6575\u3092\u653B\u6483\u3002";
+        case Transfer::RoguelikeUpgrade::ActionSkillAmbush:
+            return u8"\u5F37\u6575\u306E\u80CC\u5F8C\u3078\u56DE\u308A\u8FBC\u307F\u3001\u5C0F\u7BC4\u56F2\u3092\u653B\u6483\u3002";
+        case Transfer::RoguelikeUpgrade::ActionSkillChainThrow:
+            return u8"\u4E00\u5B9A\u7BC4\u56F2\u5185\u306E\u6575\u3059\u3079\u3066\u3092\u653B\u6483\u3002";
+        case Transfer::RoguelikeUpgrade::ActionSkillFireball:
+            return u8"\u5F37\u6575\u3078\u5411\u3051\u3066\u706B\u7403\u3092\u653E\u3064\u3002";
+        case Transfer::RoguelikeUpgrade::ActionSkillBloodSlash:
+            return u8"\u524D\u65B9\u3078\u92ED\u3044\u65AC\u6483\u3092\u653E\u3064\u3002";
+        case Transfer::RoguelikeUpgrade::ActionSkillNone:
+        default:
+            return u8"\u306A\u3057";
+        }
+    }
+
+    int CyclePreparationSkillType(int currentSkill, int direction, int blockedSkill)
+    {
+        const int skillCount = Transfer::RoguelikeUpgrade::ActionSkillTypeCount - 1;
+        if (skillCount <= 0)
+        {
+            return Transfer::RoguelikeUpgrade::ActionSkillWhirl;
+        }
+
+        int index = currentSkill - 1;
+        if (index < 0 || index >= skillCount)
+        {
+            index = 0;
+        }
+
+        const int step = (direction < 0) ? -1 : 1;
+        for (int attempt = 0; attempt < skillCount; ++attempt)
+        {
+            index += step;
+            if (index < 0)
+            {
+                index += skillCount;
+            }
+            else if (index >= skillCount)
+            {
+                index -= skillCount;
+            }
+            const int nextSkill = index + 1;
+            if (nextSkill != blockedSkill)
+            {
+                return nextSkill;
+            }
+        }
+        return Transfer::RoguelikeUpgrade::ActionSkillWhirl;
+    }
+
+    void DrawPreparationOverlay(const Transfer& tran, int selectedRow, int weaponType, int skill1Type, int skill2Type)
+    {
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        if (!viewport)
+        {
+            return;
+        }
+
+        ImDrawList* drawList = ImGui::GetForegroundDrawList(viewport);
+        if (!drawList)
+        {
+            return;
+        }
+
+        const float uiScale = (tran.gameplayDebug.pauseMenuUiScale < 0.75f) ? 0.75f
+            : (tran.gameplayDebug.pauseMenuUiScale > 2.0f ? 2.0f : tran.gameplayDebug.pauseMenuUiScale);
+        const ImVec2 panelSize(900.0f * uiScale, 610.0f * uiScale);
+        const ImVec2 panelMin(
+            viewport->Pos.x + (viewport->Size.x - panelSize.x) * 0.5f,
+            viewport->Pos.y + (viewport->Size.y - panelSize.y) * 0.5f);
+        const ImVec2 panelMax(panelMin.x + panelSize.x, panelMin.y + panelSize.y);
+        const float corner = 18.0f * uiScale;
+        const float rowHeight = 64.0f * uiScale;
+        const float firstRowY = panelMin.y + 166.0f * uiScale;
+
+        drawList->AddRectFilled(
+            viewport->Pos,
+            ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y),
+            IM_COL32(0, 0, 0, 152));
+        drawList->AddRectFilled(panelMin, panelMax, IM_COL32(20, 26, 34, 238), corner);
+        drawList->AddRect(panelMin, panelMax, IM_COL32(164, 196, 224, 220), corner, 0, 2.0f);
+
+        ImFont* font = ImGui::GetFont();
+        const float baseFontSize = ImGui::GetFontSize();
+        const float titleFontSize = baseFontSize * 1.55f * uiScale;
+        const float headerFontSize = baseFontSize * 1.02f * uiScale;
+        const float rowFontSize = baseFontSize * 1.05f * uiScale;
+        const float noteFontSize = baseFontSize * 0.92f * uiScale;
+
+        drawList->AddText(font, titleFontSize, ImVec2(panelMin.x + 28.0f * uiScale, panelMin.y + 26.0f * uiScale),
+            IM_COL32(245, 247, 252, 255), u8"\u6E96\u5099\u30D5\u30A7\u30FC\u30BA");
+        drawList->AddText(font, noteFontSize, ImVec2(panelMin.x + 30.0f * uiScale, panelMin.y + 70.0f * uiScale),
+            IM_COL32(196, 208, 224, 255), u8"\u4E0A\u4E0B: \u9805\u76EE\u79FB\u52D5  \u5DE6\u53F3: \u5185\u5BB9\u5909\u66F4  Enter: \u958B\u59CB  Esc: \u623B\u308B");
+        drawList->AddText(font, noteFontSize, ImVec2(panelMin.x + 30.0f * uiScale, panelMin.y + 94.0f * uiScale),
+            IM_COL32(196, 208, 224, 255), u8"\u30E9\u30F3\u958B\u59CB\u524D\u306B\u6B66\u5668\u30921\u3064\u3001\u30B9\u30AD\u30EB\u30922\u3064\u9078\u629E\u3057\u307E\u3059\u3002");
+        drawList->AddLine(
+            ImVec2(panelMin.x + 28.0f * uiScale, panelMin.y + 126.0f * uiScale),
+            ImVec2(panelMax.x - 28.0f * uiScale, panelMin.y + 126.0f * uiScale),
+            IM_COL32(112, 132, 154, 190),
+            1.5f);
+        drawList->AddText(font, headerFontSize, ImVec2(panelMin.x + 32.0f * uiScale, panelMin.y + 136.0f * uiScale),
+            IM_COL32(210, 220, 236, 255), u8"\u9805\u76EE");
+        drawList->AddText(font, headerFontSize, ImVec2(panelMin.x + 246.0f * uiScale, panelMin.y + 136.0f * uiScale),
+            IM_COL32(210, 220, 236, 255), u8"\u9078\u629E\u5185\u5BB9");
+        drawList->AddText(font, headerFontSize, ImVec2(panelMin.x + 560.0f * uiScale, panelMin.y + 136.0f * uiScale),
+            IM_COL32(210, 220, 236, 255), u8"\u8AAC\u660E");
+
+        const char* labels[kPreparationRowCount] =
+        {
+            u8"\u6B66\u5668",
+            u8"\u30B9\u30AD\u30EB1",
+            u8"\u30B9\u30AD\u30EB2",
+            u8"\u958B\u59CB",
+            u8"\u623B\u308B"
+        };
+        const char* values[kPreparationRowCount] =
+        {
+            GetPreparationWeaponLabel(weaponType),
+            GetPreparationSkillLabel(skill1Type),
+            GetPreparationSkillLabel(skill2Type),
+            u8"\u3053\u306E\u69CB\u6210\u3067\u958B\u59CB",
+            u8"\u96E3\u6613\u5EA6\u9078\u629E\u3078\u623B\u308B"
+        };
+        const char* notes[kPreparationRowCount] =
+        {
+            GetPreparationWeaponNote(weaponType),
+            GetPreparationSkillNote(skill1Type),
+            GetPreparationSkillNote(skill2Type),
+            u8"\u73FE\u5728\u306E\u6B66\u5668\u3068\u30B9\u30AD\u30EB\u69CB\u6210\u3067\u30B2\u30FC\u30E0\u3092\u958B\u59CB\u3057\u307E\u3059\u3002",
+            u8"\u9078\u629E\u5185\u5BB9\u3092\u4FDD\u6301\u3057\u305F\u307E\u307E\u96E3\u6613\u5EA6\u9078\u629E\u3078\u623B\u308A\u307E\u3059\u3002"
+        };
+
+        for (int row = 0; row < kPreparationRowCount; ++row)
+        {
+            const float rowTop = firstRowY + rowHeight * static_cast<float>(row);
+            const ImVec2 rowMin(panelMin.x + 24.0f * uiScale, rowTop);
+            const ImVec2 rowMax(panelMax.x - 24.0f * uiScale, rowTop + rowHeight - 6.0f * uiScale);
+            const bool selected = (selectedRow == row);
+            const ImU32 fillColor = selected ? IM_COL32(36, 92, 164, 236) : IM_COL32(34, 40, 52, 220);
+            drawList->AddRectFilled(rowMin, rowMax, fillColor, 10.0f * uiScale);
+            drawList->AddRect(rowMin, rowMax,
+                selected ? IM_COL32(240, 244, 255, 220) : IM_COL32(92, 104, 124, 150),
+                10.0f * uiScale, 0, selected ? 2.0f : 1.0f);
+
+            drawList->AddText(font, rowFontSize, ImVec2(panelMin.x + 34.0f * uiScale, rowTop + 14.0f * uiScale),
+                IM_COL32(244, 246, 250, 255), labels[row]);
+            drawList->AddText(font, rowFontSize, ImVec2(panelMin.x + 248.0f * uiScale, rowTop + 14.0f * uiScale),
+                IM_COL32(255, 245, 190, 255), values[row]);
+            drawList->AddText(font, noteFontSize, ImVec2(panelMin.x + 560.0f * uiScale, rowTop + 18.0f * uiScale),
+                IM_COL32(202, 216, 232, 255), notes[row]);
+        }
+
+        char footer[256]{};
+        sprintf_s(
+            footer,
+            u8"\u73FE\u5728\u306E\u69CB\u6210: %s / %s / %s",
+            GetPreparationWeaponLabel(weaponType),
+            GetPreparationSkillLabel(skill1Type),
+            GetPreparationSkillLabel(skill2Type));
+        drawList->AddText(font, noteFontSize, ImVec2(panelMin.x + 30.0f * uiScale, panelMax.y - 38.0f * uiScale),
+            IM_COL32(196, 208, 224, 255), footer);
+    }
     bool IsTitleConfirmTriggered()
     {
         return IsMenuConfirmTrigger();
@@ -365,6 +594,14 @@ SceneTitle::SceneTitle()
     , m_isKeyConfigCapturing(false)
     , m_isDifficultyOpen(false)
     , m_difficultySelection(1)
+    , m_isPreparationOpen(false)
+    , m_preparationSelection(kPreparationRowWeapon)
+    , m_preparationWeaponType(Transfer::RoguelikeUpgrade::WeaponBasic)
+    , m_preparationSkillSlots
+    {
+        Transfer::RoguelikeUpgrade::ActionSkillWhirl,
+        Transfer::RoguelikeUpgrade::ActionSkillRush
+    }
 {
     m_pLogo = new UIObject("Title/Title_Logo.png", SCREEN_WIDTH * 0.5f, 210.0f, 900.0f, 380.0f);
     m_pStart = new UIObject("Title/Btn_Start.png", SCREEN_WIDTH * 0.5f, 500.0f, 360.0f, 96.0f);
@@ -385,6 +622,7 @@ SceneTitle::SceneTitle()
     m_difficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
     tran.gameplayDebug.titleDifficultyOpen = 0;
     tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
+    tran.gameplayDebug.titlePreparationOpen = 0;
 }
 
 SceneTitle::~SceneTitle()
@@ -428,6 +666,103 @@ void SceneTitle::Update()
         }
     }
 
+    if (m_isPreparationOpen)
+    {
+        tran.gameplayDebug.titleOptionOpen = 0;
+        tran.gameplayDebug.titleOptionSelection = 0;
+        tran.gameplayDebug.titleOptionRequestClose = 0;
+        tran.gameplayDebug.titleKeyConfigOpen = 0;
+        tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
+        tran.gameplayDebug.titleDifficultyOpen = 0;
+        tran.gameplayDebug.titlePreparationOpen = 1;
+
+        auto startPreparedRun = [&]()
+        {
+            tran.roguelike.loadoutWeaponType = m_preparationWeaponType;
+            tran.roguelike.loadoutSkills[0] = m_preparationSkillSlots[0];
+            tran.roguelike.loadoutSkills[1] = m_preparationSkillSlots[1];
+            tran.RebuildDerivedTraitLevels();
+            tran.gameplayDebug.titlePreparationOpen = 0;
+            tran.gameplayDebug.titleKeyConfigOpen = 0;
+            tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
+            tran.gameplayDebug.runElapsedSec = 0.0f;
+            tran.gameplayDebug.runRecordedSec = 0.0f;
+            tran.gameplayDebug.runTimerRunning = 0;
+            m_isPreparationOpen = false;
+            SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+        };
+
+        auto closePreparationOverlay = [&]()
+        {
+            m_isPreparationOpen = false;
+            m_isDifficultyOpen = true;
+            tran.gameplayDebug.titlePreparationOpen = 0;
+            tran.gameplayDebug.titleDifficultyOpen = 1;
+            tran.gameplayDebug.titleDifficultySelection = m_difficultySelection;
+        };
+
+        if (IsMenuBackTrigger())
+        {
+            closePreparationOverlay();
+            return;
+        }
+
+        if (IsKeyTrigger(VK_UP) || IsKeyTrigger('W'))
+        {
+            m_preparationSelection = WrapIndex(m_preparationSelection - 1, kPreparationRowCount);
+        }
+        if (IsKeyTrigger(VK_DOWN) || IsKeyTrigger('S'))
+        {
+            m_preparationSelection = WrapIndex(m_preparationSelection + 1, kPreparationRowCount);
+        }
+
+        const bool moveLeft = IsKeyTrigger(VK_LEFT) || IsKeyTrigger('A');
+        const bool moveRight = IsKeyTrigger(VK_RIGHT) || IsKeyTrigger('D');
+        if (moveLeft || moveRight)
+        {
+            const int direction = moveLeft ? -1 : 1;
+            switch (m_preparationSelection)
+            {
+            case kPreparationRowWeapon:
+                m_preparationWeaponType = WrapIndex(
+                    m_preparationWeaponType + direction,
+                    Transfer::RoguelikeUpgrade::WeaponTypeCount);
+                break;
+            case kPreparationRowSkill1:
+                m_preparationSkillSlots[0] = CyclePreparationSkillType(
+                    m_preparationSkillSlots[0],
+                    direction,
+                    m_preparationSkillSlots[1]);
+                break;
+            case kPreparationRowSkill2:
+                m_preparationSkillSlots[1] = CyclePreparationSkillType(
+                    m_preparationSkillSlots[1],
+                    direction,
+                    m_preparationSkillSlots[0]);
+                break;
+            default:
+                break;
+            }
+        }
+
+        if (IsTitleConfirmTriggered())
+        {
+            if (m_preparationSelection == kPreparationRowStart)
+            {
+                startPreparedRun();
+                return;
+            }
+            if (m_preparationSelection == kPreparationRowBack)
+            {
+                closePreparationOverlay();
+                return;
+            }
+        }
+        return;
+    }
+
+    tran.gameplayDebug.titlePreparationOpen = 0;
+
     if (m_isDifficultyOpen)
     {
         tran.gameplayDebug.titleOptionOpen = 0;
@@ -450,6 +785,12 @@ void SceneTitle::Update()
             const int selectedDifficulty = tran.NormalizeDifficultyPreset(difficulty);
             tran.ApplyDifficultyPreset(selectedDifficulty);
             tran.ResetRoguelikeUpgrade();
+            m_preparationWeaponType = tran.roguelike.loadoutWeaponType;
+            m_preparationSkillSlots[0] = Transfer::RoguelikeUpgrade::ActionSkillWhirl;
+            m_preparationSkillSlots[1] = Transfer::RoguelikeUpgrade::ActionSkillRush;
+            tran.roguelike.loadoutSkills[0] = m_preparationSkillSlots[0];
+            tran.roguelike.loadoutSkills[1] = m_preparationSkillSlots[1];
+            tran.RebuildDerivedTraitLevels();
             tran.gameplayDebug.requestBossBattle = 0;
             tran.gameplayDebug.bossBattleActive = 0;
             tran.gameplayDebug.showBossResultTimer = 0;
@@ -461,7 +802,9 @@ void SceneTitle::Update()
             tran.gameplayDebug.titleKeyConfigOpen = 0;
             tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
             m_isDifficultyOpen = false;
-            SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+            m_isPreparationOpen = true;
+            m_preparationSelection = kPreparationRowWeapon;
+            tran.gameplayDebug.titlePreparationOpen = 1;
         };
 
         if (IsMenuBackTrigger())
@@ -724,4 +1067,17 @@ void SceneTitle::Draw()
         if (m_pDifficultyBack) m_pDifficultyBack->Draw();
     }
     UIObject::End2D();
+
+    if (m_isPreparationOpen)
+    {
+        TRAN_INS;
+        DrawPreparationOverlay(
+            tran,
+            m_preparationSelection,
+            m_preparationWeaponType,
+            m_preparationSkillSlots[0],
+            m_preparationSkillSlots[1]);
+    }
 }
+
+

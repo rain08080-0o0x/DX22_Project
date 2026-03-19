@@ -17,6 +17,9 @@ public:
 
 	void LockPos(bool set)final;
 private:
+	void OrbitCamera(float deltaX, float deltaY);
+	void PanCamera(float deltaX, float deltaY);
+	void ZoomCamera(float delta);
 	void SyncOrbitFromPose();
 	float m_radXZ;
 	float m_radY;

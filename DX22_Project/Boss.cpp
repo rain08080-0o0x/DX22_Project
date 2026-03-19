@@ -115,6 +115,238 @@ namespace
     }
 
     /**
+     * @brief ボス種別ごとの行動傾向をまとめた軽量設定です。
+     */
+    struct BossProfile
+    {
+        int archetype = Transfer::RoguelikeUpgrade::BossBalancedMid;
+        DirectX::XMFLOAT4 color = { 0.75f, 0.72f, 0.48f, 1.0f };
+        float hpScale = 1.0f;
+        float guardScale = 1.0f;
+        float sizeScale = 1.0f;
+        float cooldownScale = 1.0f;
+        float telegraphScale = 1.0f;
+        float damageScale = 1.0f;
+        float laneScale = 1.0f;
+        float dashDurationScale = 1.0f;
+        float jumpOutScale = 1.0f;
+        float randomRainRadiusScale = 1.0f;
+        float trackingRadiusScale = 1.0f;
+        float fieldSafeScale = 1.0f;
+        float randomRainCountScale = 1.0f;
+        float summonCountScale = 1.0f;
+        float trackingCountScale = 1.0f;
+        float stompCountScale = 1.0f;
+        int ultimateInterval = 5;
+        bool startsSpecial = false;
+        bool inflictsCurse = false;
+        int topLevelWeights[5] = { 2, 2, 3, 2, 3 };
+    };
+
+    /**
+     * @brief 指定ボス種別に対応する行動傾向を返します。
+     * @param archetype ボス種別です。
+     * @return ボス種別ごとの設定です。
+     */
+    BossProfile MakeBossProfile(int archetype)
+    {
+        BossProfile profile;
+        profile.archetype = ClampInt(
+            archetype,
+            Transfer::RoguelikeUpgrade::BossHeavyMelee,
+            Transfer::RoguelikeUpgrade::BossFinalBarrage);
+
+        switch (profile.archetype)
+        {
+        case Transfer::RoguelikeUpgrade::BossHeavyMelee:
+            profile.color = { 0.78f, 0.32f, 0.22f, 1.0f };
+            profile.hpScale = 1.25f;
+            profile.guardScale = 1.35f;
+            profile.sizeScale = 1.18f;
+            profile.cooldownScale = 1.18f;
+            profile.telegraphScale = 1.10f;
+            profile.damageScale = 1.20f;
+            profile.laneScale = 1.20f;
+            profile.dashDurationScale = 1.08f;
+            profile.randomRainCountScale = 0.75f;
+            profile.summonCountScale = 0.80f;
+            profile.trackingCountScale = 0.70f;
+            profile.stompCountScale = 1.35f;
+            profile.ultimateInterval = 4;
+            profile.topLevelWeights[0] = 6;
+            profile.topLevelWeights[1] = 4;
+            profile.topLevelWeights[2] = 1;
+            profile.topLevelWeights[3] = 1;
+            profile.topLevelWeights[4] = 1;
+            break;
+
+        case Transfer::RoguelikeUpgrade::BossLightRanged:
+            profile.color = { 0.34f, 0.84f, 1.0f, 1.0f };
+            profile.hpScale = 0.88f;
+            profile.guardScale = 0.82f;
+            profile.sizeScale = 0.88f;
+            profile.cooldownScale = 0.82f;
+            profile.telegraphScale = 0.88f;
+            profile.damageScale = 0.85f;
+            profile.laneScale = 0.92f;
+            profile.dashDurationScale = 0.90f;
+            profile.randomRainRadiusScale = 0.90f;
+            profile.trackingRadiusScale = 0.90f;
+            profile.randomRainCountScale = 1.55f;
+            profile.summonCountScale = 1.10f;
+            profile.trackingCountScale = 1.60f;
+            profile.stompCountScale = 0.75f;
+            profile.ultimateInterval = 4;
+            profile.topLevelWeights[0] = 1;
+            profile.topLevelWeights[1] = 1;
+            profile.topLevelWeights[2] = 5;
+            profile.topLevelWeights[3] = 2;
+            profile.topLevelWeights[4] = 6;
+            break;
+
+        case Transfer::RoguelikeUpgrade::BossSwiftDebuff:
+            profile.color = { 0.78f, 0.42f, 0.98f, 1.0f };
+            profile.hpScale = 0.95f;
+            profile.guardScale = 0.90f;
+            profile.sizeScale = 0.92f;
+            profile.cooldownScale = 0.68f;
+            profile.telegraphScale = 0.76f;
+            profile.damageScale = 0.95f;
+            profile.laneScale = 0.95f;
+            profile.dashDurationScale = 0.74f;
+            profile.jumpOutScale = 0.75f;
+            profile.randomRainCountScale = 0.70f;
+            profile.summonCountScale = 0.60f;
+            profile.trackingCountScale = 1.35f;
+            profile.stompCountScale = 0.85f;
+            profile.ultimateInterval = 3;
+            profile.inflictsCurse = true;
+            profile.topLevelWeights[0] = 6;
+            profile.topLevelWeights[1] = 2;
+            profile.topLevelWeights[2] = 1;
+            profile.topLevelWeights[3] = 0;
+            profile.topLevelWeights[4] = 5;
+            break;
+
+        case Transfer::RoguelikeUpgrade::BossFinalBarrage:
+            profile.color = { 1.0f, 0.20f, 0.18f, 1.0f };
+            profile.hpScale = 1.75f;
+            profile.guardScale = 1.45f;
+            profile.sizeScale = 1.08f;
+            profile.cooldownScale = 0.55f;
+            profile.telegraphScale = 0.65f;
+            profile.damageScale = 1.15f;
+            profile.laneScale = 1.05f;
+            profile.dashDurationScale = 0.78f;
+            profile.jumpOutScale = 0.60f;
+            profile.randomRainRadiusScale = 0.92f;
+            profile.trackingRadiusScale = 0.92f;
+            profile.fieldSafeScale = 0.82f;
+            profile.randomRainCountScale = 2.25f;
+            profile.summonCountScale = 0.25f;
+            profile.trackingCountScale = 2.40f;
+            profile.stompCountScale = 1.55f;
+            profile.ultimateInterval = 2;
+            profile.startsSpecial = true;
+            profile.topLevelWeights[0] = 1;
+            profile.topLevelWeights[1] = 1;
+            profile.topLevelWeights[2] = 7;
+            profile.topLevelWeights[3] = 0;
+            profile.topLevelWeights[4] = 8;
+            break;
+
+        case Transfer::RoguelikeUpgrade::BossBalancedMid:
+        default:
+            profile.color = { 0.86f, 0.74f, 0.40f, 1.0f };
+            profile.ultimateInterval = 4;
+            break;
+        }
+
+        return profile;
+    }
+
+    void ApplyFinalBossScriptGlobals(BossProfile& profile, const BossAttackScript::Profile& script)
+    {
+        profile.hpScale = ClampRange(script.hpScale, 0.10f, 8.0f);
+        profile.guardScale = ClampRange(script.guardScale, 0.10f, 8.0f);
+        profile.sizeScale = ClampRange(script.sizeScale, 0.20f, 3.0f);
+        profile.cooldownScale = ClampRange(script.cooldownScale, 0.10f, 4.0f);
+        profile.telegraphScale = ClampRange(script.telegraphScale, 0.10f, 4.0f);
+        profile.damageScale = ClampRange(script.damageScale, 0.10f, 8.0f);
+        profile.startsSpecial = script.startsSpecial;
+    }
+
+    /**
+     * @brief 現在進行中ノードに対応するボス種別を返します。
+     * @param tran Transfer シングルトンです。
+     * @return BossArchetype の値です。
+     */
+    int ResolveCurrentBossArchetype(const Transfer& tran)
+    {
+        const int currentStageType = tran.GetCurrentRunStageType();
+        if (currentStageType == Transfer::RoguelikeUpgrade::StageFinalBoss)
+        {
+            return ClampInt(
+                tran.roguelike.finalBossType,
+                Transfer::RoguelikeUpgrade::BossHeavyMelee,
+                Transfer::RoguelikeUpgrade::BossFinalBarrage);
+        }
+
+        if (currentStageType == Transfer::RoguelikeUpgrade::StageBoss)
+        {
+            const int stageIndex = ClampInt(tran.roguelike.currentStageIndex, 0, tran.GetRunStageCount() - 1);
+            const int mapNumber = tran.GetRunStageMapNumberAt(stageIndex);
+            const int bossSlot = ClampInt(
+                mapNumber - 1,
+                0,
+                Transfer::RoguelikeUpgrade::kRegularBossSlotCount - 1);
+            return ClampInt(
+                tran.roguelike.regularBossOrder[bossSlot],
+                Transfer::RoguelikeUpgrade::BossHeavyMelee,
+                Transfer::RoguelikeUpgrade::BossSwiftDebuff);
+        }
+
+        return Transfer::RoguelikeUpgrade::BossBalancedMid;
+    }
+
+    /**
+     * @brief ボス種別の重みに従って次の通常攻撃種別を抽選します。
+     * @param profile ボス種別設定です。
+     * @return 0:DashNarrow 1:DashWide 2:RandomRain 3:Summon 4:TrackingDrop です。
+     */
+    int PickWeightedBossAttack(const BossProfile& profile)
+    {
+        int totalWeight = 0;
+        for (int i = 0; i < 5; ++i)
+        {
+            if (profile.topLevelWeights[i] > 0)
+            {
+                totalWeight += profile.topLevelWeights[i];
+            }
+        }
+        if (totalWeight <= 0)
+        {
+            return 4;
+        }
+
+        int roll = RandomRangeInt(1, totalWeight);
+        for (int i = 0; i < 5; ++i)
+        {
+            const int weight = (profile.topLevelWeights[i] > 0) ? profile.topLevelWeights[i] : 0;
+            if (weight <= 0)
+            {
+                continue;
+            }
+            roll -= weight;
+            if (roll <= 0)
+            {
+                return i;
+            }
+        }
+        return 4;
+    }
+
+    /**
      * @brief Linearly interpolates a 3D vector.
      * @param a Start value.
      * @param b End value.
@@ -129,6 +361,219 @@ namespace
             a.y + (b.y - a.y) * rate,
             a.z + (b.z - a.z) * rate
         };
+    }
+
+    float DegToRad(float deg)
+    {
+        return deg * (DirectX::XM_PI / 180.0f);
+    }
+
+    DirectX::XMFLOAT3 RotateOffsetY(const DirectX::XMFLOAT3& value, float yawDeg)
+    {
+        const float rad = DegToRad(yawDeg);
+        const float c = std::cos(rad);
+        const float s = std::sin(rad);
+        return {
+            value.x * c - value.z * s,
+            value.y,
+            value.x * s + value.z * c
+        };
+    }
+
+    DirectX::XMFLOAT3 ClampArenaPos(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& size, float stageHalf)
+    {
+        const float hx = size.x * 0.5f;
+        const float hz = size.z * 0.5f;
+        return {
+            ClampRange(pos.x, -stageHalf + hx, stageHalf - hx),
+            pos.y,
+            ClampRange(pos.z, -stageHalf + hz, stageHalf - hz)
+        };
+    }
+
+    struct ScriptedColliderZone
+    {
+        DirectX::XMFLOAT3 center = { 0.0f, 0.05f, 0.0f };
+        DirectX::XMFLOAT3 size = { 1.0f, 0.10f, 1.0f };
+        float yawDeg = 0.0f;
+        int shape = BossAttackScript::ColliderShapeBox;
+        DirectX::XMFLOAT3 startPos = { 0.0f, 0.05f, 0.0f };
+        DirectX::XMFLOAT3 endPos = { 0.0f, 0.05f, 0.0f };
+        bool hasPath = false;
+    };
+
+    DirectX::XMFLOAT3 ResolveRuntimePoint(int mode,
+                                          const DirectX::XMFLOAT3& value,
+                                          float randomRadius,
+                                          const DirectX::XMFLOAT3& anchor,
+                                          const DirectX::XMFLOAT3& playerPos,
+                                          float facingYawDeg)
+    {
+        switch (mode)
+        {
+        case BossAttackScript::ColliderStartCurrent:
+        {
+            const DirectX::XMFLOAT3 offset = RotateOffsetY(value, facingYawDeg);
+            return {
+                anchor.x + offset.x,
+                anchor.y + offset.y,
+                anchor.z + offset.z
+            };
+        }
+        case BossAttackScript::ColliderStartPlayer:
+            return playerPos;
+        case BossAttackScript::ColliderStartPlayerAreaRandom:
+        {
+            const float angle = RandomRange(0.0f, DirectX::XM_2PI);
+            const float distance = RandomRange(0.0f, MaxFloat(randomRadius, 0.0f));
+            return {
+                playerPos.x + std::cos(angle) * distance,
+                playerPos.y,
+                playerPos.z + std::sin(angle) * distance
+            };
+        }
+        case BossAttackScript::ColliderStartAbsolute:
+        default:
+            return value;
+        }
+    }
+
+    float DistancePointToSegment2D(const DirectX::XMFLOAT3& point,
+                                   const DirectX::XMFLOAT3& startPos,
+                                   const DirectX::XMFLOAT3& endPos)
+    {
+        const float segX = endPos.x - startPos.x;
+        const float segZ = endPos.z - startPos.z;
+        const float lenSq = segX * segX + segZ * segZ;
+        if (lenSq <= 0.000001f)
+        {
+            const float dx = point.x - startPos.x;
+            const float dz = point.z - startPos.z;
+            return std::sqrt(dx * dx + dz * dz);
+        }
+
+        const float toPointX = point.x - startPos.x;
+        const float toPointZ = point.z - startPos.z;
+        float t = (toPointX * segX + toPointZ * segZ) / lenSq;
+        t = ClampRange(t, 0.0f, 1.0f);
+        const float closestX = startPos.x + segX * t;
+        const float closestZ = startPos.z + segZ * t;
+        const float dx = point.x - closestX;
+        const float dz = point.z - closestZ;
+        return std::sqrt(dx * dx + dz * dz);
+    }
+
+    ScriptedColliderZone BuildScriptedColliderZone(const BossAttackScript::Collider& collider,
+                                                   const DirectX::XMFLOAT3& anchor,
+                                                   const DirectX::XMFLOAT3& playerPos,
+                                                   float facingYawDeg,
+                                                   float stageHalf,
+                                                   float minimumHeight,
+                                                   bool allowEndPosition)
+    {
+        ScriptedColliderZone zone;
+        const float baseYawDeg =
+            (collider.startMode == BossAttackScript::ColliderStartCurrent) ? facingYawDeg : 0.0f;
+        zone.shape = BossAttackScript::NormalizeColliderShape(collider.shape);
+
+        DirectX::XMFLOAT3 startPos = ResolveRuntimePoint(
+            collider.startMode,
+            collider.startPos,
+            collider.startRandomRadius,
+            anchor,
+            playerPos,
+            facingYawDeg);
+        startPos = ClampArenaPos(startPos, collider.startSize, stageHalf);
+
+        DirectX::XMFLOAT3 endPos = startPos;
+        if (allowEndPosition && collider.useEndPosition)
+        {
+            switch (BossAttackScript::NormalizeColliderEndMode(collider.endMode))
+            {
+            case BossAttackScript::ColliderEndCurrentRelative:
+            {
+                const DirectX::XMFLOAT3 endOffset = RotateOffsetY(collider.endPos, facingYawDeg);
+                endPos = {
+                    anchor.x + endOffset.x,
+                    anchor.y + endOffset.y,
+                    anchor.z + endOffset.z
+                };
+                break;
+            }
+            case BossAttackScript::ColliderEndPlayer:
+                endPos = playerPos;
+                break;
+            case BossAttackScript::ColliderEndPlayerAreaRandom:
+            {
+                const float angle = RandomRange(0.0f, DirectX::XM_2PI);
+                const float distance = RandomRange(0.0f, MaxFloat(collider.endRandomRadius, 0.0f));
+                endPos = {
+                    playerPos.x + std::cos(angle) * distance,
+                    playerPos.y,
+                    playerPos.z + std::sin(angle) * distance
+                };
+                break;
+            }
+            case BossAttackScript::ColliderEndAbsolute:
+            default:
+                endPos = collider.endPos;
+                break;
+            }
+            endPos = ClampArenaPos(endPos, collider.endSize, stageHalf);
+        }
+
+        zone.startPos = startPos;
+        zone.endPos = endPos;
+        zone.hasPath = allowEndPosition && collider.useEndPosition;
+
+        if (allowEndPosition && collider.useEndPosition)
+        {
+            const float dx = endPos.x - startPos.x;
+            const float dz = endPos.z - startPos.z;
+            const float distance = std::sqrt(dx * dx + dz * dz);
+            if (distance > 0.001f)
+            {
+                zone.center = {
+                    (startPos.x + endPos.x) * 0.5f,
+                    (startPos.y + endPos.y) * 0.5f,
+                    (startPos.z + endPos.z) * 0.5f
+                };
+                zone.size = {
+                    std::max(collider.startSize.x, collider.endSize.x),
+                    std::max(collider.startSize.y, collider.endSize.y),
+                    (zone.shape == BossAttackScript::ColliderShapeCircle)
+                        ? std::max(collider.startSize.x, collider.endSize.x)
+                        : distance
+                };
+                zone.yawDeg = std::atan2(dx, dz) * (180.0f / DirectX::XM_PI);
+                zone.size.y = MaxFloat(zone.size.y, minimumHeight);
+                return zone;
+            }
+        }
+
+        zone.center = startPos;
+        zone.size = collider.startSize;
+        zone.yawDeg = baseYawDeg;
+        zone.size.y = MaxFloat(zone.size.y, minimumHeight);
+        return zone;
+    }
+
+    int ResolveProfileTypeFromBossArchetype(int bossArchetype)
+    {
+        switch (bossArchetype)
+        {
+        case Transfer::RoguelikeUpgrade::BossHeavyMelee:
+            return BossAttackScript::ProfileHeavyMelee;
+        case Transfer::RoguelikeUpgrade::BossLightRanged:
+            return BossAttackScript::ProfileLightRanged;
+        case Transfer::RoguelikeUpgrade::BossSwiftDebuff:
+            return BossAttackScript::ProfileSwiftDebuff;
+        case Transfer::RoguelikeUpgrade::BossFinalBarrage:
+            return BossAttackScript::ProfileFinalBarrage;
+        case Transfer::RoguelikeUpgrade::BossBalancedMid:
+        default:
+            return BossAttackScript::ProfileBalancedMid;
+        }
     }
 
     /**
@@ -156,6 +601,42 @@ namespace
         return Collision::Hit(a, b).isHit;
     }
 
+    bool HitZone(const Collision::Box& box, const BossController::AttackZone& zone)
+    {
+        const float halfHeightA = box.size.y * 0.5f;
+        const float halfHeightB = zone.size.y * 0.5f;
+        if (std::fabs(box.center.y - zone.center.y) > (halfHeightA + halfHeightB))
+        {
+            return false;
+        }
+
+        if (zone.shape == BossAttackScript::ColliderShapeCircle)
+        {
+            const float playerRadius = MaxFloat(box.size.x, box.size.z) * 0.5f;
+            const float zoneRadius = zone.size.x * 0.5f;
+            const float distance = zone.hasPath
+                ? DistancePointToSegment2D(box.center, zone.startPos, zone.endPos)
+                : DistancePointToSegment2D(box.center, zone.center, zone.center);
+            return distance <= (zoneRadius + playerRadius);
+        }
+
+        if (std::fabs(zone.yawDeg) <= 0.01f)
+        {
+            return HitAabb(box, MakeAabb(zone.center, zone.size));
+        }
+
+        const float dx = box.center.x - zone.center.x;
+        const float dz = box.center.z - zone.center.z;
+        const float rad = DegToRad(-zone.yawDeg);
+        const float c = std::cos(rad);
+        const float s = std::sin(rad);
+        const float localX = dx * c - dz * s;
+        const float localZ = dx * s + dz * c;
+        const float limitX = zone.size.x * 0.5f + box.size.x * 0.5f;
+        const float limitZ = zone.size.z * 0.5f + box.size.z * 0.5f;
+        return (std::fabs(localX) <= limitX) && (std::fabs(localZ) <= limitZ);
+    }
+
     /**
      * @brief Draws a flat marker texture on the ground with a tint.
      * @param texture Marker texture.
@@ -166,12 +647,15 @@ namespace
     void DrawAttackMarkerTintLocal(Texture* texture,
                                    const DirectX::XMFLOAT3& pos,
                                    const DirectX::XMFLOAT3& size,
-                                   const DirectX::XMFLOAT4& color)
+                                   const DirectX::XMFLOAT4& color,
+                                   float yawDeg = 0.0f)
     {
         if (!texture) return;
 
         const float markerY = 0.002f;
-        DirectX::XMMATRIX r = DirectX::XMMatrixRotationX(DirectX::XM_PIDIV2);
+        DirectX::XMMATRIX r =
+            DirectX::XMMatrixRotationZ(DegToRad(yawDeg)) *
+            DirectX::XMMatrixRotationX(DirectX::XM_PIDIV2);
         DirectX::XMMATRIX t = DirectX::XMMatrixTranslation(pos.x, markerY, pos.z);
         DirectX::XMFLOAT4X4 world{};
         DirectX::XMStoreFloat4x4(&world, DirectX::XMMatrixTranspose(r * t));
@@ -247,6 +731,7 @@ namespace
      * @param guardHeightRate Guard bar height ratio.
      */
     void DrawBossHpOverlayLocal(float hpRate,
+                                float burnRate,
                                 float guardRate,
                                 bool isBroken,
                                 float barWidthRate,
@@ -254,7 +739,9 @@ namespace
                                 float guardOffsetX,
                                 float guardOffsetY,
                                 float guardWidthRate,
-                                float guardHeightRate)
+                                float guardHeightRate,
+                                int chainCount,
+                                Texture* chainTexture)
     {
         ImDrawList* dl = ImGui::GetForegroundDrawList();
         if (!dl) return;
@@ -274,12 +761,39 @@ namespace
         dl->AddRect(frameMin, frameMax, IM_COL32(230, 230, 230, 210), radius, 0, 2.0f);
 
         const float fillRate = Clamp01(hpRate);
+        const float burnFillRate = ClampRange(burnRate, fillRate, 1.0f);
+        const float burnInnerW = (barW - padding * 2.0f) * burnFillRate;
         const float innerW = (barW - padding * 2.0f) * fillRate;
         const ImVec2 fillMin(x + padding, y + padding);
         const ImVec2 fillMax(x + padding + innerW, y + barH - padding);
+        if (burnInnerW > 0.0f)
+        {
+            dl->AddRectFilled(
+                fillMin,
+                ImVec2(x + padding + burnInnerW, y + barH - padding),
+                IM_COL32(255, 140, 30, 225),
+                radius * 0.6f);
+        }
         if (innerW > 0.0f)
         {
             dl->AddRectFilled(fillMin, fillMax, IM_COL32(180, 30, 30, 220), radius * 0.6f);
+        }
+
+        if (chainTexture && chainTexture->GetResource() && chainCount > 0)
+        {
+            const float bindRate = Clamp01(static_cast<float>(chainCount) * 0.05f);
+            const float innerBarWidth = barW - padding * 2.0f;
+            const float chainWidth = innerBarWidth * bindRate;
+            const float iconHeight = MaxFloat(10.0f, barH - padding * 2.0f);
+            if (chainWidth > 0.0f)
+            {
+                const ImVec2 iconMin(x + padding + innerBarWidth - chainWidth, y + padding);
+                const ImVec2 iconMax(x + padding + innerBarWidth, y + padding + iconHeight);
+                dl->AddImage(
+                    reinterpret_cast<ImTextureID>(chainTexture->GetResource()),
+                    iconMin,
+                    iconMax);
+            }
         }
 
         const float guardWidth = static_cast<float>(SCREEN_WIDTH) * ClampRange(guardWidthRate, 0.10f, 0.90f);
@@ -361,16 +875,48 @@ namespace
                         const DirectX::XMFLOAT3& center,
                         const DirectX::XMFLOAT3& size,
                         const DirectX::XMFLOAT4& color,
-                        float revealStart = 0.0f,
-                        bool safeZone = false)
+                        float revealStart,
+                        float yawDeg,
+                        int shape,
+                        const DirectX::XMFLOAT3& startPos,
+                        const DirectX::XMFLOAT3& endPos,
+                        bool hasPath,
+                        bool safeZone)
     {
         BossController::AttackZone zone;
         zone.center = center;
         zone.size = size;
         zone.color = color;
         zone.revealStart = revealStart;
+        zone.yawDeg = yawDeg;
+        zone.shape = shape;
+        zone.startPos = startPos;
+        zone.endPos = endPos;
+        zone.hasPath = hasPath;
         zone.safeZone = safeZone;
         zones.push_back(zone);
+    }
+
+    void PushAttackZone(std::vector<BossController::AttackZone>& zones,
+                        const DirectX::XMFLOAT3& center,
+                        const DirectX::XMFLOAT3& size,
+                        const DirectX::XMFLOAT4& color,
+                        float revealStart = 0.0f,
+                        float yawDeg = 0.0f,
+                        bool safeZone = false)
+    {
+        PushAttackZone(
+            zones,
+            center,
+            size,
+            color,
+            revealStart,
+            yawDeg,
+            BossAttackScript::ColliderShapeBox,
+            center,
+            center,
+            false,
+            safeZone);
     }
 
     /**
@@ -381,14 +927,22 @@ namespace
      */
     void SpawnRockVisual(std::vector<BossController::FallingRock>& rocks,
                          const DirectX::XMFLOAT3& center,
-                         float span)
+                         float span,
+                         float duration = 0.28f,
+                         float spawnHeight = 2.8f,
+                         float spinDegPerSec = 0.0f,
+                         bool billboard = true)
     {
         BossController::FallingRock rock;
         const float safeSpan = SafeSpan(span, 1.0f);
         rock.pos = { center.x, 0.0f, center.z };
         rock.size = { safeSpan, safeSpan, safeSpan };
-        rock.duration = 0.28f;
+        rock.duration = ClampRange(duration, 0.05f, 10.0f);
         rock.timer = rock.duration;
+        rock.spawnHeight = MaxFloat(spawnHeight, 0.0f);
+        rock.spinDegPerSec = spinDegPerSec;
+        rock.angleDeg = 0.0f;
+        rock.billboard = billboard;
         rocks.push_back(rock);
     }
 }
@@ -413,12 +967,18 @@ void BossController::ResetForScene(const DirectX::XMFLOAT3& playerSize,
         playerSize.z * bossScale
     };
     pos = { 0.0f, 0.0f, 0.0f };
+    color = { 0.86f, 0.74f, 0.40f, 1.0f };
     maxHp = ClampInt(bossMaxHp, 1, 9999);
     hp = maxHp;
     phase = 1;
+    archetype = Transfer::RoguelikeUpgrade::BossBalancedMid;
     lastHitSwingId = -1;
+    scriptEntryIndex = -1;
+    attackDamageScale = 1.0f;
+    scriptedAttack = false;
     attackKind = AttackKindDashNarrow;
     attackPattern = AttackPatternVertical;
+    attackFacingYawDeg = 0.0f;
     attackLane.center = { 0.0f, 0.0f, 0.0f };
     attackLane.size = { 0.0f, 0.0f, 0.0f };
     attackLane.pattern = attackPattern;
@@ -432,6 +992,7 @@ void BossController::ResetForScene(const DirectX::XMFLOAT3& playerSize,
     attackStateTimer = 0.0f;
     attackTelegraphDuration = 0.0f;
     attackExecuteDuration = 0.0f;
+    attackJumpOutOverrideSec = -1.0f;
     attackCooldownTimer = 0.0f;
     attackRepeatsRemaining = 0;
     attackCycleCount = 0;
@@ -502,19 +1063,39 @@ void BossController::ReleaseBrokenTexture()
 void SceneGame::InitializeBossForScene()
 {
     auto& tran = Transfer::GetInstance();
+    const int bossArchetype = ResolveCurrentBossArchetype(tran);
+    const int profileType = ResolveProfileTypeFromBossArchetype(bossArchetype);
+    m_finalBossScript = BossAttackScript::MakeDefaultProfile(profileType);
+    BossAttackScript::LoadProfile(m_finalBossScript, profileType);
+    BossProfile bossProfile = MakeBossProfile(bossArchetype);
+    ApplyFinalBossScriptGlobals(bossProfile, m_finalBossScript);
+    m_finalBossScriptCursor = 0;
     // Difficulty changes the effective HP before the boss is reset.
     const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
     const float bossHpScale =
         tran.GetBossHpScaleByDifficulty(difficultyPreset) *
         tran.GetBossHpScaleByUpgradeProgress();
     const int effectiveBossMaxHp = ClampInt(
-        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale)),
+        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale * bossProfile.hpScale)),
         1,
         9999);
-    const float initialGuardMax = ClampRange(tran.gameplay.bossGuardInitialMax, 1.0f, 200.0f);
-    m_boss.ResetForScene(tran.player.size, tran.gameplay.bossSizeAreaScale, effectiveBossMaxHp, initialGuardMax);
+    const float initialGuardMax = ClampRange(tran.gameplay.bossGuardInitialMax * bossProfile.guardScale, 1.0f, 200.0f);
+    m_boss.ResetForScene(
+        tran.player.size,
+        ClampRange(tran.gameplay.bossSizeAreaScale * bossProfile.sizeScale, 4.0f, 12.0f),
+        effectiveBossMaxHp,
+        initialGuardMax);
+    m_boss.archetype = bossArchetype;
+    m_boss.color = bossProfile.color;
+    m_boss.specialUnlocked = bossProfile.startsSpecial;
+    m_boss.forceUltimatePending = bossProfile.startsSpecial;
+    if (bossProfile.startsSpecial)
+    {
+        m_boss.phase = 2;
+    }
     m_lastBossSkillProjectileId = -1;
     m_bossSkillContactCooldownTimer = 0.0f;
+    m_bossCurseTimer = 0.0f;
 }
 
 /**
@@ -551,6 +1132,11 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
     }
 
     auto& tran = Transfer::GetInstance();
+    const int bossArchetype = ResolveCurrentBossArchetype(tran);
+    BossProfile bossProfile = MakeBossProfile(bossArchetype);
+    ApplyFinalBossScriptGlobals(bossProfile, m_finalBossScript);
+    m_boss.archetype = bossArchetype;
+    m_boss.color = bossProfile.color;
     if (m_boss.requiresArenaReset)
     {
         // Entering boss mode clears regular enemies and projectiles exactly once.
@@ -621,7 +1207,7 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
         tran.GetBossHpScaleByDifficulty(difficultyPreset) *
         tran.GetBossHpScaleByUpgradeProgress();
     const int effectiveBossMaxHp = ClampInt(
-        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale)),
+        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossMaxHp) * bossHpScale * bossProfile.hpScale)),
         1,
         9999);
 
@@ -642,8 +1228,8 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
         m_boss.hp = m_boss.maxHp;
     }
 
-    const float guardMin = tran.gameplay.bossGuardInitialMax;
-    const float guardMaxLimit = tran.gameplay.bossGuardFinalMax;
+    const float guardMin = ClampRange(tran.gameplay.bossGuardInitialMax * bossProfile.guardScale, 1.0f, 200.0f);
+    const float guardMaxLimit = ClampRange(tran.gameplay.bossGuardFinalMax * bossProfile.guardScale, guardMin, 200.0f);
     const float clampedGuardMax = ClampRange(
         (m_boss.guardMax > 0.0f) ? m_boss.guardMax : guardMin,
         guardMin,
@@ -663,13 +1249,19 @@ bool SceneGame::UpdateBossDebugSetup(float stageSize)
         m_boss.guard = m_boss.guardMax;
     }
 
-    const float bossScale = std::sqrt(tran.gameplay.bossSizeAreaScale);
+    const float bossScale = std::sqrt(ClampRange(tran.gameplay.bossSizeAreaScale * bossProfile.sizeScale, 4.0f, 12.0f));
     m_boss.size =
     {
         tran.player.size.x * bossScale,
         tran.player.size.y * bossScale,
         tran.player.size.z * bossScale
     };
+    if (bossProfile.startsSpecial && m_boss.phase < 2)
+    {
+        m_boss.phase = 2;
+        m_boss.specialUnlocked = true;
+        m_boss.forceUltimatePending = true;
+    }
 
     return false;
 }
@@ -698,6 +1290,9 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     }
 
     auto& tran = Transfer::GetInstance();
+    BossProfile bossProfile = MakeBossProfile(m_boss.archetype);
+    ApplyFinalBossScriptGlobals(bossProfile, m_finalBossScript);
+    const bool useFinalBossScript = !m_finalBossScript.attacks.empty();
     if (tran.gameplayDebug.bossHpEditRequest != 0)
     {
         const int requestedMaxHp = ClampInt(tran.gameplayDebug.bossMaxHpEditValue, 1, 9999);
@@ -732,21 +1327,21 @@ bool SceneGame::UpdateBossBattle(float stageSize,
 
     // Snapshot all runtime tuning values into locals so the rest of the update uses one consistent frame view.
     const float stageHalf = stageSize * 0.5f;
-    const float dashSec = ClampRange(tran.gameplay.bossAttackDashDuration, 0.05f, 2.0f);
-    const float jumpOutSec = ClampRange(tran.gameplay.bossAttackJumpOutTime, 0.0f, 4.0f);
+    const float dashSec = ClampRange(tran.gameplay.bossAttackDashDuration * bossProfile.dashDurationScale, 0.05f, 2.0f);
+    const float jumpOutSec = ClampRange(tran.gameplay.bossAttackJumpOutTime * bossProfile.jumpOutScale, 0.0f, 4.0f);
     const int difficultyPreset = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
     const float difficultyBossCooldownScale = tran.GetBossCooldownScaleByDifficulty(difficultyPreset);
     const float phaseLowHpCooldownScale = (m_boss.phase >= 3) ? 0.60f : 1.0f;
     const float brokenCooldownScale = m_boss.isBroken ? 2.40f : 1.0f;
     const float cooldownSec = ClampRange(
-        tran.gameplay.bossAttackCooldown * difficultyBossCooldownScale * phaseLowHpCooldownScale * brokenCooldownScale,
+        tran.gameplay.bossAttackCooldown * difficultyBossCooldownScale * phaseLowHpCooldownScale * brokenCooldownScale * bossProfile.cooldownScale,
         0.0f,
         6.0f);
     const float brokenTelegraphScale = m_boss.isBroken ? 1.35f : 1.0f;
-    const float telegraphMultiplier = ClampRange(tran.gameplay.bossAttackTelegraph, 0.10f, 4.0f) * brokenTelegraphScale;
-    const float bossDamage = (tran.gameplay.bossAttackDamage < 0.0f) ? 0.0f : tran.gameplay.bossAttackDamage;
+    const float telegraphMultiplier = ClampRange(tran.gameplay.bossAttackTelegraph, 0.10f, 4.0f) * brokenTelegraphScale * bossProfile.telegraphScale;
+    const float bossDamage = ((tran.gameplay.bossAttackDamage < 0.0f) ? 0.0f : tran.gameplay.bossAttackDamage) * bossProfile.damageScale;
     const float lanePlayerRatio = ClampRange(tran.gameplay.bossAttackLanePlayerScale, 0.5f, 8.0f);
-    const float globalLaneScale = lanePlayerRatio / 3.0f;
+    const float globalLaneScale = (lanePlayerRatio / 3.0f) * bossProfile.laneScale;
     const float playerWidth = SafeSpan(tran.player.size.x, 0.8f);
     const float playerDepth = SafeSpan(tran.player.size.z, playerWidth);
     const float playerSpan = MaxFloat(playerWidth, playerDepth);
@@ -754,23 +1349,43 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     const float dashNarrowTelegraphSec = ClampRange(tran.gameplay.bossDashNarrowTelegraph, 0.10f, 8.0f) * telegraphMultiplier;
     const float dashWideTelegraphSec = ClampRange(tran.gameplay.bossDashWideTelegraph, 0.10f, 8.0f) * telegraphMultiplier;
     const float dashWideWidthRate = ClampRange(tran.gameplay.bossDashWideWidthRate, 0.10f, 1.00f);
-    const int randomRainCount = ClampInt(tran.gameplay.bossRandomRainCount, 1, 16);
+    const int randomRainCount = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossRandomRainCount) * bossProfile.randomRainCountScale)),
+        1,
+        32);
     const float randomRainTelegraphSec = ClampRange(tran.gameplay.bossRandomRainTelegraph, 0.10f, 8.0f) * telegraphMultiplier;
-    const float randomRainRadiusScale = (tran.gameplay.bossRandomRainRadiusScale < 0.25f) ? 0.25f : tran.gameplay.bossRandomRainRadiusScale;
-    const int summonMin = ClampInt(tran.gameplay.bossSummonMin, 1, 32);
-    const int summonMax = ClampInt((tran.gameplay.bossSummonMax < summonMin) ? summonMin : tran.gameplay.bossSummonMax, summonMin, 32);
+    const float randomRainRadiusScale = ((tran.gameplay.bossRandomRainRadiusScale < 0.25f) ? 0.25f : tran.gameplay.bossRandomRainRadiusScale) * bossProfile.randomRainRadiusScale;
+    const int summonBaseMin = ClampInt(tran.gameplay.bossSummonMin, 1, 32);
+    const int summonBaseMax = ClampInt(
+        (tran.gameplay.bossSummonMax < summonBaseMin) ? summonBaseMin : tran.gameplay.bossSummonMax,
+        summonBaseMin,
+        32);
+    const int summonMin = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(summonBaseMin) * bossProfile.summonCountScale)),
+        1,
+        32);
+    const int summonMax = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(summonBaseMax) * bossProfile.summonCountScale)),
+        summonMin,
+        32);
     const float summonTelegraphSec = ClampRange(tran.gameplay.bossSummonTelegraph, 0.10f, 8.0f) * telegraphMultiplier;
-    const int trackingDropCount = ClampInt(tran.gameplay.bossTrackingDropCount, 1, 16);
+    const int trackingDropCount = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossTrackingDropCount) * bossProfile.trackingCountScale)),
+        1,
+        32);
     const float trackingDropTelegraphSec = ClampRange(tran.gameplay.bossTrackingDropTelegraph, 0.10f, 8.0f) * telegraphMultiplier;
-    const float trackingDropRadiusScale = (tran.gameplay.bossTrackingDropRadiusScale < 0.5f) ? 0.5f : tran.gameplay.bossTrackingDropRadiusScale;
+    const float trackingDropRadiusScale = ((tran.gameplay.bossTrackingDropRadiusScale < 0.5f) ? 0.5f : tran.gameplay.bossTrackingDropRadiusScale) * bossProfile.trackingRadiusScale;
     const float ultimateCrossTelegraphSec = ClampRange(tran.gameplay.bossUltimateCrossTelegraph, 0.10f, 8.0f) * telegraphMultiplier;
     const float ultimateCrossLaneScale = (tran.gameplay.bossUltimateCrossLaneScale < 0.25f) ? 0.25f : tran.gameplay.bossUltimateCrossLaneScale;
-    const int ultimateStompCount = ClampInt(tran.gameplay.bossUltimateStompCount, 1, 16);
+    const int ultimateStompCount = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(tran.gameplay.bossUltimateStompCount) * bossProfile.stompCountScale)),
+        1,
+        32);
     const float ultimateStompTelegraphSec = ClampRange(tran.gameplay.bossUltimateStompTelegraph, 0.10f, 12.0f) * telegraphMultiplier;
     const float ultimateStompRepeatTelegraphSec = ClampRange(tran.gameplay.bossUltimateStompRepeatTelegraph, 0.10f, 12.0f) * telegraphMultiplier;
     const float ultimateStompRadiusScale = (tran.gameplay.bossUltimateStompRadiusScale < 0.5f) ? 0.5f : tran.gameplay.bossUltimateStompRadiusScale;
     const float ultimateFieldTelegraphSec = ClampRange(tran.gameplay.bossUltimateFieldTelegraph, 0.10f, 12.0f) * telegraphMultiplier;
-    const float ultimateFieldSafeScale = (tran.gameplay.bossUltimateFieldSafeScale < 0.5f) ? 0.5f : tran.gameplay.bossUltimateFieldSafeScale;
+    const float ultimateFieldSafeScale = ((tran.gameplay.bossUltimateFieldSafeScale < 0.5f) ? 0.5f : tran.gameplay.bossUltimateFieldSafeScale) * bossProfile.fieldSafeScale;
     const DirectX::XMFLOAT4 dangerColor = { 1.0f, 0.15f, 0.10f, 1.0f };
     const DirectX::XMFLOAT4 safeColor = { 0.20f, 0.95f, 0.35f, 1.0f };
     const DirectX::XMFLOAT4 safeOutlineColor = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -784,7 +1399,9 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         200.0f);
     const float guardRecoverStep = ClampRange(tran.gameplay.bossGuardRecoverStep, 0.0f, 50.0f);
     const float guardDamagePerHit = 1.0f;
-    const int ultimateInterval = (m_boss.phase >= 3) ? 3 : 5;
+    const int ultimateInterval = (m_boss.phase >= 3)
+        ? ((bossProfile.ultimateInterval > 1) ? (bossProfile.ultimateInterval - 1) : 1)
+        : bossProfile.ultimateInterval;
     const float bossHitStop = ClampRange(tran.gameplay.bossAttackHitStop, 0.0f, 0.20f);
 
     // Local helpers keep the long attack state machine readable.
@@ -810,8 +1427,12 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         m_boss.attackStateTimer = 0.0f;
         m_boss.attackTelegraphDuration = telegraphDuration;
         m_boss.attackExecuteDuration = executeDuration;
+        m_boss.attackJumpOutOverrideSec = -1.0f;
         m_boss.attackResolved = false;
         m_boss.jumpedOut = false;
+        m_boss.attackDamageScale = 1.0f;
+        m_boss.scriptEntryIndex = -1;
+        m_boss.scriptedAttack = false;
         m_boss.attackZones.clear();
         m_boss.attackLane.center = { 0.0f, 0.0f, 0.0f };
         m_boss.attackLane.size = { 0.0f, 0.0f, 0.0f };
@@ -992,8 +1613,9 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             { safeSize.x * 1.18f, safeSize.y, safeSize.z * 1.18f },
             safeOutlineColor,
             0.0f,
+            0.0f,
             true);
-        PushAttackZone(m_boss.attackZones, safeCenter, safeSize, safeColor, 0.0f, true);
+        PushAttackZone(m_boss.attackZones, safeCenter, safeSize, safeColor, 0.0f, 0.0f, true);
 
         const int gridCount = 7;
         const float cellSize = stageSize / static_cast<float>(gridCount);
@@ -1036,9 +1658,199 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         }
     };
 
+    auto beginScriptedAttack = [&](const BossAttackScript::Attack& scriptEntry, int scriptIndex, bool continuingRepeat)
+    {
+        const int deliveryMode = BossAttackScript::NormalizeAttackDeliveryMode(scriptEntry.deliveryMode);
+        const bool isBossSelfAttack = (deliveryMode == BossAttackScript::AttackDeliveryBossSelf);
+        const bool isRemoteFallingAttack = (deliveryMode == BossAttackScript::AttackDeliveryRemoteFalling);
+        startTelegraph(BossController::AttackKindCustom,
+            ClampRange(scriptEntry.telegraphSec * bossProfile.telegraphScale, 0.05f, 20.0f),
+            ClampRange(scriptEntry.activeSec, 0.05f, 10.0f));
+
+        m_boss.scriptedAttack = true;
+        m_boss.scriptEntryIndex = scriptIndex;
+        m_boss.attackDamageScale = ClampRange(scriptEntry.damageScale, 0.0f, 20.0f);
+        m_boss.attackJumpOutOverrideSec = -1.0f;
+        m_boss.attackFacingYawDeg = 0.0f;
+        m_boss.dashStartPos = { 0.0f, 0.0f, 0.0f };
+        m_boss.dashEndPos = { 0.0f, 0.0f, 0.0f };
+        if (!continuingRepeat)
+        {
+            m_boss.attackRepeatsRemaining = ClampInt(scriptEntry.repeatCount, 1, 64);
+        }
+
+        const DirectX::XMFLOAT3 bossOrigin = { 0.0f, 0.0f, 0.0f };
+        const DirectX::XMFLOAT3 toPlayer = {
+            tran.player.pos.x - bossOrigin.x,
+            0.0f,
+            tran.player.pos.z - bossOrigin.z
+        };
+        const float toPlayerLenSq = toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z;
+        const float toPlayerInvLen = (toPlayerLenSq > 0.000001f) ? (1.0f / std::sqrt(toPlayerLenSq)) : 0.0f;
+        const DirectX::XMFLOAT3 moveDir = (toPlayerInvLen > 0.0f)
+            ? DirectX::XMFLOAT3{ toPlayer.x * toPlayerInvLen, 0.0f, toPlayer.z * toPlayerInvLen }
+            : DirectX::XMFLOAT3{ 0.0f, 0.0f, 1.0f };
+
+        std::vector<DirectX::XMFLOAT3> origins;
+        const int spawnMode = BossAttackScript::NormalizeSpawnMode(scriptEntry.spawnMode);
+        const int spawnCount = ClampInt(scriptEntry.spawnCount, 1, 64);
+        if (spawnMode == BossAttackScript::SpawnArenaRandom)
+        {
+            for (int i = 0; i < spawnCount; ++i)
+            {
+                origins.push_back({
+                    RandomRange(-stageHalf, stageHalf),
+                    0.0f,
+                    RandomRange(-stageHalf, stageHalf)
+                });
+            }
+        }
+        else if (spawnMode == BossAttackScript::SpawnPlayerAreaRandom)
+        {
+            const float randomRadius = ClampRange(scriptEntry.randomRadius, 0.0f, stageHalf);
+            for (int i = 0; i < spawnCount; ++i)
+            {
+                const float angle = RandomRange(0.0f, DirectX::XM_2PI);
+                const float distance = RandomRange(0.0f, randomRadius);
+                origins.push_back({
+                    ClampRange(tran.player.pos.x + std::cos(angle) * distance, -stageHalf, stageHalf),
+                    0.0f,
+                    ClampRange(tran.player.pos.z + std::sin(angle) * distance, -stageHalf, stageHalf)
+                });
+            }
+        }
+        else if (spawnMode == BossAttackScript::SpawnPlayerPosition)
+        {
+            for (int i = 0; i < spawnCount; ++i)
+            {
+                origins.push_back(tran.player.pos);
+            }
+        }
+        else
+        {
+            origins.push_back(bossOrigin);
+        }
+
+        DirectX::XMFLOAT3 bossTargetPos = bossOrigin;
+        if (isBossSelfAttack)
+        {
+            switch (BossAttackScript::NormalizeMovePreset(scriptEntry.movePreset))
+            {
+            case BossAttackScript::MoveForward:
+            case BossAttackScript::MoveChargePlayer:
+                bossTargetPos = {
+                    ClampRange(bossOrigin.x + moveDir.x * scriptEntry.moveDistance, -stageHalf, stageHalf),
+                    0.0f,
+                    ClampRange(bossOrigin.z + moveDir.z * scriptEntry.moveDistance, -stageHalf, stageHalf)
+                };
+                break;
+            case BossAttackScript::MoveRetreat:
+                bossTargetPos = {
+                    ClampRange(bossOrigin.x - moveDir.x * scriptEntry.moveDistance, -stageHalf, stageHalf),
+                    0.0f,
+                    ClampRange(bossOrigin.z - moveDir.z * scriptEntry.moveDistance, -stageHalf, stageHalf)
+                };
+                break;
+            case BossAttackScript::MoveWarpBehindPlayer:
+                bossTargetPos = {
+                    ClampRange(tran.player.pos.x - moveDir.x * scriptEntry.moveDistance, -stageHalf, stageHalf),
+                    0.0f,
+                    ClampRange(tran.player.pos.z - moveDir.z * scriptEntry.moveDistance, -stageHalf, stageHalf)
+                };
+                break;
+            case BossAttackScript::MoveToAttackOrigin:
+                if (!origins.empty())
+                {
+                    bossTargetPos = origins.front();
+                }
+                break;
+            default:
+                break;
+            }
+        }
+
+        const DirectX::XMFLOAT3 faceToPlayer = {
+            tran.player.pos.x - bossTargetPos.x,
+            0.0f,
+            tran.player.pos.z - bossTargetPos.z
+        };
+        const float faceLenSq = faceToPlayer.x * faceToPlayer.x + faceToPlayer.z * faceToPlayer.z;
+        if (faceLenSq > 0.000001f)
+        {
+            const float faceInvLen = 1.0f / std::sqrt(faceLenSq);
+            m_boss.attackFacingYawDeg = std::atan2(-(faceToPlayer.x * faceInvLen), faceToPlayer.z * faceInvLen) * (180.0f / DirectX::XM_PI);
+        }
+
+        m_boss.dashStartPos = bossOrigin;
+        m_boss.dashEndPos = bossTargetPos;
+
+        if (scriptEntry.visual.enabled && !scriptEntry.visual.texturePath.empty() && scriptEntry.visual.texturePath.find("Assets/") == 0)
+        {
+            m_boss.LoadRockTexture(scriptEntry.visual.texturePath.c_str());
+        }
+
+        for (const DirectX::XMFLOAT3& origin : origins)
+        {
+            const DirectX::XMFLOAT3 anchor = (spawnMode == BossAttackScript::SpawnFixed) ? bossTargetPos : origin;
+            for (int colliderId : scriptEntry.colliderIds)
+            {
+                const BossAttackScript::Collider* collider = BossAttackScript::FindCollider(m_finalBossScript, colliderId);
+                if (!collider || !collider->enabled)
+                {
+                    continue;
+                }
+
+                ScriptedColliderZone zone = BuildScriptedColliderZone(
+                    *collider,
+                    { anchor.x, tran.player.pos.y + zoneHeight * 0.5f, anchor.z },
+                    tran.player.pos,
+                    m_boss.attackFacingYawDeg,
+                    stageHalf,
+                    zoneHeight,
+                    !isRemoteFallingAttack);
+                clampZoneSizeToStage(zone.size);
+                clampCenterToStage(zone.center, zone.size);
+                PushAttackZone(
+                    m_boss.attackZones,
+                    zone.center,
+                    zone.size,
+                    dangerColor,
+                    0.0f,
+                    zone.yawDeg,
+                    zone.shape,
+                    zone.startPos,
+                    zone.endPos,
+                    zone.hasPath,
+                    false);
+            }
+        }
+    };
+
     auto beginNextTopLevelAttack = [&]()
     {
         ++m_boss.attackCycleCount;
+        if (useFinalBossScript)
+        {
+            const int entryCount = static_cast<int>(m_finalBossScript.attacks.size());
+            if (entryCount > 0)
+            {
+                const int maxEntryIndex = entryCount - 1;
+                const int startIndex = ClampInt(m_finalBossScriptCursor, 0, maxEntryIndex);
+                const int attemptCount = entryCount;
+                for (int attempt = 0; attempt < attemptCount; ++attempt)
+                {
+                    const int candidateIndex = (startIndex + attempt) % entryCount;
+                    const BossAttackScript::Attack& scriptEntry = m_finalBossScript.attacks[candidateIndex];
+                    if (!scriptEntry.enabled)
+                    {
+                        continue;
+                    }
+                    m_finalBossScriptCursor = (candidateIndex + 1) % entryCount;
+                    beginScriptedAttack(scriptEntry, candidateIndex, false);
+                    return;
+                }
+            }
+        }
         if (m_boss.forceUltimatePending && m_boss.specialUnlocked)
         {
             m_boss.forceUltimatePending = false;
@@ -1054,7 +1866,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             return;
         }
 
-        switch (std::rand() % 5)
+        switch (PickWeightedBossAttack(bossProfile))
         {
         case 0: beginDashAttack(BossController::AttackKindDashNarrow, false); break;
         case 1: beginDashAttack(BossController::AttackKindDashWide, true); break;
@@ -1067,7 +1879,9 @@ bool SceneGame::UpdateBossBattle(float stageSize,
     auto applyBossDamageToPlayer = [&]() -> bool
     {
         const float hpBefore = tran.player.hp;
-        const bool endedRun = applyPlayerDamage && applyPlayerDamage(bossDamage);
+        const float attackDamageScale = MaxFloat(m_boss.attackDamageScale, 0.0f);
+        const float appliedBossDamage = MaxFloat(bossDamage * attackDamageScale, 0.0f);
+        const bool endedRun = applyPlayerDamage && applyPlayerDamage(appliedBossDamage);
         if (tran.player.hp < hpBefore && m_hitStopTimer < bossHitStop)
         {
             m_hitStopTimer = bossHitStop;
@@ -1092,6 +1906,34 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                 m_screenShakeAmplitude = bossHitShakeAmplitude;
             }
             m_screenShakePhase = 0.0f;
+            if (bossProfile.inflictsCurse)
+            {
+                const float curseDuration = 2.5f;
+                const float immediateAttackPenalty = 0.30f;
+                const float immediateSkillPenalty = 0.60f;
+                m_bossCurseTimer = MaxFloat(m_bossCurseTimer, curseDuration);
+                if (m_attackCooldownTimer < immediateAttackPenalty)
+                {
+                    m_attackCooldownTimer = immediateAttackPenalty;
+                }
+                if (m_attackCooldownUiTimer < immediateAttackPenalty)
+                {
+                    m_attackCooldownUiTimer = immediateAttackPenalty;
+                }
+                if (m_attackCooldownUiDuration < immediateAttackPenalty)
+                {
+                    m_attackCooldownUiDuration = immediateAttackPenalty;
+                }
+                for (int slotIndex = 0; slotIndex < 2; ++slotIndex)
+                {
+                    if (m_skillStockCount[slotIndex] < m_skillStockMax[slotIndex])
+                    {
+                        m_skillStockRechargeTimer[slotIndex] += immediateSkillPenalty;
+                    }
+                }
+                m_skill1CooldownTimer = m_skillStockRechargeTimer[0];
+                m_skill2CooldownTimer = m_skillStockRechargeTimer[1];
+            }
         }
         return endedRun;
     };
@@ -1113,11 +1955,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             {
                 continue;
             }
-
-            Collision::Box safeBox = MakeAabb(
-                { zone.center.x, playerBox.center.y, zone.center.z },
-                { zone.size.x, zoneHeight, zone.size.z });
-            if (HitAabb(playerBox, safeBox))
+            if (HitZone(playerBox, zone))
             {
                 safeFromField = true;
                 break;
@@ -1142,13 +1980,11 @@ bool SceneGame::UpdateBossBattle(float stageSize,
 
         case BossController::AttackKindRandomRain:
         case BossController::AttackKindTrackingDrop:
+        case BossController::AttackKindCustom:
             for (const auto& zone : m_boss.attackZones)
             {
                 if (zone.safeZone) continue;
-                const Collision::Box hitBox = MakeAabb(
-                    { zone.center.x, playerBox.center.y, zone.center.z },
-                    { zone.size.x, zoneHeight, zone.size.z });
-                if (HitAabb(playerBox, hitBox))
+                if (HitZone(playerBox, zone))
                 {
                     if (applyBossDamageToPlayer())
                     {
@@ -1161,7 +1997,28 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             {
                 if (!zone.safeZone)
                 {
-                    SpawnRockVisual(m_boss.fallingRocks, zone.center, MaxFloat(zone.size.x, zone.size.z));
+                    float visualDuration = 0.28f;
+                    float visualSpawnHeight = MaxFloat(zone.size.x, zone.size.z);
+                    float visualSpin = 0.0f;
+                    bool visualBillboard = true;
+                    if (m_boss.scriptedAttack &&
+                        m_boss.scriptEntryIndex >= 0 &&
+                        m_boss.scriptEntryIndex < static_cast<int>(m_finalBossScript.attacks.size()))
+                    {
+                        const BossAttackScript::Attack& activeAttack = m_finalBossScript.attacks[m_boss.scriptEntryIndex];
+                        visualDuration = activeAttack.visual.enabled ? ClampRange(activeAttack.visual.travelSec, 0.05f, 10.0f) : 0.28f;
+                        visualSpawnHeight = activeAttack.visual.enabled ? ClampRange(activeAttack.visual.spawnHeight, 0.0f, 30.0f) : MaxFloat(zone.size.x, zone.size.z);
+                        visualSpin = activeAttack.visual.enabled ? ClampRange(activeAttack.visual.spinDegPerSec, -720.0f, 720.0f) : 0.0f;
+                        visualBillboard = activeAttack.visual.enabled ? activeAttack.visual.billboard : true;
+                    }
+                    SpawnRockVisual(
+                        m_boss.fallingRocks,
+                        zone.center,
+                        MaxFloat(zone.size.x, zone.size.z),
+                        visualDuration,
+                        visualSpawnHeight,
+                        visualSpin,
+                        visualBillboard);
                 }
             }
             break;
@@ -1170,10 +2027,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             for (const auto& zone : m_boss.attackZones)
             {
                 if (zone.safeZone) continue;
-                const Collision::Box hitBox = MakeAabb(
-                    { zone.center.x, playerBox.center.y, zone.center.z },
-                    { zone.size.x, zoneHeight, zone.size.z });
-                if (HitAabb(playerBox, hitBox))
+                if (HitZone(playerBox, zone))
                 {
                     if (applyBossDamageToPlayer())
                     {
@@ -1188,10 +2042,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             for (const auto& zone : m_boss.attackZones)
             {
                 if (zone.safeZone) continue;
-                const Collision::Box hitBox = MakeAabb(
-                    { zone.center.x, playerBox.center.y, zone.center.z },
-                    { zone.size.x, zoneHeight, zone.size.z });
-                if (HitAabb(playerBox, hitBox))
+                if (HitZone(playerBox, zone))
                 {
                     if (applyBossDamageToPlayer())
                     {
@@ -1217,6 +2068,10 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         m_boss.attackExecuteDuration = 0.0f;
         m_boss.attackResolved = false;
         m_boss.jumpedOut = false;
+        m_boss.scriptEntryIndex = -1;
+        m_boss.scriptedAttack = false;
+        m_boss.attackDamageScale = 1.0f;
+        m_boss.attackJumpOutOverrideSec = -1.0f;
         m_boss.pos = { 0.0f, 0.0f, 0.0f };
         m_boss.attackCooldownTimer = m_boss.forceUltimatePending ? 0.0f : cooldownSec;
     };
@@ -1233,6 +2088,24 @@ bool SceneGame::UpdateBossBattle(float stageSize,
         m_boss.attackResolved = false;
         m_boss.jumpedOut = false;
         m_boss.pos = { 0.0f, 0.0f, 0.0f };
+
+        if (m_boss.scriptedAttack &&
+            m_boss.scriptEntryIndex >= 0 &&
+            m_boss.scriptEntryIndex < static_cast<int>(m_finalBossScript.attacks.size()))
+        {
+            const BossAttackScript::Attack& scriptEntry = m_finalBossScript.attacks[m_boss.scriptEntryIndex];
+            --m_boss.attackRepeatsRemaining;
+            if (m_boss.attackRepeatsRemaining > 0)
+            {
+                beginScriptedAttack(scriptEntry, m_boss.scriptEntryIndex, true);
+                m_boss.dashStartPos = previousPos;
+                m_boss.pos = previousPos;
+                return;
+            }
+
+            finishCurrentAttack();
+            return;
+        }
 
         switch (m_boss.attackKind)
         {
@@ -1306,8 +2179,12 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                 (m_boss.attackKind == BossController::AttackKindDashNarrow) ||
                 (m_boss.attackKind == BossController::AttackKindDashWide);
             const bool isStompAttack = (m_boss.attackKind == BossController::AttackKindUltimateStomp);
-            const float effectiveJumpOutSec = (jumpOutSec < m_boss.attackTelegraphDuration)
-                ? jumpOutSec
+            const bool isCustomAttack = (m_boss.attackKind == BossController::AttackKindCustom);
+            const float jumpOutOverrideSec = (m_boss.attackJumpOutOverrideSec >= 0.0f)
+                ? m_boss.attackJumpOutOverrideSec
+                : jumpOutSec;
+            const float effectiveJumpOutSec = (jumpOutOverrideSec < m_boss.attackTelegraphDuration)
+                ? jumpOutOverrideSec
                 : m_boss.attackTelegraphDuration;
             const float stompJumpStartLimit = (m_boss.attackTelegraphDuration > kBossFixedDt)
                 ? (m_boss.attackTelegraphDuration - kBossFixedDt)
@@ -1350,7 +2227,7 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                 m_boss.attackStateTimer = 0.0f;
                 m_boss.attackResolved = isStompAttack ? false : true;
 
-                if (isDashAttack)
+                if (isDashAttack || isCustomAttack)
                 {
                     m_boss.pos = m_boss.dashStartPos;
                 }
@@ -1383,6 +2260,12 @@ bool SceneGame::UpdateBossBattle(float stageSize,
                 const float duration = (m_boss.attackExecuteDuration > 0.01f) ? m_boss.attackExecuteDuration : 0.01f;
                 const float dashRate = Clamp01(m_boss.attackStateTimer / duration);
                 m_boss.pos = LerpFloat3(m_boss.dashStartPos, m_boss.dashEndPos, dashRate);
+            }
+            else if (m_boss.attackKind == BossController::AttackKindCustom)
+            {
+                const float duration = (m_boss.attackExecuteDuration > 0.01f) ? m_boss.attackExecuteDuration : 0.01f;
+                const float moveRate = Clamp01(m_boss.attackStateTimer / duration);
+                m_boss.pos = LerpFloat3(m_boss.dashStartPos, m_boss.dashEndPos, moveRate);
             }
             else if (m_boss.attackKind == BossController::AttackKindUltimateStomp &&
                      !m_boss.attackZones.empty())
@@ -1482,7 +2365,8 @@ bool SceneGame::UpdateBossBattle(float stageSize,
             }
 
             const float appliedDamageScale = m_boss.isBroken ? brokenDamageScale : normalDamageScale;
-            m_boss.hpDamageCarry += playerDamage * appliedDamageScale;
+            const float appliedPlayerDamage = static_cast<float>((m_attackDamageThisSwing > 0) ? m_attackDamageThisSwing : playerDamage);
+            m_boss.hpDamageCarry += appliedPlayerDamage * appliedDamageScale;
             const int hpDamage = static_cast<int>(std::floor(m_boss.hpDamageCarry + 0.0001f));
             if (hpDamage > 0)
             {
@@ -1520,20 +2404,32 @@ bool SceneGame::UpdateBossBattle(float stageSize,
 
             if (m_boss.hp <= 0)
             {
-                // Boss defeat immediately transitions to the win result flow.
                 m_boss.attackZones.clear();
                 m_boss.fallingRocks.clear();
-                tran.gameplayDebug.runTimerRunning = 0;
-                tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
                 tran.gameplayDebug.bossBattleActive = 0;
-                tran.gameplayDebug.showBossResultTimer = 1;
                 tran.gameplayDebug.upgradeSelectionPending = 0;
-                tran.gameplayDebug.upgradeRerollRemain = 0;
                 tran.roguelike.selectionPending = 0;
-                tran.roguelike.rerollRemain = 0;
                 if (m_pClearSe) PlaySound(m_pClearSe);
-                SceneManager::ChangeResult(SceneManager::ResultType::Win);
-                SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+                const int currentStageType = tran.GetCurrentRunStageType();
+                const bool isFinalBossStage =
+                    currentStageType == Transfer::RoguelikeUpgrade::StageFinalBoss ||
+                    tran.roguelike.currentStageIndex >= (tran.GetRunStageCount() - 1);
+                if (isFinalBossStage)
+                {
+                    tran.gameplayDebug.runTimerRunning = 0;
+                    tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+                    tran.gameplayDebug.showBossResultTimer = 1;
+                    tran.gameplayDebug.upgradeRerollRemain = 0;
+                    tran.roguelike.rerollRemain = 0;
+                    SceneManager::ChangeResult(SceneManager::ResultType::Win);
+                    SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+                    return true;
+                }
+
+                tran.gameplayDebug.showBossResultTimer = 0;
+                tran.BeginNextStageSelection();
+                SceneManager::ChangeResult(SceneManager::ResultType::None);
+                SceneManager::ChangeScene(SceneManager::SCENE_GAME);
                 return true;
             }
         }
@@ -1585,7 +2481,8 @@ void SceneGame::DrawBossTelegraphMarker() const
                 m_pBossAttackRangeMarker,
                 zone.center,
                 outlineSize,
-                { 1.0f, 1.0f, 1.0f, 0.14f + 0.12f * pulse });
+                { 1.0f, 1.0f, 1.0f, 0.14f + 0.12f * pulse },
+                zone.yawDeg);
         }
         else
         {
@@ -1594,7 +2491,8 @@ void SceneGame::DrawBossTelegraphMarker() const
                 m_pBossAttackRangeMarker,
                 zone.center,
                 outlineSize,
-                { 1.0f, 0.95f, 0.95f, 0.10f + 0.10f * pulse });
+                { 1.0f, 0.95f, 0.95f, 0.10f + 0.10f * pulse },
+                zone.yawDeg);
         }
 
         DirectX::XMFLOAT4 color = zone.color;
@@ -1605,7 +2503,8 @@ void SceneGame::DrawBossTelegraphMarker() const
             m_pBossAttackRangeMarker,
             zone.center,
             zone.size,
-            color);
+            color,
+            zone.yawDeg);
     }
 }
 
@@ -1664,14 +2563,27 @@ void SceneGame::DrawBossFallingObjects() const
 
         const float t = Clamp01(rock.timer / rock.duration);
         DirectX::XMFLOAT3 drawPos = rock.pos;
-        drawPos.y = rock.size.y * (0.10f + 2.80f * t);
+        drawPos.y = rock.spawnHeight * t;
 
-        DrawBillboardSpriteLocal(
-            m_boss.rockTexture,
-            m_pCamera,
-            drawPos,
-            rock.size,
-            { 1.0f, 1.0f, 1.0f, 0.45f + 0.55f * (1.0f - t) });
+        const DirectX::XMFLOAT4 color = { 1.0f, 1.0f, 1.0f, 0.45f + 0.55f * (1.0f - t) };
+        if (rock.billboard)
+        {
+            DrawBillboardSpriteLocal(
+                m_boss.rockTexture,
+                m_pCamera,
+                drawPos,
+                rock.size,
+                color);
+        }
+        else
+        {
+            DrawAttackMarkerTintLocal(
+                m_boss.rockTexture,
+                { drawPos.x, 0.02f, drawPos.z },
+                rock.size,
+                color,
+                rock.angleDeg);
+        }
     }
 }
 
@@ -1810,11 +2722,13 @@ void SceneGame::DrawBossHpUi() const
 
     auto& tran = Transfer::GetInstance();
     const float hpRate = Clamp01(static_cast<float>(m_boss.hp) / static_cast<float>(m_boss.maxHp));
+    const float burnRate = Clamp01((static_cast<float>(m_boss.hp) + MaxFloat(0.0f, m_bossBurnPool)) / static_cast<float>(m_boss.maxHp));
     const float guardRate = (m_boss.guardMax > 0.01f)
         ? Clamp01(m_boss.guard / m_boss.guardMax)
         : 0.0f;
     DrawBossHpOverlayLocal(
         hpRate,
+        burnRate,
         guardRate,
         m_boss.isBroken,
         tran.gameplay.bossHpBarWidthRate,
@@ -1822,7 +2736,9 @@ void SceneGame::DrawBossHpUi() const
         tran.gameplay.bossGuardBarOffsetX,
         tran.gameplay.bossGuardBarOffsetY,
         tran.gameplay.bossGuardBarWidthRate,
-        tran.gameplay.bossGuardBarHeightRate);
+        tran.gameplay.bossGuardBarHeightRate,
+        m_bossChainCount,
+        m_pChainUiTexture);
 }
 
 

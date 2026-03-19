@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Block.cpp" />
+    <ClCompile Include="BossAttackScript.cpp" />
     <ClCompile Include="Boss.cpp" />
     <ClCompile Include="BuildMap.cpp" />
     <ClCompile Include="BuildSelection.cpp" />
@@ -177,6 +178,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneCastleEditor.cpp" />
     <ClCompile Include="Scene3DEditor.cpp" />
+    <ClCompile Include="SceneBossEditor.cpp" />
     <ClCompile Include="SceneEffectDebug.cpp" />
     <ClCompile Include="SceneGame.cpp" />
     <ClCompile Include="SceneManager.cpp" />
@@ -200,6 +202,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Block.h" />
+    <ClInclude Include="BossAttackScript.h" />
     <ClInclude Include="Boss.h" />
     <ClInclude Include="BuildMap.h" />
     <ClInclude Include="BuildSelection.h" />
@@ -239,6 +242,7 @@
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneCastleEditor.h" />
     <ClInclude Include="Scene3DEditor.h" />
+    <ClInclude Include="SceneBossEditor.h" />
     <ClInclude Include="SceneEffectDebug.h" />
     <ClInclude Include="SceneGame.h" />
     <ClInclude Include="SceneManager.h" />

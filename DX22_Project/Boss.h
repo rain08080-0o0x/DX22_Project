@@ -56,11 +56,13 @@ public:
         /** @brief Repeated stomp ultimate. */
         AttackKindUltimateStomp,
         /** @brief Near full-arena ultimate. */
-        AttackKindUltimateField
+        AttackKindUltimateField,
+        /** @brief Generic profile-driven attack. */
+        AttackKindCustom
     };
 
     /**
-     * @brief Box used to draw danger zones and safe zones.
+     * @brief Collider zone used to draw danger zones and safe zones.
      */
     struct AttackZone
     {
@@ -68,10 +70,20 @@ public:
         DirectX::XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
         /** @brief Zone size. */
         DirectX::XMFLOAT3 size = { 0.0f, 0.0f, 0.0f };
+        /** @brief Collider shape. 0=Box 1=Circle. */
+        int shape = 0;
         /** @brief Zone draw color. */
         DirectX::XMFLOAT4 color = { 1.0f, 0.15f, 0.10f, 1.0f };
         /** @brief Time offset before the zone becomes visible. */
         float revealStart = 0.0f;
+        /** @brief Rotation around the vertical axis in degrees. */
+        float yawDeg = 0.0f;
+        /** @brief Original start point for path-based zones. */
+        DirectX::XMFLOAT3 startPos = { 0.0f, 0.0f, 0.0f };
+        /** @brief Original end point for path-based zones. */
+        DirectX::XMFLOAT3 endPos = { 0.0f, 0.0f, 0.0f };
+        /** @brief True when the zone is a sweep/path instead of a single point. */
+        bool hasPath = false;
         /** @brief True when the zone is safe instead of dangerous. */
         bool safeZone = false;
     };
@@ -89,6 +101,14 @@ public:
         float timer = 0.0f;
         /** @brief Total lifetime. */
         float duration = 0.0f;
+        /** @brief Height above the ground where the visual starts. */
+        float spawnHeight = 2.8f;
+        /** @brief Spin speed in degrees per second. */
+        float spinDegPerSec = 0.0f;
+        /** @brief Current spin angle in degrees. */
+        float angleDeg = 0.0f;
+        /** @brief True when the visual should face the camera. */
+        bool billboard = true;
     };
 
     /**
@@ -177,12 +197,22 @@ public:
     int maxHp = 1;
     /** @brief Current battle phase. */
     int phase = 1;
+    /** @brief Current archetype resolved from the roguelike route. */
+    int archetype = 0;
     /** @brief Last swing id that damaged the boss. */
     int lastHitSwingId = -1;
+    /** @brief Final-boss script entry index used by the current attack. */
+    int scriptEntryIndex = -1;
+    /** @brief Damage multiplier applied only to the active attack. */
+    float attackDamageScale = 1.0f;
+    /** @brief True when the current attack came from the scripted final-boss editor. */
+    bool scriptedAttack = false;
     /** @brief Currently selected attack kind. */
     AttackKind attackKind = AttackKindDashNarrow;
     /** @brief Current lane axis. */
     AttackPattern attackPattern = AttackPatternVertical;
+    /** @brief Generic attack facing yaw in degrees. */
+    float attackFacingYawDeg = 0.0f;
     /** @brief Active lane data. */
     AttackLane attackLane;
     /** @brief Active telegraph and safe-zone boxes. */
@@ -205,6 +235,8 @@ public:
     float attackTelegraphDuration = 0.0f;
     /** @brief Execute duration for the active attack. */
     float attackExecuteDuration = 0.0f;
+    /** @brief Optional per-attack jump-out override. Negative disables override. */
+    float attackJumpOutOverrideSec = -1.0f;
     /** @brief Cooldown remaining before the next attack starts. */
     float attackCooldownTimer = 0.0f;
     /** @brief Remaining repeats for a repeated pattern. */

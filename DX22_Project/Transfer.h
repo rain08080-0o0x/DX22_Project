@@ -345,6 +345,7 @@ private:
 		int titleKeyConfigRequestOpen = 0;
 		int titleDifficultyOpen = 0;
 		int titleDifficultySelection = 1; // 0:Easy 1:Normal 2:Hard
+		int titlePreparationOpen = 0;
 		float pauseMenuUiScale = 1.0f;
 		float pauseMenuFontScale = 1.0f;
 		float pauseMenuButtonScale = 1.0f;
@@ -374,7 +375,17 @@ public:
 		/** @brief 同時提示する強化候補数です。 */
 		static const int kOfferCount = 3;
 		/** @brief 1 run 内で進行するステージ数です。 */
-		static const int kRunStageCount = 12;
+		static const int kRunStageCount = 28;
+		/** @brief 新仕様で保持するスキルスロット数です。 */
+		static const int kSkillSlotCount = 2;
+		/** @brief 特性レベルの上限です。 */
+		static const int kTraitLevelMax = 7;
+		/** @brief 武器強化候補数です。 */
+		static const int kWeaponUpgradeTypeCount = 5;
+		/** @brief スキル強化候補数です。 */
+		static const int kSkillEnhancementTypeCount = 5;
+		/** @brief 通常ボス選出数です。 */
+		static const int kRegularBossSlotCount = 3;
 
 		/**
 		 * @brief 強化候補の種類です。
@@ -420,9 +431,15 @@ public:
 		enum SelectionPhase
 		{
 			SelectionNone = 0,
-			SelectionStatus = 1,
-			SelectionSkill = 2,
-			SelectionMixed = 3
+			SelectionRewardSkill = 1,
+			SelectionRewardTrait = 2,
+			SelectionRewardTag = 3,
+			SelectionRewardWeapon = 4,
+			SelectionRewardArtifact = 5,
+			SelectionShopTrait = 6,
+			SelectionShopSkillChange = 7,
+			SelectionShopSkillEnhance = 8,
+			SelectionMixed = 9
 		};
 
 		/**
@@ -433,8 +450,149 @@ public:
 			StageCombat = 0,
 			StageShop = 1,
 			StageRest = 2,
-			StageBoss = 3
+			StageBoss = 3,
+			StageFinalBoss = 4
 		};
+
+		/**
+		 * @brief run マップ上の報酬カテゴリ種別です。
+		 */
+		enum RewardType
+		{
+			RewardUnknown = 0,
+			RewardSkill = 1,
+			RewardTrait = 2,
+			RewardTag = 3,
+			RewardWeapon = 4,
+			RewardDice = 5,
+			RewardArtifact = 6,
+			RewardShop = 7,
+			RewardRest = 8,
+			RewardBoss = 9,
+			RewardFinalBoss = 10
+		};
+
+		/**
+		 * @brief 新仕様の武器種別です。
+		 */
+		enum WeaponType
+		{
+			WeaponBasic = 0,
+			WeaponHeavy = 1,
+			WeaponRapid = 2,
+			WeaponRanged = 3,
+			WeaponTypeCount = 4
+		};
+
+		/**
+		 * @brief 新仕様の装備スキル種別です。
+		 */
+		enum ActionSkillType
+		{
+			ActionSkillNone = 0,
+			ActionSkillWhirl = 1,
+			ActionSkillRush = 2,
+			ActionSkillAmbush = 3,
+			ActionSkillChainThrow = 4,
+			ActionSkillFireball = 5,
+			ActionSkillBloodSlash = 6,
+			ActionSkillTypeCount = 7
+		};
+
+		/**
+		 * @brief 武器強化候補種別です。
+		 */
+		enum WeaponUpgradeType
+		{
+			WeaponUpgradeCooldownBurst = 0,
+			WeaponUpgradeChainOnCrit = 1,
+			WeaponUpgradeBloodOnCrit = 2,
+			WeaponUpgradeFireOnCrit = 3,
+			WeaponUpgradeCritNeedReduce = 4
+		};
+
+		/**
+		 * @brief スキル強化候補種別です。
+		 */
+		enum SkillEnhancementType
+		{
+			SkillEnhanceCooldown = 0,
+			SkillEnhanceWeapon = 1,
+			SkillEnhanceChain = 2,
+			SkillEnhanceBlood = 3,
+			SkillEnhanceFire = 4
+		};
+
+		/**
+		 * @brief 特性種別です。
+		 */
+		enum TraitType
+		{
+			TraitCooldown = 0,
+			TraitWeapon = 1,
+			TraitChain = 2,
+			TraitBlood = 3,
+			TraitFire = 4,
+			TraitTypeCount = 5
+		};
+
+		/**
+		 * @brief タグ解除対象の詳細タグです。
+		 */
+		enum TagType
+		{
+			TagCooldown = 0,
+			TagWeapon = 1,
+			TagChain = 2,
+			TagBlood = 3,
+			TagFire = 4,
+			TagTypeCount = 5
+		};
+
+		/**
+		 * @brief 魔道具種別です。
+		 */
+		enum ArtifactType
+		{
+			ArtifactBarbarianNecklace = 0,
+			ArtifactGreatShieldCrest = 1,
+			ArtifactGlassShoes = 2,
+			ArtifactMagicPiggyBank = 3,
+			ArtifactDiceBox = 4,
+			ArtifactTypeCount = 5
+		};
+
+		/**
+		 * @brief ボス系統です。通常ボスは 4 種から 3 体を抽選します。
+		 */
+		enum BossArchetype
+		{
+			BossHeavyMelee = 0,
+			BossLightRanged = 1,
+			BossBalancedMid = 2,
+			BossSwiftDebuff = 3,
+			BossFinalBarrage = 4,
+			BossArchetypeCount = 5
+		};
+
+		/**
+		 * @brief 報酬候補 1 件の種別です。
+		 */
+		enum OfferType
+		{
+			OfferNone = 0,
+			OfferTrait = 1,
+			OfferWeaponUpgrade = 2,
+			OfferSkillEnhance = 3,
+			OfferSkillChange = 4,
+			OfferTagDisable = 5,
+			OfferArtifact = 6
+		};
+
+		/** @brief packed offer の上位種別桁です。 */
+		static const int kOfferTypeStride = 1000;
+		/** @brief packed offer の主値桁です。 */
+		static const int kOfferPrimaryStride = 100;
 
 		/**
 		 * @brief リザルトシーン中の進行モードです。
@@ -455,8 +613,8 @@ public:
 		int attackSpeedLevel = 0;
 		/** @brief 回避クールタイム短縮レベルです。 */
 		int evadeCooldownLevel = 0;
-		/** @brief 最後に取得した強化種別です。 */
-		int lastUpgradeType = -1; // UpgradeType
+		/** @brief 最後に取得した候補です。旧 UpgradeType または packed offer を保持します。 */
+		int lastUpgradeType = -1;
 		/** @brief スキルスロット1に装備しているスキルです。 */
 		int skillSlot1 = SkillNone;
 		/** @brief スキルスロット2に装備しているスキルです。 */
@@ -489,12 +647,12 @@ public:
 		int selectionPhase = SelectionNone;
 		/** @brief 現在の選択フローで残っている報酬回数です。 */
 		int selectionRoundsRemaining = 0;
-		/** @brief 現在提示中の強化候補です。 */
+		/** @brief 現在提示中の報酬候補です。packed offer を保持します。 */
 		int offers[kOfferCount] =
 		{
-			UpgradeAttackPower,
-			UpgradeAttackSpeed,
-			UpgradeEvadeCooldown
+			-1,
+			-1,
+			-1
 		};
 		/** @brief 現在進行中のステージ番号です。0 始まりです。 */
 		int currentStageIndex = 0;
@@ -505,17 +663,110 @@ public:
 		/** @brief run マップ上の各ステージ種別です。 */
 		int stageTypes[kRunStageCount] =
 		{
-			StageCombat, StageCombat, StageCombat, StageShop,
-			StageCombat, StageCombat, StageCombat, StageShop,
-			StageCombat, StageCombat, StageRest, StageBoss
+			StageCombat, StageCombat, StageCombat, StageCombat, StageCombat, StageCombat, StageRest, StageBoss,
+			StageCombat, StageCombat, StageCombat, StageCombat, StageCombat, StageCombat, StageRest, StageBoss,
+			StageCombat, StageCombat, StageCombat, StageCombat, StageCombat, StageCombat, StageCombat, StageCombat,
+			StageShop, StageRest, StageBoss, StageFinalBoss
+		};
+		/** @brief run マップ上の各ノード報酬カテゴリです。 */
+		int stageRewardTypes[kRunStageCount] =
+		{
+			RewardSkill, RewardUnknown, RewardUnknown, RewardArtifact, RewardUnknown, RewardUnknown, RewardRest, RewardBoss,
+			RewardSkill, RewardUnknown, RewardUnknown, RewardArtifact, RewardUnknown, RewardUnknown, RewardRest, RewardBoss,
+			RewardSkill, RewardSkill, RewardUnknown, RewardUnknown, RewardUnknown, RewardUnknown, RewardUnknown, RewardUnknown,
+			RewardShop, RewardRest, RewardBoss, RewardFinalBoss
+		};
+		/** @brief 各ノードが属するマップ番号です。1 始まりです。 */
+		int stageMapNumbers[kRunStageCount] =
+		{
+			1, 1, 1, 1, 1, 1, 1, 1,
+			2, 2, 2, 2, 2, 2, 2, 2,
+			3, 3, 3, 3, 3, 3, 3, 3,
+			3, 3, 3, 3
+		};
+		/** @brief 各ノードのステップ番号です。開始/休憩/ボスなどは 0 です。 */
+		int stageStepNumbers[kRunStageCount] =
+		{
+			0, 1, 2, 3, 4, 5, 0, 0,
+			0, 1, 2, 3, 4, 5, 0, 0,
+			0, 0, 1, 2, 3, 4, 5, 6,
+			0, 0, 0, 0
 		};
 		/** @brief 各ステージへ進む際に表示する候補数です。 */
 		int stageOptionCounts[kRunStageCount] =
 		{
-			1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 1
+			1, 2, 2, 1, 2, 2, 1, 1,
+			1, 2, 2, 1, 2, 2, 1, 1,
+			1, 1, 2, 2, 1, 1, 2, 2,
+			1, 1, 1, 1
+		};
+		/** @brief 次に進むノードへ提示するカテゴリ候補です。 */
+		int stageOptions[kRunStageCount][kOfferCount] =
+		{
+			{ RewardSkill, RewardUnknown, RewardUnknown },
+			{ RewardTrait, RewardTag, RewardUnknown },
+			{ RewardTrait, RewardWeapon, RewardUnknown },
+			{ RewardArtifact, RewardUnknown, RewardUnknown },
+			{ RewardTrait, RewardDice, RewardUnknown },
+			{ RewardTrait, RewardWeapon, RewardUnknown },
+			{ RewardRest, RewardUnknown, RewardUnknown },
+			{ RewardBoss, RewardUnknown, RewardUnknown },
+			{ RewardSkill, RewardUnknown, RewardUnknown },
+			{ RewardTrait, RewardTag, RewardUnknown },
+			{ RewardTrait, RewardWeapon, RewardUnknown },
+			{ RewardArtifact, RewardUnknown, RewardUnknown },
+			{ RewardTrait, RewardDice, RewardUnknown },
+			{ RewardTrait, RewardWeapon, RewardUnknown },
+			{ RewardRest, RewardUnknown, RewardUnknown },
+			{ RewardBoss, RewardUnknown, RewardUnknown },
+			{ RewardSkill, RewardUnknown, RewardUnknown },
+			{ RewardSkill, RewardUnknown, RewardUnknown },
+			{ RewardTrait, RewardTag, RewardUnknown },
+			{ RewardTrait, RewardWeapon, RewardUnknown },
+			{ RewardArtifact, RewardUnknown, RewardUnknown },
+			{ RewardTrait, RewardWeapon, RewardUnknown },
+			{ RewardTrait, RewardTag, RewardUnknown },
+			{ RewardTrait, RewardWeapon, RewardUnknown },
+			{ RewardShop, RewardUnknown, RewardUnknown },
+			{ RewardRest, RewardUnknown, RewardUnknown },
+			{ RewardBoss, RewardUnknown, RewardUnknown },
+			{ RewardFinalBoss, RewardUnknown, RewardUnknown }
 		};
 		/** @brief 現在のショップ訪問で何回購入したかです。 */
 		int shopPurchaseCount = 0;
+		/** @brief 1 run 内で保持する復活回数上限です。 */
+		int reviveMax = 1;
+		/** @brief 現在残っている復活回数です。 */
+		int reviveRemain = 1;
+		/** @brief 新仕様で選択している武器種別です。 */
+		int loadoutWeaponType = WeaponBasic;
+		/** @brief 新仕様で選択している装備スキルです。 */
+		int loadoutSkills[kSkillSlotCount] =
+		{
+			ActionSkillNone,
+			ActionSkillNone
+		};
+		/** @brief 所持済み武器強化です。 */
+		int weaponUpgradeOwned[kWeaponUpgradeTypeCount] = {};
+		/** @brief スキルごとの所持強化です。 */
+		int actionSkillEnhancements[ActionSkillTypeCount][kSkillEnhancementTypeCount] = {};
+		/** @brief 特性強化マス由来の基礎特性レベルです。 */
+		int traitNodeLevels[TraitTypeCount] = {};
+		/** @brief 最終的に戦闘へ適用する特性レベルです。 */
+		int traitLevels[TraitTypeCount] = {};
+		/** @brief 解除したタグです。1 なら候補から除外します。 */
+		int disabledTags[TagTypeCount] = {};
+		/** @brief 所持魔道具です。1 なら取得済みです。 */
+		int ownedArtifacts[ArtifactTypeCount] = {};
+		/** @brief run 中に戦う通常ボス 3 体の順序です。 */
+		int regularBossOrder[kRegularBossSlotCount] =
+		{
+			BossHeavyMelee,
+			BossLightRanged,
+			BossBalancedMid
+		};
+		/** @brief 最終ボス種別です。 */
+		int finalBossType = BossFinalBarrage;
 	};
 	/**
 	 * @brief 入力デバイスごとの論理割り当てです。
@@ -589,6 +840,11 @@ public:
 	void ResetRoguelikeUpgrade();
 
 	/**
+	 * @brief 装備・強化状態から派生特性レベルを再計算します。
+	 */
+	void RebuildDerivedTraitLevels();
+
+	/**
 	 * @brief キーコンフィグを既定値へ戻します。
 	 */
 	void ResetInputConfigToDefault();
@@ -608,6 +864,11 @@ public:
 	 * @brief 三択強化候補の生成を開始します。
 	 */
 	void BeginUpgradeSelection();
+
+	/**
+	 * @brief 現在進行中ノードの報酬カテゴリに応じた報酬処理を開始します。
+	 */
+	void BeginCurrentStageRewardSelection();
 
 	/**
 	 * @brief 挑戦ステージ用の混合報酬選択を開始します。
@@ -671,6 +932,33 @@ public:
 	int GetCurrentRunStageType() const;
 
 	/**
+	 * @brief 指定番号のステージ報酬カテゴリを返します。
+	 * @param stageIndex 0 始まりのステージ番号です。
+	 * @return RewardType の値です。
+	 */
+	int GetRunRewardTypeAt(int stageIndex) const;
+
+	/**
+	 * @brief 現在進行中のステージ報酬カテゴリを返します。
+	 * @return RewardType の値です。
+	 */
+	int GetCurrentRunRewardType() const;
+
+	/**
+	 * @brief 指定番号のステージが属するマップ番号を返します。
+	 * @param stageIndex 0 始まりのステージ番号です。
+	 * @return 1 始まりのマップ番号です。
+	 */
+	int GetRunStageMapNumberAt(int stageIndex) const;
+
+	/**
+	 * @brief 指定番号のステージに対応するステップ番号を返します。
+	 * @param stageIndex 0 始まりのステージ番号です。
+	 * @return ステップ番号です。非ステップノードは 0 です。
+	 */
+	int GetRunStageStepNumberAt(int stageIndex) const;
+
+	/**
 	 * @brief 指定ステージへ進む際に表示する候補数を返します。
 	 * @param stageIndex 0 始まりのステージ番号です。
 	 * @return 1 から 3 の候補数です。
@@ -697,6 +985,32 @@ public:
 	bool ContinueFromCurrentNonCombatStage();
 
 	/**
+	 * @brief 指定ノードへ提示する報酬カテゴリ候補を返します。
+	 * @param stageIndex 0 始まりのステージ番号です。
+	 * @param optionIndex 候補番号です。
+	 * @return RewardType の値です。
+	 */
+	int GetRunStageOptionRewardType(int stageIndex, int optionIndex) const;
+
+	/**
+	 * @brief ショップの現在購入コストを返します。
+	 * @return 次の購入に必要なリロールアイテム数です。
+	 */
+	int GetCurrentShopCost() const;
+
+	/**
+	 * @brief プレイヤー HP を最大 HP 基準の割合で回復します。
+	 * @param ratio 最大 HP に対する回復割合です。
+	 */
+	void HealPlayerByRatio(float ratio);
+
+	/**
+	 * @brief 残り復活回数を消費してプレイヤーを全回復復活させます。
+	 * @return 復活に成功した場合は true です。
+	 */
+	bool TryConsumePlayerRevive();
+
+	/**
 	 * @brief ステージ進行報酬としてリロールアイテムを加算します。
 	 */
 	void GrantStageProgressRerollItems();
@@ -718,7 +1032,7 @@ public:
 
 	/**
 	 * @brief ショップ系処理向けに、指定カテゴリの強化選択画面を開始します。
-	 * @param selectionPhase SelectionStatus または SelectionSkill です。
+	 * @param selectionPhase SelectionPhase の値です。
 	 * @param cost 消費するリロールアイテム数です。
 	 * @return 購入処理と選択開始に成功した場合は true です。
 	 */

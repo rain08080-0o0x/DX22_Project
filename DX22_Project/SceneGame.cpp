@@ -55,9 +55,18 @@ namespace
     const float kEnemyHpBillboardOffsetScale = 0.7f;
     const float kEnemyHpBillboardMinWidth = 0.6f;
     const float kEnemyHpBillboardMinHeight = 0.1f;
+    const float kBloodStockUiSpacing = 2.0f;
+    const float kBloodStockUiBaseSize = 14.0f;
+    const float kBloodStockUiMaxWidth = 252.0f;
+    const float kChainBeamDuration = 0.16f;
+    const float kChainBeamSegmentSpacing = 0.22f;
+    const float kChainBeamSegmentSize = 0.28f;
     const float kDebugRangeBoxHeight = 0.05f;
     const DirectX::XMFLOAT4 kDebugEnemyColorOutRange = { 0.0f, 1.0f, 0.0f, 1.0f };
     const DirectX::XMFLOAT4 kDebugEnemyColorInRangeCooling = { 0.0f, 0.8f, 1.0f, 1.0f };
+    const DirectX::XMFLOAT4 kBloodUiTint = { 0.72f, 0.08f, 0.16f, 0.96f };
+    const DirectX::XMFLOAT4 kChainBeamTint = { 0.88f, 0.92f, 0.98f, 0.92f };
+    const DirectX::XMFLOAT4 kBurnGaugeColor = { 1.0f, 0.55f, 0.08f, 0.92f };
     const DirectX::XMFLOAT4 kDebugEnemyColorReady = { 1.0f, 1.0f, 0.0f, 1.0f };
     const DirectX::XMFLOAT4 kDebugEnemyColorWindup = { 1.0f, 0.4f, 0.0f, 1.0f };
     const DirectX::XMFLOAT4 kDebugEnemyColorHit = { 1.0f, 0.0f, 0.0f, 1.0f };
@@ -100,6 +109,30 @@ namespace
     const float kSkillOrbitDamageScale = 1.0f;
     const float kSkillOrbitContactCooldown = 0.35f;
     const float kSkillOrbitBillboardScale = 0.75f;
+    const float kWeaponCritBaseDamageScale = 1.5f;
+    const float kWeaponDamageBuffDuration = 3.0f;
+    const float kWeaponSkillAmpDuration = 4.0f;
+    const float kWeaponProjectileRadius = 0.20f;
+    const float kWeaponProjectileSpeed = 14.0f;
+    const float kWeaponProjectileMaxDistance = 12.0f;
+    const float kSkillWhirlCooldown = 12.0f;
+    const float kSkillWhirlDamageScale = 7.5f;
+    const float kSkillRushCooldown = 6.0f;
+    const float kSkillRushDamageScale = 3.0f;
+    const float kSkillAmbushCooldown = 8.0f;
+    const float kSkillAmbushDamageScale = 5.0f;
+    const float kSkillChainThrowCooldown = 8.0f;
+    const float kSkillChainThrowDamageScale = 2.0f;
+    const float kSkillFireballCooldown = 10.0f;
+    const float kSkillFireballDamageScale = 4.5f;
+    const float kSkillBloodSlashCooldown = 4.0f;
+    const float kSkillBloodSlashDamageScale = 3.5f;
+    const float kSkillRushDistance = 2.4f;
+    const float kSkillChainThrowRange = 3.2f;
+    const float kSkillFireballRadius = 0.32f;
+    const float kSkillFireballSpeed = 13.0f;
+    const float kSkillSlashProjectileRadius = 0.26f;
+    const float kSkillSlashProjectileSpeed = 11.0f;
     const float kCombatEffectDuration = 0.22f;
     const float kCombatEffectGrowScale = 1.12f;
     const float kCombatEffectScale = 1.15f;
@@ -110,10 +143,14 @@ namespace
     const int kCombatEffectFrameCount = kCombatEffectColumns * kCombatEffectRows;
     const int kMaxHitEffectEmitters = 5;
     const float kHitEffectCullMargin = 0.25f;
+    const float kBloodOrbLifetime = 10.0f;
+    const int kBloodOrbFieldCap = 20;
+    const float kBloodFireSynergyRadius = 5.0f;
     const DirectX::XMFLOAT4 kChallengeHazardColor = { 1.0f, 0.28f, 0.18f, 0.80f };
     const DirectX::XMFLOAT4 kChallengeHazardResolvedColor = { 1.0f, 0.75f, 0.20f, 0.45f };
     const DirectX::XMFLOAT4 kChallengeBeaconColor = { 0.20f, 1.0f, 0.65f, 0.85f };
     const DirectX::XMFLOAT4 kChallengeBeaconCoreColor = { 0.85f, 1.0f, 0.25f, 0.95f };
+    const char* kDirectionMarkerTexturePath = "Assets/Texture/Chracter/triangle.png";
 
     /**
      * @brief カメラモード値を有効な 2 値へ正規化します。
@@ -534,18 +571,138 @@ namespace
         DirectX::XMStoreFloat3(&outDir, dirVec);
     }
 
-    int GetSkillCooldownUpgradeLevel(const Transfer::RoguelikeUpgrade& roguelike, int skillType)
+    int NormalizeWeaponType(int weaponType)
     {
-        switch (skillType)
+        return ClampInt(
+            weaponType,
+            Transfer::RoguelikeUpgrade::WeaponBasic,
+            Transfer::RoguelikeUpgrade::WeaponRanged);
+    }
+
+    int NormalizeActionSkillType(int skillType)
+    {
+        return ClampInt(
+            skillType,
+            Transfer::RoguelikeUpgrade::ActionSkillNone,
+            Transfer::RoguelikeUpgrade::ActionSkillBloodSlash);
+    }
+
+    float GetWeaponAttacksPerSecond(int weaponType)
+    {
+        switch (NormalizeWeaponType(weaponType))
         {
-        case Transfer::RoguelikeUpgrade::SkillShot:
-            return roguelike.skillShotCooldownLevel;
-        case Transfer::RoguelikeUpgrade::SkillNova:
-            return roguelike.skillNovaCooldownLevel;
-        case Transfer::RoguelikeUpgrade::SkillOrbit:
-            return roguelike.skillOrbitCooldownLevel;
+        case Transfer::RoguelikeUpgrade::WeaponHeavy:
+            return 0.8f;
+        case Transfer::RoguelikeUpgrade::WeaponRapid:
+            return 4.0f;
+        case Transfer::RoguelikeUpgrade::WeaponRanged:
+            return 1.0f;
+        case Transfer::RoguelikeUpgrade::WeaponBasic:
         default:
-            return 0;
+            return 1.5f;
+        }
+    }
+
+    int GetWeaponCritNeed(const Transfer::RoguelikeUpgrade& roguelike, int weaponType)
+    {
+        int critNeed = 3;
+        switch (NormalizeWeaponType(weaponType))
+        {
+        case Transfer::RoguelikeUpgrade::WeaponHeavy:
+        case Transfer::RoguelikeUpgrade::WeaponRapid:
+            critNeed = 2;
+            break;
+        case Transfer::RoguelikeUpgrade::WeaponRanged:
+            critNeed = 1;
+            break;
+        default:
+            critNeed = 3;
+            break;
+        }
+
+        if (roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeCritNeedReduce] != 0 && critNeed > 1)
+        {
+            --critNeed;
+        }
+        if (critNeed < 1) critNeed = 1;
+        return critNeed;
+    }
+
+    float GetWeaponDamageScale(const Transfer::RoguelikeUpgrade& roguelike, int weaponType)
+    {
+        float scale = 1.0f;
+        switch (NormalizeWeaponType(weaponType))
+        {
+        case Transfer::RoguelikeUpgrade::WeaponHeavy:
+            scale = 1.35f;
+            break;
+        case Transfer::RoguelikeUpgrade::WeaponRapid:
+            scale = 0.62f;
+            break;
+        case Transfer::RoguelikeUpgrade::WeaponRanged:
+            scale = 1.10f;
+            break;
+        default:
+            scale = 1.0f;
+            break;
+        }
+
+        const int weaponTraitLevel = ClampInt(
+            roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitWeapon],
+            0,
+            Transfer::RoguelikeUpgrade::kTraitLevelMax);
+        scale += 0.10f * static_cast<float>(weaponTraitLevel);
+        if (weaponTraitLevel >= 2)
+        {
+            scale += 0.25f;
+        }
+        return scale;
+    }
+
+    float GetWeaponAttackSpeedScale(const Transfer::RoguelikeUpgrade& roguelike)
+    {
+        (void)roguelike;
+        return 1.0f;
+    }
+
+    float GetWeaponKnockbackScale(int weaponType)
+    {
+        switch (NormalizeWeaponType(weaponType))
+        {
+        case Transfer::RoguelikeUpgrade::WeaponHeavy:
+            return 1.45f;
+        case Transfer::RoguelikeUpgrade::WeaponRapid:
+            return 0.0f;
+        case Transfer::RoguelikeUpgrade::WeaponRanged:
+            return 0.85f;
+        default:
+            return 1.0f;
+        }
+    }
+
+    bool WeaponUsesProjectile(int weaponType)
+    {
+        return NormalizeWeaponType(weaponType) == Transfer::RoguelikeUpgrade::WeaponRanged;
+    }
+
+    float GetActionSkillBaseCooldown(int skillType)
+    {
+        switch (NormalizeActionSkillType(skillType))
+        {
+        case Transfer::RoguelikeUpgrade::ActionSkillWhirl:
+            return kSkillWhirlCooldown;
+        case Transfer::RoguelikeUpgrade::ActionSkillRush:
+            return kSkillRushCooldown;
+        case Transfer::RoguelikeUpgrade::ActionSkillAmbush:
+            return kSkillAmbushCooldown;
+        case Transfer::RoguelikeUpgrade::ActionSkillChainThrow:
+            return kSkillChainThrowCooldown;
+        case Transfer::RoguelikeUpgrade::ActionSkillFireball:
+            return kSkillFireballCooldown;
+        case Transfer::RoguelikeUpgrade::ActionSkillBloodSlash:
+            return kSkillBloodSlashCooldown;
+        default:
+            return 0.0f;
         }
     }
 
@@ -908,11 +1065,21 @@ SceneGame::SceneGame()
     , m_challengeHazards()
     , m_enemyProjectiles()
     , m_skillProjectiles()
-    , m_boss()
-    , m_pShadow(nullptr)
+      , m_bloodOrbs()
+      , m_chainBeamEffects()
+      , m_boss()
+      , m_finalBossScript(BossAttackScript::MakeDefaultProfile(BossAttackScript::ProfileHeavyMelee))
+      , m_finalBossScriptCursor(0)
+      , m_pShadow(nullptr)
     , m_pAttackMarker(nullptr)
+    , m_pDirectionMarkerTexture(nullptr)
     , m_pCombatEffectTexture(nullptr)
     , m_pSkillTexture(nullptr)
+    , m_pBloodUiTexture(nullptr)
+    , m_pBloodStockOnTexture(nullptr)
+    , m_pBloodStockOffTexture(nullptr)
+    , m_pChainUiTexture(nullptr)
+    , m_pChainLinkTexture(nullptr)
     , m_pBossAttackRangeMarker(nullptr)
     , m_pGroundTexture(nullptr)
     , m_pAttackSe(nullptr)
@@ -934,6 +1101,10 @@ SceneGame::SceneGame()
     , m_requestedEnemyCount(0)
     , m_currentWave(1)
     , m_waveMax(1)
+    , m_clearPortalMode(ClearPortalNone)
+    , m_clearPortalSpawnTimer(0.0f)
+    , m_clearPortalPulseTimer(0.0f)
+    , m_clearPortalPos(0.0f, 0.0f, 0.0f)
     , m_cameraIntroActive(true)
     , m_cameraIntroTimer(0.0f)
     , m_cameraIntroStartEye(0.0f, 0.0f, 0.0f)
@@ -954,13 +1125,25 @@ SceneGame::SceneGame()
     , m_attackSwingId(0)
     , m_nextHitEffectEmitter(0)
     , m_skillProjectileSerial(0)
+    , m_weaponAttackCount(0)
+    , m_weaponAttackStock(1)
+    , m_weaponAttackStockMax(1)
+    , m_weaponAttackStockRechargeTimer(0.0f)
+    , m_weaponDamageBuffTimer(0.0f)
+    , m_weaponDamageBuffScale(0.0f)
+    , m_skillStockCount{ 1, 1 }
+    , m_skillStockMax{ 1, 1 }
+    , m_skillStockRechargeTimer{ 0.0f, 0.0f }
+    , m_bloodStock(0)
+    , m_bloodStockMax(5)
     , m_attackHitCountThisSwing(0)
     , m_hitStopTimer(0.0f)
-    , m_attackTrailSpawnTimer(0.0f)
-    , m_playerDamageFlashTimer(0.0f)
-    , m_playerDamageInvincibleTimer(0.0f)
-    , m_bossStompImpactTimer(0.0f)
-    , m_screenShakeTimer(0.0f)
+      , m_attackTrailSpawnTimer(0.0f)
+      , m_playerDamageFlashTimer(0.0f)
+      , m_playerDamageInvincibleTimer(0.0f)
+      , m_bossCurseTimer(0.0f)
+      , m_bossStompImpactTimer(0.0f)
+      , m_screenShakeTimer(0.0f)
     , m_screenShakeDuration(0.0f)
     , m_screenShakeAmplitude(0.0f)
     , m_screenShakePhase(0.0f)
@@ -971,6 +1154,13 @@ SceneGame::SceneGame()
     , m_attackCenter(0.0f, 0.0f, 0.0f)
     , m_attackSize(0.0f, 0.0f, 0.0f)
     , m_orbitSkill()
+    , m_attackDamageThisSwing(0)
+    , m_attackKnockbackScaleThisSwing(1.0f)
+    , m_attackCriticalThisSwing(false)
+    , m_bossChainCount(0)
+    , m_bossBurnPool(0.0f)
+    , m_bossBurnDps(0.0f)
+    , m_bossBurnCarry(0.0f)
     , m_hitEffectPreset()
     , m_challengeType(ChallengeNone)
     , m_challengeActive(false)
@@ -1032,7 +1222,12 @@ SceneGame::SceneGame()
     tran.gameplayDebug.titleKeyConfigRequestOpen = 0;
     tran.gameplayDebug.titleDifficultyOpen = 0;
     tran.gameplayDebug.titleDifficultySelection = tran.NormalizeDifficultyPreset(tran.gameplayDebug.difficultyPreset);
-    m_isBossBattleDebug = (tran.GetCurrentRunStageType() == Transfer::RoguelikeUpgrade::StageBoss);
+    {
+        const int currentStageType = tran.GetCurrentRunStageType();
+        m_isBossBattleDebug =
+            currentStageType == Transfer::RoguelikeUpgrade::StageBoss ||
+            currentStageType == Transfer::RoguelikeUpgrade::StageFinalBoss;
+    }
     tran.gameplayDebug.requestBossBattle = 0;
     tran.gameplayDebug.bossBattleActive = m_isBossBattleDebug ? 1 : 0;
     tran.gameplayDebug.showBossResultTimer = 0;
@@ -1108,10 +1303,12 @@ SceneGame::SceneGame()
         static_cast<float>(tran.gameplay.waveEnemyAddPerWave),
         0.0f,
         static_cast<float>(kEnemyCountMax)));
-    const int difficultyPreset = ClampInt(tran.gameplayDebug.difficultyPreset, 0, 2);
-    const int effectiveBaseEnemyCount = ClampInt(
-        baseEnemyCount + CalcDifficultyBaseEnemyBonus(difficultyPreset),
-        kEnemyCountMin,
+	const int difficultyPreset = ClampInt(tran.gameplayDebug.difficultyPreset, 0, 2);
+    const bool isTagRewardStage =
+        tran.GetCurrentRunRewardType() == Transfer::RoguelikeUpgrade::RewardTag;
+	const int effectiveBaseEnemyCount = ClampInt(
+		baseEnemyCount + CalcDifficultyBaseEnemyBonus(difficultyPreset),
+		kEnemyCountMin,
         kEnemyCountMax);
     const int effectiveWaveEnemyAdd = ClampInt(
         waveEnemyAddPerWave + CalcDifficultyWaveAddBonus(difficultyPreset),
@@ -1120,12 +1317,15 @@ SceneGame::SceneGame()
 
     m_currentWave = 1;
     m_waveMax = waveMax;
-    m_requestedEnemyCount = CalcWaveEnemyCount(effectiveBaseEnemyCount, m_currentWave, effectiveWaveEnemyAdd);
-    if (m_isBossBattleDebug)
-    {
-        m_currentWave = m_waveMax;
-        m_requestedEnemyCount = 0;
-    }
+	m_requestedEnemyCount = CalcWaveEnemyCount(effectiveBaseEnemyCount, m_currentWave, effectiveWaveEnemyAdd);
+	if (m_isBossBattleDebug || isTagRewardStage)
+	{
+		if (m_isBossBattleDebug)
+		{
+			m_currentWave = m_waveMax;
+		}
+		m_requestedEnemyCount = 0;
+	}
 
     tran.gameplay.enemyCount = baseEnemyCount;
     tran.gameplay.waveMax = m_waveMax;
@@ -1148,6 +1348,7 @@ SceneGame::SceneGame()
     tran.gameplayDebug.upgradeOffer2 = tran.roguelike.offers[2];
     EnsureEnemyCount(m_requestedEnemyCount, tran.player.stageSize);
     InitializeBossForScene();
+    ResetTraitCombatState();
 
     m_pShadow = new Texture();
     if (FAILED(m_pShadow->Create("Assets/Texture/Shadow.png")))
@@ -1160,10 +1361,40 @@ SceneGame::SceneGame()
     {
         MessageBox(NULL, "Texture load failed.\nStar.png", "Error", MB_OK);
     }
+    m_pDirectionMarkerTexture = new Texture();
+    if (FAILED(m_pDirectionMarkerTexture->Create(kDirectionMarkerTexturePath)))
+    {
+        MessageBox(NULL, "Texture load failed.\nChracter/triangle.png", "Error", MB_OK);
+    }
     m_pSkillTexture = new Texture();
     if (FAILED(m_pSkillTexture->Create("Assets/Texture/Chracter/skill.png")))
     {
         MessageBox(NULL, "Texture load failed.\nChracter/skill.png", "Error", MB_OK);
+    }
+    m_pBloodUiTexture = new Texture();
+    if (FAILED(m_pBloodUiTexture->Create("Assets/Texture/Skills/blood_ui.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nSkills/blood_ui.png", "Error", MB_OK);
+    }
+    m_pBloodStockOnTexture = new Texture();
+    if (FAILED(m_pBloodStockOnTexture->Create("Assets/Texture/Skills/blood_stock_on.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nSkills/blood_stock_on.png", "Error", MB_OK);
+    }
+    m_pBloodStockOffTexture = new Texture();
+    if (FAILED(m_pBloodStockOffTexture->Create("Assets/Texture/Skills/blood_stock_off.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nSkills/blood_stock_off.png", "Error", MB_OK);
+    }
+    m_pChainUiTexture = new Texture();
+    if (FAILED(m_pChainUiTexture->Create("Assets/Texture/Skills/chain_ui.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nSkills/chain_ui.png", "Error", MB_OK);
+    }
+    m_pChainLinkTexture = new Texture();
+    if (FAILED(m_pChainLinkTexture->Create("Assets/Texture/Skills/chain.png")))
+    {
+        MessageBox(NULL, "Texture load failed.\nSkills/chain.png", "Error", MB_OK);
     }
     m_pBossAttackRangeMarker = new Texture();
     if (FAILED(m_pBossAttackRangeMarker->Create("Assets/Texture/Game/AttackRange.png")))
@@ -1315,6 +1546,11 @@ SceneGame::~SceneGame()
         delete m_pAttackMarker;
         m_pAttackMarker = nullptr;
     }
+    if (m_pDirectionMarkerTexture)
+    {
+        delete m_pDirectionMarkerTexture;
+        m_pDirectionMarkerTexture = nullptr;
+    }
     if (m_pCombatEffectTexture)
     {
         delete m_pCombatEffectTexture;
@@ -1324,6 +1560,31 @@ SceneGame::~SceneGame()
     {
         delete m_pSkillTexture;
         m_pSkillTexture = nullptr;
+    }
+    if (m_pBloodUiTexture)
+    {
+        delete m_pBloodUiTexture;
+        m_pBloodUiTexture = nullptr;
+    }
+    if (m_pBloodStockOnTexture)
+    {
+        delete m_pBloodStockOnTexture;
+        m_pBloodStockOnTexture = nullptr;
+    }
+    if (m_pBloodStockOffTexture)
+    {
+        delete m_pBloodStockOffTexture;
+        m_pBloodStockOffTexture = nullptr;
+    }
+    if (m_pChainUiTexture)
+    {
+        delete m_pChainUiTexture;
+        m_pChainUiTexture = nullptr;
+    }
+    if (m_pChainLinkTexture)
+    {
+        delete m_pChainLinkTexture;
+        m_pChainLinkTexture = nullptr;
     }
     if (m_pBossAttackRangeMarker)
     {
@@ -1559,6 +1820,14 @@ void SceneGame::StartChallenge(int challengeType, float stageSize)
     m_attackTimer = 0.0f;
     m_attackWindupTimer = 0.0f;
     m_attackRecoveryTimer = 0.0f;
+    m_attackDamageThisSwing = 0;
+    m_attackKnockbackScaleThisSwing = 1.0f;
+    m_weaponAttackCount = 0;
+    m_weaponAttackStock = 1;
+    m_weaponAttackStockMax = 1;
+    m_weaponAttackStockRechargeTimer = 0.0f;
+    m_weaponDamageBuffTimer = 0.0f;
+    m_weaponDamageBuffScale = 0.0f;
     m_enemyProjectiles.clear();
     m_skillProjectiles.clear();
     m_markerEffects.clear();
@@ -1569,6 +1838,7 @@ void SceneGame::StartChallenge(int challengeType, float stageSize)
     m_boss.fallingRocks.clear();
     m_boss.requiresArenaReset = false;
     EnsureEnemyCount(0, stageSize);
+    ResetTraitCombatState();
 
     m_cameraIntroActive = false;
     m_cameraIntroTimer = ClampRange(tran.gameplay.cameraIntroDuration, kCameraIntroDurationMin, kCameraIntroDurationMax);
@@ -1624,9 +1894,18 @@ void SceneGame::FinishChallenge(bool success)
     EnsureEnemyCount(0, m_stageSize);
     m_enemyProjectiles.clear();
     m_skillProjectiles.clear();
+    m_attackDamageThisSwing = 0;
+    m_attackKnockbackScaleThisSwing = 1.0f;
+    m_weaponAttackCount = 0;
+    m_weaponAttackStock = 1;
+    m_weaponAttackStockMax = 1;
+    m_weaponAttackStockRechargeTimer = 0.0f;
+    m_weaponDamageBuffTimer = 0.0f;
+    m_weaponDamageBuffScale = 0.0f;
     m_markerEffects.clear();
     m_orbitSkill.active = false;
     ResetChallengeState();
+    ResetTraitCombatState();
 
     tran.BeginChallengeRewardSelection(rewardCount);
     SceneManager::ChangeResult(SceneManager::ResultType::Win);
@@ -1693,6 +1972,9 @@ bool SceneGame::UpdateChallengeNoDamage(float stageSize)
             tran.player.pos.z
         },
         tran.player.size);
+    const bool isPlayerInvulnerable =
+        m_pPlayer->IsEvading() ||
+        m_playerDamageInvincibleTimer > 0.0f;
 
     for (ChallengeHazard& hazard : m_challengeHazards)
     {
@@ -1703,7 +1985,7 @@ bool SceneGame::UpdateChallengeNoDamage(float stageSize)
             const Collision::Box hazardBox = MakeAabb(
                 { hazard.center.x, playerBox.center.y, hazard.center.z },
                 { hazard.radius * 2.0f, playerBox.size.y, hazard.radius * 2.0f });
-            if (HitAabb(playerBox, hazardBox))
+            if (!isPlayerInvulnerable && HitAabb(playerBox, hazardBox))
             {
                 ++m_challengeHitCount;
                 if (m_pPlayerHitSe) PlaySound(m_pPlayerHitSe);
@@ -2065,12 +2347,165 @@ int SceneGame::GetSkillTypeForSlot(int slotIndex) const
     switch (slotIndex)
     {
     case 0:
-        return tran.roguelike.skillSlot1;
+        return NormalizeActionSkillType(tran.roguelike.loadoutSkills[0]);
     case 1:
-        return tran.roguelike.skillSlot2;
+        return NormalizeActionSkillType(tran.roguelike.loadoutSkills[1]);
     default:
-        return Transfer::RoguelikeUpgrade::SkillNone;
+        return Transfer::RoguelikeUpgrade::ActionSkillNone;
     }
+}
+
+bool SceneGame::TryGetAmbushTarget(DirectX::XMFLOAT3& targetCenter, DirectX::XMFLOAT3& targetSize) const
+{
+    if (m_isBossBattleDebug && m_boss.hp > 0)
+    {
+        targetCenter = {
+            m_boss.pos.x,
+            m_boss.pos.y + m_boss.size.y * 0.5f,
+            m_boss.pos.z
+        };
+        targetSize = m_boss.size;
+        return true;
+    }
+
+    const EnemySlot* bestSlot = nullptr;
+    int bestMaxHp = -1;
+    int bestHp = -1;
+    for (const auto& slot : m_enemies)
+    {
+        if (!slot.enemy || !slot.enemy->IsAlive()) continue;
+        const int currentMaxHp = slot.enemy->GetMaxHp();
+        const int currentHp = slot.enemy->GetHp();
+        if (!bestSlot || currentMaxHp > bestMaxHp || (currentMaxHp == bestMaxHp && currentHp > bestHp))
+        {
+            bestSlot = &slot;
+            bestMaxHp = currentMaxHp;
+            bestHp = currentHp;
+        }
+    }
+
+    if (!bestSlot || !bestSlot->enemy)
+    {
+        return false;
+    }
+
+    const Collision::Box targetBox = bestSlot->enemy->GetCollision();
+    targetCenter = targetBox.center;
+    targetSize = targetBox.size;
+    return true;
+}
+
+void SceneGame::BeginClearPortal(int mode, const DirectX::XMFLOAT3& preferredPos)
+{
+    if (mode == ClearPortalNone || m_clearPortalMode != ClearPortalNone)
+    {
+        return;
+    }
+
+    auto& tran = Transfer::GetInstance();
+    DirectX::XMFLOAT3 portalPos = { preferredPos.x, 0.0f, preferredPos.z };
+    const DirectX::XMFLOAT3 playerPos = { tran.player.pos.x, 0.0f, tran.player.pos.z };
+    const float minDistance = 1.8f;
+    if (DistSqXZ(portalPos, playerPos) < (minDistance * minDistance))
+    {
+        const DirectX::XMFLOAT3 fallbackDir = NormalizeXZ(m_lastMoveDir, { 0.0f, 0.0f, 1.0f });
+        portalPos.x = playerPos.x + fallbackDir.x * minDistance;
+        portalPos.z = playerPos.z + fallbackDir.z * minDistance;
+    }
+
+    const float stage = (tran.player.stageSize > 0.1f) ? tran.player.stageSize : m_stageSize;
+    const float stageHalf = MaxFloat(stage * 0.5f - 0.8f, 0.5f);
+    portalPos.x = ClampRange(portalPos.x, -stageHalf, stageHalf);
+    portalPos.z = ClampRange(portalPos.z, -stageHalf, stageHalf);
+
+    m_clearPortalMode = mode;
+    m_clearPortalSpawnTimer = 0.5f;
+    m_clearPortalPulseTimer = 0.0f;
+    m_clearPortalPos = portalPos;
+    m_enemyProjectiles.clear();
+}
+
+bool SceneGame::UpdateClearPortal(float dt)
+{
+    if (m_clearPortalMode == ClearPortalNone)
+    {
+        return false;
+    }
+
+    if (m_clearPortalSpawnTimer > 0.0f)
+    {
+        m_clearPortalSpawnTimer -= dt;
+        if (m_clearPortalSpawnTimer < 0.0f) m_clearPortalSpawnTimer = 0.0f;
+        return false;
+    }
+
+    m_clearPortalPulseTimer += dt;
+    if (!m_pPlayer)
+    {
+        return false;
+    }
+
+    auto& tran = Transfer::GetInstance();
+    const float playerRadius = MaxFloat(tran.player.size.x, tran.player.size.z) * 0.5f;
+    const float portalRadius = 0.70f;
+    const float hitRange = playerRadius + portalRadius;
+    const float dx = tran.player.pos.x - m_clearPortalPos.x;
+    const float dz = tran.player.pos.z - m_clearPortalPos.z;
+    if ((dx * dx + dz * dz) > (hitRange * hitRange))
+    {
+        return false;
+    }
+
+    const int portalMode = m_clearPortalMode;
+    m_clearPortalMode = ClearPortalNone;
+    m_clearPortalSpawnTimer = 0.0f;
+    m_clearPortalPulseTimer = 0.0f;
+
+    switch (portalMode)
+    {
+    case ClearPortalReward:
+        tran.BeginCurrentStageRewardSelection();
+        if (tran.roguelike.selectionPending != 0 ||
+            tran.roguelike.intermissionMode != Transfer::RoguelikeUpgrade::IntermissionNone)
+        {
+            SceneManager::ChangeResult(SceneManager::ResultType::Win);
+            SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+        }
+        else
+        {
+            SceneManager::ChangeResult(SceneManager::ResultType::None);
+            SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+        }
+        return true;
+
+    case ClearPortalNextStage:
+        if (tran.BeginNextStageSelection() &&
+            (tran.roguelike.selectionPending != 0 ||
+             tran.roguelike.intermissionMode != Transfer::RoguelikeUpgrade::IntermissionNone))
+        {
+            SceneManager::ChangeResult(SceneManager::ResultType::Win);
+            SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+        }
+        else
+        {
+            SceneManager::ChangeResult(SceneManager::ResultType::None);
+            SceneManager::ChangeScene(SceneManager::SCENE_GAME);
+        }
+        return true;
+
+    case ClearPortalFinalResult:
+        tran.gameplayDebug.showBossResultTimer = 1;
+        tran.gameplayDebug.upgradeRerollRemain = 0;
+        tran.roguelike.rerollRemain = 0;
+        SceneManager::ChangeResult(SceneManager::ResultType::Win);
+        SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+        return true;
+
+    default:
+        break;
+    }
+
+    return false;
 }
 
 bool SceneGame::ActivateSkillSlot(int slotIndex, int playerAttackDamage, float stageSize)
@@ -2079,7 +2514,7 @@ bool SceneGame::ActivateSkillSlot(int slotIndex, int playerAttackDamage, float s
 
     auto& tran = Transfer::GetInstance();
     const int skillType = GetSkillTypeForSlot(slotIndex);
-    if (skillType == Transfer::RoguelikeUpgrade::SkillNone)
+    if (skillType == Transfer::RoguelikeUpgrade::ActionSkillNone)
     {
         return false;
     }
@@ -2091,149 +2526,454 @@ bool SceneGame::ActivateSkillSlot(int slotIndex, int playerAttackDamage, float s
         tran.player.pos.z
     };
     const float stageHalf = stageSize * 0.5f;
+    const float attackKnockback = (tran.gameplay.attackKnockback < 0.0f) ? 0.0f : tran.gameplay.attackKnockback;
+    const float baseHitStop = (tran.gameplay.attackHitStop < 0.0f) ? 0.0f : tran.gameplay.attackHitStop;
 
-    switch (skillType)
+    auto calcDamage = [&](float damageScale) -> int
     {
-    case Transfer::RoguelikeUpgrade::SkillShot:
-    {
-        const float shotRangeScale = tran.GetSkillRangeScaleByLevel(tran.roguelike.skillShotRangeLevel);
-        const float shotDamageScale = tran.GetSkillDamageScaleByLevel(tran.roguelike.skillShotPowerLevel);
-        float maxDistance = stageHalf * 2.0f;
-        if (std::fabs(forward.x) > 1.0e-4f)
-        {
-            const float edgeX = (forward.x >= 0.0f) ? stageHalf : -stageHalf;
-            const float distX = (edgeX - tran.player.pos.x) / forward.x;
-            if (distX > 0.0f && distX < maxDistance) maxDistance = distX;
-        }
-        if (std::fabs(forward.z) > 1.0e-4f)
-        {
-            const float edgeZ = (forward.z >= 0.0f) ? stageHalf : -stageHalf;
-            const float distZ = (edgeZ - tran.player.pos.z) / forward.z;
-            if (distZ > 0.0f && distZ < maxDistance) maxDistance = distZ;
-        }
-        if (maxDistance < 0.5f) maxDistance = 0.5f;
-
-        SkillProjectile shot{};
-        shot.dir = forward;
-        shot.radius = kSkillShotRadius * shotRangeScale;
-        shot.speed = kSkillShotSpeed;
-        shot.remainDistance = maxDistance;
-        shot.damage = ClampInt(
-            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * shotDamageScale)),
+        return ClampInt(
+            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * damageScale)),
             1,
-            999);
-        shot.projectileId = m_skillProjectileSerial++;
-        if (m_skillProjectileSerial < 0) m_skillProjectileSerial = 0;
-        shot.pos = {
-            playerPos.x + forward.x * (tran.player.size.x * 0.9f),
-            playerPos.y,
-            playerPos.z + forward.z * (tran.player.size.z * 0.9f)
-        };
-        m_skillProjectiles.push_back(shot);
+            9999);
+    };
 
-        return true;
-    }
-    case Transfer::RoguelikeUpgrade::SkillNova:
+    auto clampPlayerPosToStage = [&](DirectX::XMFLOAT3& nextPos)
     {
-        const float novaRangeScale = tran.GetSkillRangeScaleByLevel(tran.roguelike.skillNovaRangeLevel);
-        const float novaDamageScale = tran.GetSkillDamageScaleByLevel(tran.roguelike.skillNovaPowerLevel);
-        const int skillDamage = ClampInt(
-            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * kSkillNovaDamageScale * novaDamageScale)),
-            1,
-            999);
-        const DirectX::XMFLOAT3 hitSize = {
-            tran.player.size.x * kSkillNovaRadiusScale * novaRangeScale,
-            tran.player.size.y * kSkillNovaHeightScale,
-            tran.player.size.z * kSkillNovaRadiusScale * novaRangeScale
-        };
-        const Collision::Box hitBox = MakeAabb(playerPos, hitSize);
-        bool hitSomething = false;
+        const float halfX = tran.player.size.x * 0.5f;
+        const float halfZ = tran.player.size.z * 0.5f;
+        nextPos.x = ClampRange(nextPos.x, -stageHalf + halfX, stageHalf - halfX);
+        nextPos.z = ClampRange(nextPos.z, -stageHalf + halfZ, stageHalf - halfZ);
+    };
 
+    auto applyKnockbackToEnemy = [&](EnemySlot& slot, const DirectX::XMFLOAT3& sourcePos, float knockbackScale)
+    {
+        const Collision::Box enemyBox = slot.enemy->GetCollision();
+        DirectX::XMFLOAT3 nextPos = enemyBox.center;
+        const DirectX::XMFLOAT3 knockDir = NormalizeXZ({
+            enemyBox.center.x - sourcePos.x,
+            0.0f,
+            enemyBox.center.z - sourcePos.z
+        }, forward);
+        nextPos.x += knockDir.x * attackKnockback * knockbackScale;
+        nextPos.z += knockDir.z * attackKnockback * knockbackScale;
+        const float halfX = enemyBox.size.x * 0.5f;
+        const float halfZ = enemyBox.size.z * 0.5f;
+        nextPos.x = ClampRange(nextPos.x, -stageHalf + halfX, stageHalf - halfX);
+        nextPos.z = ClampRange(nextPos.z, -stageHalf + halfZ, stageHalf - halfZ);
+        slot.enemy->SetPos({ nextPos.x, 0.0f, nextPos.z });
+    };
+
+    const bool skillEnhanceWeapon =
+        tran.roguelike.actionSkillEnhancements[skillType][Transfer::RoguelikeUpgrade::SkillEnhanceWeapon] != 0;
+    const bool skillEnhanceChain =
+        tran.roguelike.actionSkillEnhancements[skillType][Transfer::RoguelikeUpgrade::SkillEnhanceChain] != 0;
+    const bool skillEnhanceBlood =
+        tran.roguelike.actionSkillEnhancements[skillType][Transfer::RoguelikeUpgrade::SkillEnhanceBlood] != 0;
+    const bool skillEnhanceFire =
+        tran.roguelike.actionSkillEnhancements[skillType][Transfer::RoguelikeUpgrade::SkillEnhanceFire] != 0;
+    int bloodSlashInnateRemain = 3;
+
+    auto applyDirectHitToBoss = [&](
+        const Collision::Box& hitBox,
+        int damage,
+        const std::function<void(const Collision::Box&)>& onHitBoss) -> bool
+    {
+        if (!m_isBossBattleDebug || m_boss.hp <= 0)
+        {
+            return false;
+        }
+        const Collision::Box bossBox = MakeAabb({
+            m_boss.pos.x,
+            m_boss.pos.y + m_boss.size.y * 0.5f,
+            m_boss.pos.z
+        }, m_boss.size);
+        if (!HitAabb(hitBox, bossBox))
+        {
+            return false;
+        }
+
+        SpawnHitEffect(bossBox.center, bossBox.size);
+        const bool defeated = ApplySkillDamageToBoss(damage);
+        if (onHitBoss && !defeated)
+        {
+            onHitBoss(bossBox);
+        }
+        return defeated;
+    };
+
+    auto applyDirectHitToEnemies = [&](
+        const Collision::Box& hitBox,
+        int damage,
+        const DirectX::XMFLOAT3& sourcePos,
+        float knockbackScale,
+        const std::function<void(EnemySlot&, const Collision::Box&)>& onHitEnemy) -> int
+    {
+        int hitCount = 0;
         for (auto& slot : m_enemies)
         {
             if (!slot.enemy) continue;
             const Collision::Box enemyBox = slot.enemy->GetCollision();
             if (!HitAabb(hitBox, enemyBox)) continue;
             SpawnHitEffect(enemyBox.center, enemyBox.size);
-            slot.enemy->Damage(skillDamage);
-            const DirectX::XMFLOAT3 knockDir = NormalizeXZ({
-                enemyBox.center.x - playerPos.x,
-                0.0f,
-                enemyBox.center.z - playerPos.z
-            }, forward);
-            DirectX::XMFLOAT3 nextPos = {
-                enemyBox.center.x + knockDir.x * tran.gameplay.attackKnockback * 1.2f,
-                0.0f,
-                enemyBox.center.z + knockDir.z * tran.gameplay.attackKnockback * 1.2f
-            };
-            const float halfX = enemyBox.size.x * 0.5f;
-            const float halfZ = enemyBox.size.z * 0.5f;
-            nextPos.x = ClampRange(nextPos.x, -stageHalf + halfX, stageHalf - halfX);
-            nextPos.z = ClampRange(nextPos.z, -stageHalf + halfZ, stageHalf - halfZ);
-            slot.enemy->SetPos(nextPos);
-            hitSomething = true;
-        }
-
-        if (m_isBossBattleDebug && m_boss.hp > 0)
-        {
-            const Collision::Box bossBox = MakeAabb({
-                m_boss.pos.x,
-                m_boss.pos.y + m_boss.size.y * 0.5f,
-                m_boss.pos.z
-            }, m_boss.size);
-            if (HitAabb(hitBox, bossBox))
+            slot.enemy->Damage(damage);
+            if (onHitEnemy)
             {
-                hitSomething = true;
-                SpawnHitEffect(bossBox.center, bossBox.size);
-                if (ApplySkillDamageToBoss(skillDamage))
-                {
-                    return true;
-                }
+                onHitEnemy(slot, enemyBox);
             }
+            applyKnockbackToEnemy(slot, sourcePos, knockbackScale);
+            ++hitCount;
         }
+        return hitCount;
+    };
 
-        if (hitSomething)
-        {
-            if (m_pAttackSe) PlaySound(m_pAttackSe);
-            if (m_hitStopTimer < tran.gameplay.attackHitStop)
-            {
-                m_hitStopTimer = tran.gameplay.attackHitStop;
-            }
-        }
-        return true;
-    }
-    case Transfer::RoguelikeUpgrade::SkillOrbit:
+    auto spawnProjectile = [&](const DirectX::XMFLOAT3& origin,
+                               const DirectX::XMFLOAT3& direction,
+                               float radius,
+                               float speed,
+                               float maxDistance,
+                               int damage,
+                               float knockbackScale)
     {
-        const float orbitRangeScale = tran.GetSkillRangeScaleByLevel(tran.roguelike.skillOrbitRangeLevel);
-        const float orbitDamageScale = tran.GetOrbitDamageScaleByCountLevel(tran.roguelike.skillOrbitCountLevel);
-        m_orbitSkill.active = true;
-        m_orbitSkill.duration = kSkillOrbitDuration;
-        m_orbitSkill.timer = kSkillOrbitDuration;
-        m_orbitSkill.angle = 0.0f;
-        m_orbitSkill.angularSpeed = kSkillOrbitAngularSpeed;
-        m_orbitSkill.radius = ((tran.player.size.x > tran.player.size.z) ? tran.player.size.x : tran.player.size.z) * kSkillOrbitRadiusScale;
-        m_orbitSkill.count = tran.GetOrbitCountByLevel(tran.roguelike.skillOrbitCountLevel);
-        m_orbitSkill.damage = ClampInt(
-            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * kSkillOrbitDamageScale * orbitDamageScale)),
-            1,
-            999);
-        m_orbitSkill.size = {
-            tran.player.size.x * kSkillOrbitBillboardScale * orbitRangeScale,
-            tran.player.size.y * kSkillOrbitBillboardScale * orbitRangeScale,
-            tran.player.size.z * kSkillOrbitBillboardScale * orbitRangeScale
-        };
-        m_orbitSkill.pos = CalcOrbitSatellitePos(
-            m_orbitSkill.angle,
-            m_orbitSkill.radius,
-            m_orbitSkill.count,
-            tran.player.pos,
-            tran.player.size.y,
-            0);
-        m_bossSkillContactCooldownTimer = 0.0f;
+        SkillProjectile shot{};
+        shot.pos = origin;
+        shot.dir = NormalizeXZ(direction, forward);
+        shot.radius = radius;
+        shot.speed = speed;
+        shot.remainDistance = maxDistance;
+        shot.damage = damage;
+        shot.projectileId = m_skillProjectileSerial++;
+        if (m_skillProjectileSerial < 0) m_skillProjectileSerial = 0;
+        shot.knockbackScale = knockbackScale;
+        shot.sourceSkillType = skillType;
+        shot.sourceDamage = damage;
+        shot.sourceWeapon = false;
+        shot.critical = false;
+        shot.remainingInnateBloodCount =
+            (skillType == Transfer::RoguelikeUpgrade::ActionSkillBloodSlash) ? 3 : 0;
+        shot.innateBurnDamage =
+            (skillType == Transfer::RoguelikeUpgrade::ActionSkillFireball) ? static_cast<float>(damage) : 0.0f;
+        m_skillProjectiles.push_back(shot);
+    };
+
+    auto findPriorityEnemy = [&]() -> EnemySlot*
+    {
+        EnemySlot* bestSlot = nullptr;
+        int bestMaxHp = -1;
+        int bestHp = -1;
         for (auto& slot : m_enemies)
         {
-            slot.skillContactCooldownTimer = 0.0f;
+            if (!slot.enemy || !slot.enemy->IsAlive()) continue;
+            const int currentMaxHp = slot.enemy->GetMaxHp();
+            const int currentHp = slot.enemy->GetHp();
+            if (!bestSlot || currentMaxHp > bestMaxHp || (currentMaxHp == bestMaxHp && currentHp > bestHp))
+            {
+                bestSlot = &slot;
+                bestMaxHp = currentMaxHp;
+                bestHp = currentHp;
+            }
         }
+        return bestSlot;
+    };
+
+    auto finishImmediateSkill = [&](int hitCount, bool includeBoss)
+    {
+        if (hitCount > 0 || includeBoss)
+        {
+            if (m_pAttackSe) PlaySound(m_pAttackSe);
+            if (m_hitStopTimer < baseHitStop)
+            {
+                m_hitStopTimer = baseHitStop;
+            }
+        }
+    };
+
+    auto applySkillTraitExtrasToEnemy = [&](EnemySlot& slot, const Collision::Box& enemyBox, int damage, int innateChainCount, int innateBloodCount, float innateBurnDamage)
+    {
+        if (skillEnhanceWeapon)
+        {
+            ApplySkillWeaponBuff(skillType);
+        }
+
+        int chainCount = innateChainCount;
+        if (skillEnhanceChain)
+        {
+            chainCount += (skillType == Transfer::RoguelikeUpgrade::ActionSkillChainThrow) ? 3 : 1;
+        }
+        if (chainCount > 0)
+        {
+            ApplyChainToEnemy(slot, chainCount, damage, enemyBox.center);
+        }
+
+        int bloodCount = innateBloodCount;
+        if (skillEnhanceBlood)
+        {
+            ++bloodCount;
+        }
+        if (bloodCount > 0)
+        {
+            SpawnBloodOrb(enemyBox.center, bloodCount);
+        }
+
+        float burnDamage = innateBurnDamage;
+        if (skillEnhanceFire)
+        {
+            burnDamage += static_cast<float>(damage);
+        }
+        if (burnDamage > 0.0f)
+        {
+            ApplyBurnToEnemy(slot, burnDamage);
+        }
+    };
+
+    auto applySkillTraitExtrasToBoss = [&](const Collision::Box& bossBox, int damage, int innateChainCount, int innateBloodCount, float innateBurnDamage)
+    {
+        if (skillEnhanceWeapon)
+        {
+            ApplySkillWeaponBuff(skillType);
+        }
+
+        int chainCount = innateChainCount;
+        if (skillEnhanceChain)
+        {
+            chainCount += (skillType == Transfer::RoguelikeUpgrade::ActionSkillChainThrow) ? 3 : 1;
+        }
+        if (chainCount > 0)
+        {
+            ApplyChainToBoss(chainCount, damage, bossBox.center);
+        }
+
+        int bloodCount = innateBloodCount;
+        if (skillEnhanceBlood)
+        {
+            ++bloodCount;
+        }
+        if (bloodCount > 0)
+        {
+            SpawnBloodOrb(bossBox.center, bloodCount);
+        }
+
+        float burnDamage = innateBurnDamage;
+        if (skillEnhanceFire)
+        {
+            burnDamage += static_cast<float>(damage);
+        }
+        if (burnDamage > 0.0f)
+        {
+            ApplyBurnToBoss(burnDamage);
+        }
+    };
+
+    switch (skillType)
+    {
+    case Transfer::RoguelikeUpgrade::ActionSkillWhirl:
+    {
+        const int damage = calcDamage(kSkillWhirlDamageScale);
+        const DirectX::XMFLOAT3 hitSize = {
+            tran.player.size.x * 3.6f,
+            tran.player.size.y * 1.35f,
+            tran.player.size.z * 3.6f
+        };
+        const Collision::Box hitBox = MakeAabb(playerPos, hitSize);
+        const int hitCount = applyDirectHitToEnemies(
+            hitBox,
+            damage,
+            playerPos,
+            1.15f,
+            [&](EnemySlot& slot, const Collision::Box& enemyBox)
+            {
+                applySkillTraitExtrasToEnemy(slot, enemyBox, damage, 0, 0, 0.0f);
+            });
+        const bool bossHit = applyDirectHitToBoss(
+            hitBox,
+            damage,
+            [&](const Collision::Box& bossBox)
+            {
+                applySkillTraitExtrasToBoss(bossBox, damage, 0, 0, 0.0f);
+            });
+        finishImmediateSkill(hitCount, bossHit);
+        return true;
+    }
+    case Transfer::RoguelikeUpgrade::ActionSkillRush:
+    {
+        const int damage = calcDamage(kSkillRushDamageScale);
+        DirectX::XMFLOAT3 destination = {
+            tran.player.pos.x + forward.x * kSkillRushDistance,
+            tran.player.pos.y,
+            tran.player.pos.z + forward.z * kSkillRushDistance
+        };
+        clampPlayerPosToStage(destination);
+        const DirectX::XMFLOAT3 center = {
+            (tran.player.pos.x + destination.x) * 0.5f,
+            playerPos.y,
+            (tran.player.pos.z + destination.z) * 0.5f
+        };
+        const DirectX::XMFLOAT3 hitSize = {
+            tran.player.size.x * 1.8f,
+            tran.player.size.y * 1.2f,
+            MaxFloat(std::fabs(destination.x - tran.player.pos.x), std::fabs(destination.z - tran.player.pos.z)) + tran.player.size.z * 1.8f
+        };
+        const Collision::Box hitBox = MakeAabb(center, hitSize);
+        const int hitCount = applyDirectHitToEnemies(
+            hitBox,
+            damage,
+            center,
+            1.35f,
+            [&](EnemySlot& slot, const Collision::Box& enemyBox)
+            {
+                applySkillTraitExtrasToEnemy(slot, enemyBox, damage, 0, 0, 0.0f);
+            });
+        const bool bossHit = applyDirectHitToBoss(
+            hitBox,
+            damage,
+            [&](const Collision::Box& bossBox)
+            {
+                applySkillTraitExtrasToBoss(bossBox, damage, 0, 0, 0.0f);
+            });
+        tran.player.pos = destination;
+        m_pPlayer->SetPos(destination);
+        m_lastMoveDir = forward;
+        finishImmediateSkill(hitCount, bossHit);
+        return true;
+    }
+    case Transfer::RoguelikeUpgrade::ActionSkillAmbush:
+    {
+        DirectX::XMFLOAT3 targetCenter = playerPos;
+        DirectX::XMFLOAT3 targetSize = tran.player.size;
+        TryGetAmbushTarget(targetCenter, targetSize);
+
+        const DirectX::XMFLOAT3 approachDir = NormalizeXZ({
+            targetCenter.x - tran.player.pos.x,
+            0.0f,
+            targetCenter.z - tran.player.pos.z
+        }, forward);
+        DirectX::XMFLOAT3 destination = {
+            targetCenter.x - approachDir.x * (targetSize.x + tran.player.size.x) * 0.65f,
+            tran.player.pos.y,
+            targetCenter.z - approachDir.z * (targetSize.z + tran.player.size.z) * 0.65f
+        };
+        clampPlayerPosToStage(destination);
+        tran.player.pos = destination;
+        m_pPlayer->SetPos(destination);
+        m_lastMoveDir = approachDir;
+
+        const int damage = calcDamage(kSkillAmbushDamageScale);
+        const DirectX::XMFLOAT3 ambushCenter = {
+            destination.x + approachDir.x * tran.player.size.x * 1.3f,
+            playerPos.y,
+            destination.z + approachDir.z * tran.player.size.z * 1.3f
+        };
+        const Collision::Box hitBox = MakeAabb(ambushCenter, {
+            tran.player.size.x * 2.2f,
+            tran.player.size.y * 1.2f,
+            tran.player.size.z * 2.2f
+        });
+        const int hitCount = applyDirectHitToEnemies(
+            hitBox,
+            damage,
+            ambushCenter,
+            1.0f,
+            [&](EnemySlot& slot, const Collision::Box& enemyBox)
+            {
+                applySkillTraitExtrasToEnemy(slot, enemyBox, damage, 0, 0, 0.0f);
+            });
+        const bool bossHit = applyDirectHitToBoss(
+            hitBox,
+            damage,
+            [&](const Collision::Box& bossBox)
+            {
+                applySkillTraitExtrasToBoss(bossBox, damage, 0, 0, 0.0f);
+            });
+        finishImmediateSkill(hitCount, bossHit);
+        return true;
+    }
+    case Transfer::RoguelikeUpgrade::ActionSkillChainThrow:
+    {
+        const int damage = calcDamage(kSkillChainThrowDamageScale);
+        const Collision::Box hitBox = MakeAabb(playerPos, {
+            kSkillChainThrowRange * 2.0f,
+            tran.player.size.y * 1.6f,
+            kSkillChainThrowRange * 2.0f
+        });
+        const int hitCount = applyDirectHitToEnemies(
+            hitBox,
+            damage,
+            playerPos,
+            0.55f,
+            [&](EnemySlot& slot, const Collision::Box& enemyBox)
+            {
+                applySkillTraitExtrasToEnemy(slot, enemyBox, damage, 1, 0, 0.0f);
+            });
+        const bool bossHit = applyDirectHitToBoss(
+            hitBox,
+            damage,
+            [&](const Collision::Box& bossBox)
+            {
+                applySkillTraitExtrasToBoss(bossBox, damage, 1, 0, 0.0f);
+            });
+        finishImmediateSkill(hitCount, bossHit);
+        return true;
+    }
+    case Transfer::RoguelikeUpgrade::ActionSkillFireball:
+    {
+        DirectX::XMFLOAT3 targetPos = {
+            playerPos.x + forward.x * 6.0f,
+            playerPos.y,
+            playerPos.z + forward.z * 6.0f
+        };
+        if (m_isBossBattleDebug && m_boss.hp > 0)
+        {
+            targetPos = {
+                m_boss.pos.x,
+                playerPos.y,
+                m_boss.pos.z
+            };
+        }
+        else
+        {
+            EnemySlot* priorityEnemy = findPriorityEnemy();
+            if (priorityEnemy && priorityEnemy->enemy)
+            {
+                const Collision::Box enemyBox = priorityEnemy->enemy->GetCollision();
+                targetPos = enemyBox.center;
+            }
+        }
+
+        DirectX::XMFLOAT3 shotDir = NormalizeXZ({
+            targetPos.x - playerPos.x,
+            0.0f,
+            targetPos.z - playerPos.z
+        }, forward);
+        float maxDistance = std::sqrt(DistSqXZ(targetPos, playerPos));
+        if (maxDistance < 1.2f) maxDistance = 6.0f;
+        spawnProjectile(
+            {
+                playerPos.x + shotDir.x * tran.player.size.x,
+                playerPos.y,
+                playerPos.z + shotDir.z * tran.player.size.z
+            },
+            shotDir,
+            kSkillFireballRadius,
+            kSkillFireballSpeed,
+            maxDistance + 0.8f,
+            calcDamage(kSkillFireballDamageScale),
+            0.95f);
+        return true;
+    }
+    case Transfer::RoguelikeUpgrade::ActionSkillBloodSlash:
+    {
+        const DirectX::XMFLOAT3 shotOrigin = {
+            playerPos.x + forward.x * tran.player.size.x,
+            playerPos.y,
+            playerPos.z + forward.z * tran.player.size.z
+        };
+        spawnProjectile(
+            shotOrigin,
+            forward,
+            kSkillSlashProjectileRadius,
+            kSkillSlashProjectileSpeed,
+            stageSize,
+            calcDamage(kSkillBloodSlashDamageScale),
+            1.05f);
         return true;
     }
     default:
@@ -2308,6 +3048,601 @@ void SceneGame::UpdateSkillActors(float dt, float stageSize)
         tran.player.pos,
         tran.player.size.y,
         0);
+}
+
+void SceneGame::ResetTraitCombatState()
+{
+    m_bloodOrbs.clear();
+    m_chainBeamEffects.clear();
+    m_bloodStock = 0;
+    m_bloodStockMax = GetBloodStockCap();
+    m_skillStockCount[0] = 0;
+    m_skillStockCount[1] = 0;
+    m_skillStockMax[0] = 0;
+    m_skillStockMax[1] = 0;
+    m_skillStockRechargeTimer[0] = 0.0f;
+    m_skillStockRechargeTimer[1] = 0.0f;
+    RefreshSkillStockState();
+    for (int slotIndex = 0; slotIndex < 2; ++slotIndex)
+    {
+        m_skillStockCount[slotIndex] = m_skillStockMax[slotIndex];
+        m_skillStockRechargeTimer[slotIndex] = 0.0f;
+    }
+    m_skill1CooldownTimer = 0.0f;
+    m_skill2CooldownTimer = 0.0f;
+    m_attackCriticalThisSwing = false;
+    m_bossChainCount = 0;
+    m_bossBurnPool = 0.0f;
+    m_bossBurnDps = 0.0f;
+    m_bossBurnCarry = 0.0f;
+    for (auto& slot : m_enemies)
+    {
+        slot.chainCount = 0;
+        slot.burnPool = 0.0f;
+        slot.burnDps = 0.0f;
+        slot.burnCarry = 0.0f;
+    }
+}
+
+void SceneGame::RefreshSkillStockState()
+{
+    m_bloodStockMax = GetBloodStockCap();
+    if (m_bloodStock < 0) m_bloodStock = 0;
+    if (m_bloodStock > m_bloodStockMax) m_bloodStock = m_bloodStockMax;
+
+    for (int slotIndex = 0; slotIndex < 2; ++slotIndex)
+    {
+        const int oldMax = m_skillStockMax[slotIndex];
+        const int newMax = GetSkillStockMaxForSlot(slotIndex);
+        m_skillStockMax[slotIndex] = newMax;
+        if (newMax <= 0)
+        {
+            m_skillStockCount[slotIndex] = 0;
+            m_skillStockRechargeTimer[slotIndex] = 0.0f;
+            continue;
+        }
+
+        if (oldMax <= 0 || m_skillStockCount[slotIndex] >= oldMax)
+        {
+            m_skillStockCount[slotIndex] = newMax;
+            m_skillStockRechargeTimer[slotIndex] = 0.0f;
+        }
+        else
+        {
+            if (m_skillStockCount[slotIndex] < 0) m_skillStockCount[slotIndex] = 0;
+            if (m_skillStockCount[slotIndex] > newMax) m_skillStockCount[slotIndex] = newMax;
+            if (m_skillStockCount[slotIndex] >= newMax)
+            {
+                m_skillStockRechargeTimer[slotIndex] = 0.0f;
+            }
+        }
+    }
+
+    m_skill1CooldownTimer = m_skillStockRechargeTimer[0];
+    m_skill2CooldownTimer = m_skillStockRechargeTimer[1];
+}
+
+void SceneGame::UpdateChainBeamEffects(float dt)
+{
+    const float safeDt = (dt > 0.0f) ? dt : 0.0f;
+    auto it = m_chainBeamEffects.begin();
+    while (it != m_chainBeamEffects.end())
+    {
+        it->timer -= safeDt;
+        if (it->timer <= 0.0f)
+        {
+            it = m_chainBeamEffects.erase(it);
+            continue;
+        }
+        ++it;
+    }
+}
+
+void SceneGame::SpawnChainBeamEffect(const DirectX::XMFLOAT3& startPos, const DirectX::XMFLOAT3& endPos)
+{
+    ChainBeamEffect beam{};
+    beam.startPos = startPos;
+    beam.endPos = endPos;
+    beam.duration = kChainBeamDuration;
+    beam.timer = beam.duration;
+    m_chainBeamEffects.push_back(beam);
+    if (m_chainBeamEffects.size() > 24)
+    {
+        m_chainBeamEffects.erase(m_chainBeamEffects.begin(), m_chainBeamEffects.begin() + (m_chainBeamEffects.size() - 24));
+    }
+}
+
+int SceneGame::GetSkillStockMaxForSlot(int slotIndex) const
+{
+    if (slotIndex < 0 || slotIndex >= 2)
+    {
+        return 0;
+    }
+
+    const auto& tran = Transfer::GetInstance();
+    const int skillType = GetSkillTypeForSlot(slotIndex);
+    if (skillType == Transfer::RoguelikeUpgrade::ActionSkillNone)
+    {
+        return 0;
+    }
+
+    int maxStock = 1;
+    if (tran.roguelike.actionSkillEnhancements[skillType][Transfer::RoguelikeUpgrade::SkillEnhanceCooldown] != 0)
+    {
+        ++maxStock;
+    }
+
+    const int cooldownTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitCooldown],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    if (cooldownTraitLevel >= 2) ++maxStock;
+    if (cooldownTraitLevel >= 4) ++maxStock;
+    if (cooldownTraitLevel >= 6) ++maxStock;
+    return maxStock;
+}
+
+int SceneGame::GetSkillStockCountForSlot(int slotIndex) const
+{
+    return (slotIndex >= 0 && slotIndex < 2) ? m_skillStockCount[slotIndex] : 0;
+}
+
+float SceneGame::GetSkillRechargeTimerForSlot(int slotIndex) const
+{
+    return (slotIndex >= 0 && slotIndex < 2) ? m_skillStockRechargeTimer[slotIndex] : 0.0f;
+}
+
+bool SceneGame::TryConsumeSkillResource(int slotIndex)
+{
+    if (slotIndex < 0 || slotIndex >= 2 || m_skillStockMax[slotIndex] <= 0)
+    {
+        return false;
+    }
+
+    if (m_skillStockCount[slotIndex] > 0)
+    {
+        --m_skillStockCount[slotIndex];
+        BeginSkillCooldown(slotIndex);
+        return true;
+    }
+
+    const int requiredBloodStock = static_cast<int>(std::ceil(GetSkillRechargeTimerForSlot(slotIndex) - 0.0001f));
+    if (requiredBloodStock <= 0)
+    {
+        BeginSkillCooldown(slotIndex);
+        return true;
+    }
+    if (requiredBloodStock > m_bloodStock)
+    {
+        return false;
+    }
+
+    m_bloodStock -= requiredBloodStock;
+    if (m_bloodStock < 0) m_bloodStock = 0;
+    m_skillStockRechargeTimer[slotIndex] = 0.0f;
+    BeginSkillCooldown(slotIndex);
+    return true;
+}
+
+void SceneGame::BeginSkillCooldown(int slotIndex)
+{
+    if (slotIndex < 0 || slotIndex >= 2)
+    {
+        return;
+    }
+
+    const float duration = (slotIndex == 0) ? m_skill1CooldownDuration : m_skill2CooldownDuration;
+    if (duration > 0.0f &&
+        m_skillStockMax[slotIndex] > 0 &&
+        m_skillStockCount[slotIndex] < m_skillStockMax[slotIndex] &&
+        m_skillStockRechargeTimer[slotIndex] <= 0.0f)
+    {
+        m_skillStockRechargeTimer[slotIndex] = duration;
+    }
+
+    m_skill1CooldownTimer = m_skillStockRechargeTimer[0];
+    m_skill2CooldownTimer = m_skillStockRechargeTimer[1];
+}
+
+void SceneGame::SpawnBloodOrb(const DirectX::XMFLOAT3& pos, int count)
+{
+    const int spawnCount = ClampInt(count, 0, kBloodOrbFieldCap);
+    for (int i = 0; i < spawnCount; ++i)
+    {
+        BloodOrb orb{};
+        orb.pos = pos;
+        orb.timer = kBloodOrbLifetime;
+        if (spawnCount > 1)
+        {
+            const float angle = (2.0f * kPi * static_cast<float>(i)) / static_cast<float>(spawnCount);
+            orb.pos.x += std::cos(angle) * 0.25f;
+            orb.pos.z += std::sin(angle) * 0.25f;
+        }
+        if (static_cast<int>(m_bloodOrbs.size()) >= kBloodOrbFieldCap)
+        {
+            m_bloodOrbs.erase(m_bloodOrbs.begin());
+        }
+        m_bloodOrbs.push_back(orb);
+    }
+}
+
+void SceneGame::UpdateBloodOrbs(float dt, int playerAttackDamage)
+{
+    if (!m_pPlayer)
+    {
+        return;
+    }
+
+    const auto& tran = Transfer::GetInstance();
+    const float safeDt = (dt > 0.0f) ? dt : 0.0f;
+    const DirectX::XMFLOAT3 playerPos = tran.player.pos;
+    const float pickupRadius = GetBloodPickupRadius();
+    const float pickupRadiusSq = pickupRadius * pickupRadius;
+    const int pickupBurnDamage = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * 3.0f)),
+        1,
+        9999);
+
+    auto orbIt = m_bloodOrbs.begin();
+    while (orbIt != m_bloodOrbs.end())
+    {
+        orbIt->timer -= safeDt;
+        if (orbIt->timer <= 0.0f)
+        {
+            orbIt = m_bloodOrbs.erase(orbIt);
+            continue;
+        }
+
+        if (DistSqXZ(orbIt->pos, playerPos) <= pickupRadiusSq)
+        {
+            if (m_bloodStock < m_bloodStockMax)
+            {
+                ++m_bloodStock;
+            }
+            if (HasBloodFireSynergy())
+            {
+                for (auto& slot : m_enemies)
+                {
+                    if (!slot.enemy || !slot.enemy->IsAlive()) continue;
+                    if (DistSqXZ(slot.enemy->GetCollision().center, orbIt->pos) <= kBloodFireSynergyRadius * kBloodFireSynergyRadius)
+                    {
+                        ApplyBurnToEnemy(slot, static_cast<float>(pickupBurnDamage));
+                    }
+                }
+                if (m_isBossBattleDebug && m_boss.hp > 0)
+                {
+                    const DirectX::XMFLOAT3 bossCenter = {
+                        m_boss.pos.x,
+                        m_boss.pos.y + m_boss.size.y * 0.5f,
+                        m_boss.pos.z
+                    };
+                    if (DistSqXZ(bossCenter, orbIt->pos) <= kBloodFireSynergyRadius * kBloodFireSynergyRadius)
+                    {
+                        ApplyBurnToBoss(static_cast<float>(pickupBurnDamage));
+                    }
+                }
+            }
+            orbIt = m_bloodOrbs.erase(orbIt);
+            continue;
+        }
+
+        ++orbIt;
+    }
+}
+
+void SceneGame::UpdateDamageOverTime(float dt)
+{
+    const float safeDt = (dt > 0.0f) ? dt : 0.0f;
+    for (auto& slot : m_enemies)
+    {
+        if (!slot.enemy || !slot.enemy->IsAlive()) continue;
+        if (slot.burnPool <= 0.0f || slot.burnDps <= 0.0f) continue;
+
+        const float damageThisFrame = std::min(slot.burnPool, slot.burnDps * safeDt);
+        slot.burnPool -= damageThisFrame;
+        slot.burnCarry += damageThisFrame;
+        const int burnDamage = static_cast<int>(std::floor(slot.burnCarry + 0.0001f));
+        if (burnDamage > 0)
+        {
+            slot.burnCarry -= static_cast<float>(burnDamage);
+            slot.enemy->Damage(burnDamage);
+        }
+        if (slot.burnPool <= 0.0f)
+        {
+            slot.burnPool = 0.0f;
+            slot.burnDps = 0.0f;
+            slot.burnCarry = 0.0f;
+        }
+    }
+
+    if (!m_isBossBattleDebug || m_boss.hp <= 0 || m_bossBurnPool <= 0.0f || m_bossBurnDps <= 0.0f)
+    {
+        return;
+    }
+
+    const float damageThisFrame = std::min(m_bossBurnPool, m_bossBurnDps * safeDt);
+    m_bossBurnPool -= damageThisFrame;
+    m_bossBurnCarry += damageThisFrame;
+    const int burnDamage = static_cast<int>(std::floor(m_bossBurnCarry + 0.0001f));
+    if (burnDamage > 0)
+    {
+        m_bossBurnCarry -= static_cast<float>(burnDamage);
+        ApplySkillDamageToBoss(burnDamage);
+    }
+    if (m_bossBurnPool <= 0.0f)
+    {
+        m_bossBurnPool = 0.0f;
+        m_bossBurnDps = 0.0f;
+        m_bossBurnCarry = 0.0f;
+    }
+}
+
+int SceneGame::GetChainCapPerTarget() const
+{
+    const auto& tran = Transfer::GetInstance();
+    const int chainTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitChain],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    int cap = 3;
+    if (chainTraitLevel >= 2) cap += 2;
+    if (chainTraitLevel >= 4) cap += 2;
+    if (chainTraitLevel >= 6) cap += 2;
+    return cap;
+}
+
+int SceneGame::GetBloodStockCap() const
+{
+    const auto& tran = Transfer::GetInstance();
+    const int bloodTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitBlood],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    return 5 + bloodTraitLevel * 2;
+}
+
+float SceneGame::GetBloodPickupRadius() const
+{
+    const auto& tran = Transfer::GetInstance();
+    const int bloodTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitBlood],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    float radius = 3.0f;
+    if (bloodTraitLevel >= 2) radius = 4.0f;
+    if (bloodTraitLevel >= 4) radius = 5.0f;
+    if (bloodTraitLevel >= 6) radius = 6.0f;
+    return radius;
+}
+
+float SceneGame::GetBurnScale() const
+{
+    const auto& tran = Transfer::GetInstance();
+    const int fireTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitFire],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    float scale = 1.0f + 0.10f * static_cast<float>(fireTraitLevel);
+    if (fireTraitLevel >= 2) scale += 1.0f;
+    if (fireTraitLevel >= 4) scale += 1.0f;
+    return scale;
+}
+
+bool SceneGame::HasChainBloodSynergy() const
+{
+    const auto& tran = Transfer::GetInstance();
+    return
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitChain] >= Transfer::RoguelikeUpgrade::kTraitLevelMax &&
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitBlood] >= Transfer::RoguelikeUpgrade::kTraitLevelMax;
+}
+
+bool SceneGame::HasBloodFireSynergy() const
+{
+    const auto& tran = Transfer::GetInstance();
+    return
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitBlood] >= Transfer::RoguelikeUpgrade::kTraitLevelMax &&
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitFire] >= Transfer::RoguelikeUpgrade::kTraitLevelMax;
+}
+
+bool SceneGame::HasChainFireSynergy() const
+{
+    const auto& tran = Transfer::GetInstance();
+    return
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitChain] >= Transfer::RoguelikeUpgrade::kTraitLevelMax &&
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitFire] >= Transfer::RoguelikeUpgrade::kTraitLevelMax;
+}
+
+int SceneGame::ApplyChainToEnemy(EnemySlot& slot, int requestedCount, int sourceDamage, const DirectX::XMFLOAT3& effectPos)
+{
+    if (!slot.enemy || requestedCount <= 0)
+    {
+        return 0;
+    }
+
+    const int chainCap = GetChainCapPerTarget();
+    const int remain = chainCap - slot.chainCount;
+    if (remain <= 0)
+    {
+        return 0;
+    }
+
+    const int applied = ClampInt(requestedCount, 0, remain);
+    slot.chainCount += applied;
+    const int bindDamage = ClampInt(
+        static_cast<int>(std::round(static_cast<float>(slot.enemy->GetMaxHp()) * 0.05f * static_cast<float>(applied))),
+        0,
+        9999);
+    if (bindDamage > 0)
+    {
+        slot.enemy->Damage(bindDamage);
+    }
+    if (applied > 0)
+    {
+        const auto& tran = Transfer::GetInstance();
+        const DirectX::XMFLOAT3 startPos = {
+            tran.player.pos.x,
+            tran.player.pos.y + tran.player.size.y * 0.70f,
+            tran.player.pos.z
+        };
+        SpawnChainBeamEffect(startPos, effectPos);
+    }
+    if (HasChainBloodSynergy())
+    {
+        for (int i = 0; i < applied; ++i)
+        {
+            if ((std::rand() % 3) == 0)
+            {
+                SpawnBloodOrb(effectPos, 1);
+            }
+        }
+    }
+    if (HasChainFireSynergy() && sourceDamage > 0)
+    {
+        ApplyBurnToEnemy(slot, static_cast<float>(sourceDamage) * 0.5f);
+    }
+    return applied;
+}
+
+int SceneGame::ApplyChainToBoss(int requestedCount, int sourceDamage, const DirectX::XMFLOAT3& effectPos)
+{
+    if (!m_isBossBattleDebug || m_boss.hp <= 0 || requestedCount <= 0)
+    {
+        return 0;
+    }
+
+    const int chainCap = GetChainCapPerTarget();
+    const int remain = chainCap - m_bossChainCount;
+    if (remain <= 0)
+    {
+        return 0;
+    }
+
+    const int applied = ClampInt(requestedCount, 0, remain);
+    m_bossChainCount += applied;
+    const int bindDamage = ClampInt(
+        static_cast<int>(std::round(static_cast<float>(m_boss.maxHp) * 0.05f * static_cast<float>(applied))),
+        0,
+        9999);
+    if (bindDamage > 0)
+    {
+        ApplySkillDamageToBoss(bindDamage);
+    }
+    if (applied > 0)
+    {
+        const auto& tran = Transfer::GetInstance();
+        const DirectX::XMFLOAT3 startPos = {
+            tran.player.pos.x,
+            tran.player.pos.y + tran.player.size.y * 0.70f,
+            tran.player.pos.z
+        };
+        SpawnChainBeamEffect(startPos, effectPos);
+    }
+    if (HasChainBloodSynergy())
+    {
+        for (int i = 0; i < applied; ++i)
+        {
+            if ((std::rand() % 3) == 0)
+            {
+                SpawnBloodOrb(effectPos, 1);
+            }
+        }
+    }
+    if (HasChainFireSynergy() && sourceDamage > 0)
+    {
+        ApplyBurnToBoss(static_cast<float>(sourceDamage) * 0.5f);
+    }
+    return applied;
+}
+
+void SceneGame::ApplyBurnToEnemy(EnemySlot& slot, float burnBaseDamage)
+{
+    if (!slot.enemy || burnBaseDamage <= 0.0f)
+    {
+        return;
+    }
+
+    const auto& tran = Transfer::GetInstance();
+    const float burnAmount = burnBaseDamage * GetBurnScale();
+    slot.burnPool += burnAmount;
+    slot.burnDps += burnAmount;
+    const int fireTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitFire],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    if (fireTraitLevel >= 6)
+    {
+        const float currentHp = static_cast<float>(slot.enemy->GetHp());
+        if (slot.burnPool > currentHp)
+        {
+            const int overflowDamage = static_cast<int>(std::floor(slot.burnPool - currentHp + 0.0001f));
+            if (overflowDamage > 0)
+            {
+                slot.enemy->Damage(overflowDamage);
+                slot.burnPool -= static_cast<float>(overflowDamage);
+                if (slot.burnPool < 0.0f) slot.burnPool = 0.0f;
+            }
+        }
+    }
+}
+
+void SceneGame::ApplyBurnToBoss(float burnBaseDamage)
+{
+    if (!m_isBossBattleDebug || m_boss.hp <= 0 || burnBaseDamage <= 0.0f)
+    {
+        return;
+    }
+
+    const auto& tran = Transfer::GetInstance();
+    const float burnAmount = burnBaseDamage * GetBurnScale();
+    m_bossBurnPool += burnAmount;
+    m_bossBurnDps += burnAmount;
+    const int fireTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitFire],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    if (fireTraitLevel >= 6)
+    {
+        const float currentHp = static_cast<float>(m_boss.hp);
+        if (m_bossBurnPool > currentHp)
+        {
+            const int overflowDamage = static_cast<int>(std::floor(m_bossBurnPool - currentHp + 0.0001f));
+            if (overflowDamage > 0)
+            {
+                m_boss.hp -= overflowDamage;
+                if (m_boss.hp < 0) m_boss.hp = 0;
+                m_bossBurnPool -= static_cast<float>(overflowDamage);
+                if (m_bossBurnPool < 0.0f) m_bossBurnPool = 0.0f;
+            }
+        }
+    }
+}
+
+void SceneGame::ApplySkillWeaponBuff(int skillType)
+{
+    float buffScale = 0.25f;
+    switch (NormalizeActionSkillType(skillType))
+    {
+    case Transfer::RoguelikeUpgrade::ActionSkillWhirl:
+        buffScale = 0.30f;
+        break;
+    case Transfer::RoguelikeUpgrade::ActionSkillRush:
+        buffScale = 0.20f;
+        break;
+    default:
+        buffScale = 0.25f;
+        break;
+    }
+
+    const auto& tran = Transfer::GetInstance();
+    if (tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitWeapon] >= 4)
+    {
+        buffScale *= 3.0f;
+    }
+    if (m_weaponDamageBuffScale < buffScale)
+    {
+        m_weaponDamageBuffScale = buffScale;
+    }
+    m_weaponDamageBuffTimer = kWeaponDamageBuffDuration;
 }
 
 void SceneGame::UpdateCursorHoverDebug(float stageSize)
@@ -2519,17 +3854,28 @@ bool SceneGame::ApplySkillDamageToBoss(int damage)
     {
         m_boss.attackZones.clear();
         m_boss.fallingRocks.clear();
+        m_enemyProjectiles.clear();
+        tran.gameplayDebug.bossBattleActive = 0;
+        tran.gameplayDebug.upgradeSelectionPending = 0;
+        tran.roguelike.selectionPending = 0;
+        if (m_pClearSe) PlaySound(m_pClearSe);
+        const int currentStageType = tran.GetCurrentRunStageType();
+        const bool isFinalBossStage =
+            currentStageType == Transfer::RoguelikeUpgrade::StageFinalBoss ||
+            tran.roguelike.currentStageIndex >= (tran.GetRunStageCount() - 1);
+        if (isFinalBossStage)
+        {
+            tran.gameplayDebug.runTimerRunning = 0;
+            tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
+            tran.gameplayDebug.showBossResultTimer = 0;
+            BeginClearPortal(ClearPortalFinalResult, m_boss.pos);
+            return true;
+        }
+
+        tran.gameplayDebug.showBossResultTimer = 0;
         tran.gameplayDebug.runTimerRunning = 0;
         tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
-        tran.gameplayDebug.bossBattleActive = 0;
-        tran.gameplayDebug.showBossResultTimer = 1;
-        tran.gameplayDebug.upgradeSelectionPending = 0;
-        tran.gameplayDebug.upgradeRerollRemain = 0;
-        tran.roguelike.selectionPending = 0;
-        tran.roguelike.rerollRemain = 0;
-        if (m_pClearSe) PlaySound(m_pClearSe);
-        SceneManager::ChangeResult(SceneManager::ResultType::Win);
-        SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+        BeginClearPortal(ClearPortalNextStage, m_boss.pos);
         return true;
     }
 
@@ -2784,9 +4130,28 @@ void SceneGame::Update()
         waveEnemyAddPerWave + CalcDifficultyWaveAddBonus(difficultyPreset),
         0,
         kEnemyCountMax);
-    const int playerAttackDamage = tran.GetPlayerAttackDamageByLevel(tran.roguelike.attackPowerLevel);
-    const float playerAttackCooldownScale = tran.GetAttackCooldownScaleByLevel(tran.roguelike.attackSpeedLevel);
+    if (m_bossCurseTimer > 0.0f)
+    {
+        m_bossCurseTimer -= kFixedDt;
+        if (m_bossCurseTimer < 0.0f) m_bossCurseTimer = 0.0f;
+    }
+    const float bossCurseAttackScale = (m_bossCurseTimer > 0.0f) ? 1.25f : 1.0f;
+    const float bossCurseSkillScale = (m_bossCurseTimer > 0.0f) ? 1.30f : 1.0f;
+    const int legacyAttackDamage = tran.GetPlayerAttackDamageByLevel(tran.roguelike.attackPowerLevel);
+    const float legacyAttackCooldownScale = tran.GetAttackCooldownScaleByLevel(tran.roguelike.attackSpeedLevel);
     const float playerEvadeCooldownScale = tran.GetEvadeCooldownScaleByLevel(tran.roguelike.evadeCooldownLevel);
+    const int weaponType = NormalizeWeaponType(tran.roguelike.loadoutWeaponType);
+    const float weaponAttackRate = GetWeaponAttacksPerSecond(weaponType) * GetWeaponAttackSpeedScale(tran.roguelike);
+    const float attackCycle = MaxFloat((1.0f / MaxFloat(weaponAttackRate, 0.1f)) * legacyAttackCooldownScale * bossCurseAttackScale, 0.05f);
+    float weaponDamageScale = GetWeaponDamageScale(tran.roguelike, weaponType);
+    if (m_weaponDamageBuffTimer > 0.0f)
+    {
+        weaponDamageScale += m_weaponDamageBuffScale;
+    }
+    const int playerAttackDamage = ClampInt(
+        static_cast<int>(std::ceil(static_cast<float>(legacyAttackDamage) * weaponDamageScale)),
+        1,
+        9999);
     const float difficultyEnemyAttackDamageScale = CalcDifficultyEnemyAttackDamageScale(difficultyPreset);
     const float roguelikeEnemyAttackScale = m_isBossBattleDebug ? 1.0f : tran.GetEnemyAttackScaleByUpgradeProgress();
 
@@ -2800,12 +4165,15 @@ void SceneGame::Update()
         kCameraIntroDurationMin,
         kCameraIntroDurationMax);
     tran.gameplay.cameraIntroDuration = cameraIntroDuration;
-    const float attackWindup = (tran.gameplay.attackWindup < 0.0f) ? 0.0f : tran.gameplay.attackWindup;
-    const float attackDuration = (tran.gameplay.attackDuration < kMinDuration) ? kMinDuration : tran.gameplay.attackDuration;
-    const float attackRecovery = (tran.gameplay.attackRecovery < 0.0f) ? 0.0f : tran.gameplay.attackRecovery;
-    const float attackCooldown = ((tran.gameplay.attackCooldown < 0.0f) ? 0.0f : tran.gameplay.attackCooldown) * playerAttackCooldownScale;
-    const float skill1Cooldown = (tran.gameplay.skill1Cooldown < 0.0f) ? 0.0f : tran.gameplay.skill1Cooldown;
-    const float skill2Cooldown = (tran.gameplay.skill2Cooldown < 0.0f) ? 0.0f : tran.gameplay.skill2Cooldown;
+    const float attackWindupBase = (tran.gameplay.attackWindup < 0.0f) ? 0.0f : tran.gameplay.attackWindup;
+    const float attackDurationBase = (tran.gameplay.attackDuration < kMinDuration) ? kMinDuration : tran.gameplay.attackDuration;
+    const float attackRecoveryBase = (tran.gameplay.attackRecovery < 0.0f) ? 0.0f : tran.gameplay.attackRecovery;
+    const float attackPhaseTotal = attackWindupBase + attackDurationBase + attackRecoveryBase;
+    const float attackPhaseScale = (attackPhaseTotal > 1.0e-4f) ? (attackCycle / attackPhaseTotal) : 1.0f;
+    const float attackWindup = attackWindupBase * attackPhaseScale;
+    const float attackDuration = MaxFloat(attackDurationBase * attackPhaseScale, kMinDuration * 0.5f);
+    const float attackRecovery = attackRecoveryBase * attackPhaseScale;
+    const float attackCooldown = 0.0f;
     int multiHitShakeThreshold = tran.gameplay.screenShakeHitThreshold;
     if (multiHitShakeThreshold < kMultiHitShakeThresholdMin) multiHitShakeThreshold = kMultiHitShakeThresholdMin;
     if (multiHitShakeThreshold > kMultiHitShakeThresholdMax) multiHitShakeThreshold = kMultiHitShakeThresholdMax;
@@ -2869,32 +4237,47 @@ void SceneGame::Update()
     tran.roguelike.evadeCooldownLevel = tran.ClampUpgradeLevel(tran.roguelike.evadeCooldownLevel);
     const int skill1Type = GetSkillTypeForSlot(0);
     const int skill2Type = GetSkillTypeForSlot(1);
-    if (skill1Type != Transfer::RoguelikeUpgrade::SkillNone)
+    const int cooldownTraitLevel = ClampInt(
+        tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitCooldown],
+        0,
+        Transfer::RoguelikeUpgrade::kTraitLevelMax);
+    const float cooldownTraitScale = MaxFloat(1.0f - 0.05f * static_cast<float>(cooldownTraitLevel), 0.35f);
+    if (skill1Type != Transfer::RoguelikeUpgrade::ActionSkillNone)
     {
-        const float cooldownReduction = tran.GetSkillCooldownReductionByLevel(
-            GetSkillCooldownUpgradeLevel(tran.roguelike, skill1Type));
-        m_skill1CooldownDuration = MaxFloat(skill1Cooldown - cooldownReduction, 0.2f);
+        m_skill1CooldownDuration = MaxFloat(GetActionSkillBaseCooldown(skill1Type) * cooldownTraitScale * bossCurseSkillScale, 0.2f);
     }
     else
     {
         m_skill1CooldownDuration = 0.0f;
     }
-    if (skill2Type != Transfer::RoguelikeUpgrade::SkillNone)
+    if (skill2Type != Transfer::RoguelikeUpgrade::ActionSkillNone)
     {
-        const float cooldownReduction = tran.GetSkillCooldownReductionByLevel(
-            GetSkillCooldownUpgradeLevel(tran.roguelike, skill2Type));
-        m_skill2CooldownDuration = MaxFloat(skill2Cooldown - cooldownReduction, 0.2f);
+        m_skill2CooldownDuration = MaxFloat(GetActionSkillBaseCooldown(skill2Type) * cooldownTraitScale * bossCurseSkillScale, 0.2f);
     }
     else
     {
         m_skill2CooldownDuration = 0.0f;
+    }
+    RefreshSkillStockState();
+    m_weaponAttackStockMax = WeaponUsesProjectile(weaponType) ? 3 : 1;
+    if (m_weaponAttackCount == 0 && m_weaponAttackStock < m_weaponAttackStockMax)
+    {
+        m_weaponAttackStock = m_weaponAttackStockMax;
+    }
+    if (m_weaponAttackStock > m_weaponAttackStockMax)
+    {
+        m_weaponAttackStock = m_weaponAttackStockMax;
+    }
+    if (m_weaponAttackStock < 0)
+    {
+        m_weaponAttackStock = 0;
     }
 
     tran.gameplayDebug.effectiveEnemyBaseCount = effectiveBaseEnemyCount;
     tran.gameplayDebug.effectiveEnemyAddPerWave = effectiveWaveEnemyAdd;
     tran.gameplayDebug.effectiveEnemyAttackDamage = enemyAttackDamage;
     tran.gameplayDebug.playerAttackDamage = playerAttackDamage;
-    tran.gameplayDebug.playerAttackCooldownScale = playerAttackCooldownScale;
+    tran.gameplayDebug.playerAttackCooldownScale = attackCycle;
     tran.gameplayDebug.playerEvadeCooldownScale = playerEvadeCooldownScale;
     tran.gameplayDebug.stageClearCount = tran.roguelike.stageClearCount;
     tran.gameplayDebug.attackPowerLevel = tran.roguelike.attackPowerLevel;
@@ -3128,6 +4511,15 @@ void SceneGame::Update()
         m_playerDamageInvincibleTimer -= kFixedDt;
         if (m_playerDamageInvincibleTimer < 0.0f) m_playerDamageInvincibleTimer = 0.0f;
     }
+    if (m_weaponDamageBuffTimer > 0.0f)
+    {
+        m_weaponDamageBuffTimer -= kFixedDt;
+        if (m_weaponDamageBuffTimer <= 0.0f)
+        {
+            m_weaponDamageBuffTimer = 0.0f;
+            m_weaponDamageBuffScale = 0.0f;
+        }
+    }
     UpdateHitEffectEmitters(kFixedDt);
 
     if (m_attackCooldownUiTimer > 0.0f)
@@ -3135,48 +4527,110 @@ void SceneGame::Update()
         m_attackCooldownUiTimer -= kFixedDt;
         if (m_attackCooldownUiTimer < 0.0f) m_attackCooldownUiTimer = 0.0f;
     }
-    if (m_skill1CooldownTimer > 0.0f)
+    for (int slotIndex = 0; slotIndex < 2; ++slotIndex)
     {
-        m_skill1CooldownTimer -= kFixedDt;
-        if (m_skill1CooldownTimer < 0.0f) m_skill1CooldownTimer = 0.0f;
+        const float cooldownDuration = (slotIndex == 0) ? m_skill1CooldownDuration : m_skill2CooldownDuration;
+        if (m_skillStockMax[slotIndex] <= 0 || cooldownDuration <= 0.0f)
+        {
+            m_skillStockCount[slotIndex] = 0;
+            m_skillStockRechargeTimer[slotIndex] = 0.0f;
+            continue;
+        }
+        if (m_skillStockCount[slotIndex] >= m_skillStockMax[slotIndex])
+        {
+            m_skillStockRechargeTimer[slotIndex] = 0.0f;
+            continue;
+        }
+        if (m_skillStockRechargeTimer[slotIndex] > 0.0f)
+        {
+            m_skillStockRechargeTimer[slotIndex] -= kFixedDt;
+        }
+        if (m_skillStockRechargeTimer[slotIndex] <= 0.0f)
+        {
+            ++m_skillStockCount[slotIndex];
+            if (m_skillStockCount[slotIndex] > m_skillStockMax[slotIndex])
+            {
+                m_skillStockCount[slotIndex] = m_skillStockMax[slotIndex];
+            }
+            if (m_skillStockCount[slotIndex] < m_skillStockMax[slotIndex])
+            {
+                m_skillStockRechargeTimer[slotIndex] = cooldownDuration;
+            }
+            else
+            {
+                m_skillStockRechargeTimer[slotIndex] = 0.0f;
+            }
+        }
     }
-    if (m_skill2CooldownTimer > 0.0f)
+    m_skill1CooldownTimer = m_skillStockRechargeTimer[0];
+    m_skill2CooldownTimer = m_skillStockRechargeTimer[1];
+    if (m_weaponAttackStockMax > 1 && m_weaponAttackStock < m_weaponAttackStockMax)
     {
-        m_skill2CooldownTimer -= kFixedDt;
-        if (m_skill2CooldownTimer < 0.0f) m_skill2CooldownTimer = 0.0f;
+        if (m_weaponAttackStockRechargeTimer > 0.0f)
+        {
+            m_weaponAttackStockRechargeTimer -= kFixedDt;
+        }
+        if (m_weaponAttackStockRechargeTimer <= 0.0f)
+        {
+            ++m_weaponAttackStock;
+            if (m_weaponAttackStock > m_weaponAttackStockMax)
+            {
+                m_weaponAttackStock = m_weaponAttackStockMax;
+            }
+            if (m_weaponAttackStock < m_weaponAttackStockMax)
+            {
+                m_weaponAttackStockRechargeTimer = attackCycle;
+            }
+            else
+            {
+                m_weaponAttackStockRechargeTimer = 0.0f;
+            }
+        }
     }
-    if (m_skill1CooldownDuration <= 0.0f)
+    else if (m_weaponAttackStockMax <= 1)
     {
-        m_skill1CooldownTimer = 0.0f;
-    }
-    if (m_skill2CooldownDuration <= 0.0f)
-    {
-        m_skill2CooldownTimer = 0.0f;
+        m_weaponAttackStock = 1;
+        m_weaponAttackStockRechargeTimer = 0.0f;
     }
     const bool requestSkill1 =
-        (GetSkillTypeForSlot(0) != Transfer::RoguelikeUpgrade::SkillNone) &&
+        (GetSkillTypeForSlot(0) != Transfer::RoguelikeUpgrade::ActionSkillNone) &&
         m_skill1CooldownDuration > 0.0f &&
-        IsKeyTrigger('O') &&
-        m_skill1CooldownTimer <= 0.0f;
+        IsKeyTrigger('O');
     const bool requestSkill2 =
-        (GetSkillTypeForSlot(1) != Transfer::RoguelikeUpgrade::SkillNone) &&
+        (GetSkillTypeForSlot(1) != Transfer::RoguelikeUpgrade::ActionSkillNone) &&
         m_skill2CooldownDuration > 0.0f &&
-        IsKeyTrigger('P') &&
-        m_skill2CooldownTimer <= 0.0f;
+        IsKeyTrigger('P');
 
     if (m_pPlayer) m_pPlayer->Update();
     UpdateSkillActors(kFixedDt, stageSize);
-    if (requestSkill1 && ActivateSkillSlot(0, playerAttackDamage, stageSize))
+    UpdateBloodOrbs(kFixedDt, playerAttackDamage);
+    UpdateChainBeamEffects(kFixedDt);
+    if (UpdateClearPortal(kFixedDt))
     {
-        m_skill1CooldownTimer = m_skill1CooldownDuration;
+        return;
+    }
+    UpdateDamageOverTime(kFixedDt);
+    if (requestSkill1 && TryConsumeSkillResource(0) && ActivateSkillSlot(0, legacyAttackDamage, stageSize))
+    {
         if (SceneManager::GetCurrent() != SceneManager::SCENE_GAME) return;
     }
-    if (requestSkill2 && ActivateSkillSlot(1, playerAttackDamage, stageSize))
+    if (requestSkill2 && TryConsumeSkillResource(1) && ActivateSkillSlot(1, legacyAttackDamage, stageSize))
     {
-        m_skill2CooldownTimer = m_skill2CooldownDuration;
         if (SceneManager::GetCurrent() != SceneManager::SCENE_GAME) return;
     }
     const bool isPlayerEvading = (tran.gameplayDebug.playerEvading != 0);
+    const auto tryRevivePlayer = [&]() -> bool
+    {
+        if (!tran.TryConsumePlayerRevive())
+        {
+            return false;
+        }
+
+        m_playerDamageInvincibleTimer = MaxFloat(m_playerDamageInvincibleTimer, MaxFloat(playerDamageInvincible, 1.0f));
+        m_playerDamageFlashTimer = MaxFloat(m_playerDamageFlashTimer, tran.gameplay.playerDamageFlash);
+        tran.gameplayDebug.runTimerRunning = 1;
+        return true;
+    };
     const auto commitLose = [&]()
     {
         tran.gameplayDebug.attackSwingId = m_attackSwingId;
@@ -3216,6 +4670,10 @@ void SceneGame::Update()
         if (tran.player.hp < 0.0f) tran.player.hp = 0.0f;
         if (tran.player.hp <= 0.0f)
         {
+            if (tryRevivePlayer())
+            {
+                return false;
+            }
             commitLose();
             return true;
         }
@@ -3420,17 +4878,325 @@ void SceneGame::Update()
         if (m_enemyAttackSeGateTimer < 0.0f) m_enemyAttackSeGateTimer = 0.0f;
     }
 
+    auto applyCooldownBurst = [&](float scale)
+    {
+        for (int slotIndex = 0; slotIndex < 2; ++slotIndex)
+        {
+            if (m_skillStockRechargeTimer[slotIndex] > 0.0f)
+            {
+                m_skillStockRechargeTimer[slotIndex] *= scale;
+            }
+        }
+        m_skill1CooldownTimer = m_skillStockRechargeTimer[0];
+        m_skill2CooldownTimer = m_skillStockRechargeTimer[1];
+    };
+
+    auto applyCriticalWeaponEffects = [&](bool isCritical)
+    {
+        if (!isCritical)
+        {
+            return;
+        }
+        if (tran.roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeCooldownBurst] != 0)
+        {
+            applyCooldownBurst(0.9f);
+        }
+    };
+
+    auto applyWeaponHitExtrasToEnemy = [&](EnemySlot& slot, const DirectX::XMFLOAT3& effectPos, int damage, bool isCritical)
+    {
+        if (!isCritical)
+        {
+            return;
+        }
+        if (tran.roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeChainOnCrit] != 0)
+        {
+            ApplyChainToEnemy(slot, 1, damage, effectPos);
+        }
+        if (tran.roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeBloodOnCrit] != 0)
+        {
+            SpawnBloodOrb(effectPos, 1);
+        }
+        if (tran.roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeFireOnCrit] != 0)
+        {
+            ApplyBurnToEnemy(slot, static_cast<float>(damage));
+        }
+    };
+
+    auto applyWeaponHitExtrasToBoss = [&](const DirectX::XMFLOAT3& effectPos, int damage, bool isCritical)
+    {
+        if (!isCritical)
+        {
+            return;
+        }
+        if (tran.roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeChainOnCrit] != 0)
+        {
+            ApplyChainToBoss(1, damage, effectPos);
+        }
+        if (tran.roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeBloodOnCrit] != 0)
+        {
+            SpawnBloodOrb(effectPos, 1);
+        }
+        if (tran.roguelike.weaponUpgradeOwned[Transfer::RoguelikeUpgrade::WeaponUpgradeFireOnCrit] != 0)
+        {
+            ApplyBurnToBoss(static_cast<float>(damage));
+        }
+    };
+
+    auto applySkillProjectileExtrasToEnemy = [&](EnemySlot& slot, const Collision::Box& enemyBox, SkillProjectile& shot)
+    {
+        const int sourceDamage = (shot.sourceDamage > 0) ? shot.sourceDamage : shot.damage;
+        if (shot.sourceWeapon)
+        {
+            applyWeaponHitExtrasToEnemy(slot, enemyBox.center, sourceDamage, shot.critical);
+            return;
+        }
+
+        const int sourceSkillType = NormalizeActionSkillType(shot.sourceSkillType);
+        if (sourceSkillType == Transfer::RoguelikeUpgrade::ActionSkillNone)
+        {
+            return;
+        }
+
+        const bool enhanceWeapon =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceWeapon] != 0;
+        const bool enhanceChain =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceChain] != 0;
+        const bool enhanceBlood =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceBlood] != 0;
+        const bool enhanceFire =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceFire] != 0;
+
+        if (enhanceWeapon)
+        {
+            ApplySkillWeaponBuff(sourceSkillType);
+        }
+
+        int chainCount = 0;
+        int bloodCount = 0;
+        float burnDamage = 0.0f;
+        if (sourceSkillType == Transfer::RoguelikeUpgrade::ActionSkillFireball)
+        {
+            burnDamage += shot.innateBurnDamage;
+        }
+        else if (sourceSkillType == Transfer::RoguelikeUpgrade::ActionSkillBloodSlash && shot.remainingInnateBloodCount > 0)
+        {
+            bloodCount = 1;
+            --shot.remainingInnateBloodCount;
+        }
+
+        if (enhanceChain)
+        {
+            chainCount += 1;
+        }
+        if (enhanceBlood)
+        {
+            ++bloodCount;
+        }
+        if (enhanceFire)
+        {
+            burnDamage += static_cast<float>(sourceDamage);
+        }
+
+        if (chainCount > 0)
+        {
+            ApplyChainToEnemy(slot, chainCount, sourceDamage, enemyBox.center);
+        }
+        if (bloodCount > 0)
+        {
+            SpawnBloodOrb(enemyBox.center, bloodCount);
+        }
+        if (burnDamage > 0.0f)
+        {
+            ApplyBurnToEnemy(slot, burnDamage);
+        }
+    };
+
+    auto applySkillProjectileExtrasToBoss = [&](const DirectX::XMFLOAT3& bossCenter, SkillProjectile& shot)
+    {
+        const int sourceDamage = (shot.sourceDamage > 0) ? shot.sourceDamage : shot.damage;
+        if (shot.sourceWeapon)
+        {
+            applyWeaponHitExtrasToBoss(bossCenter, sourceDamage, shot.critical);
+            return;
+        }
+
+        const int sourceSkillType = NormalizeActionSkillType(shot.sourceSkillType);
+        if (sourceSkillType == Transfer::RoguelikeUpgrade::ActionSkillNone)
+        {
+            return;
+        }
+
+        const bool enhanceWeapon =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceWeapon] != 0;
+        const bool enhanceChain =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceChain] != 0;
+        const bool enhanceBlood =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceBlood] != 0;
+        const bool enhanceFire =
+            tran.roguelike.actionSkillEnhancements[sourceSkillType][Transfer::RoguelikeUpgrade::SkillEnhanceFire] != 0;
+
+        if (enhanceWeapon)
+        {
+            ApplySkillWeaponBuff(sourceSkillType);
+        }
+
+        int chainCount = 0;
+        int bloodCount = 0;
+        float burnDamage = 0.0f;
+        if (sourceSkillType == Transfer::RoguelikeUpgrade::ActionSkillFireball)
+        {
+            burnDamage += shot.innateBurnDamage;
+        }
+        else if (sourceSkillType == Transfer::RoguelikeUpgrade::ActionSkillBloodSlash && shot.remainingInnateBloodCount > 0)
+        {
+            bloodCount = 1;
+            --shot.remainingInnateBloodCount;
+        }
+
+        if (enhanceChain)
+        {
+            chainCount += 1;
+        }
+        if (enhanceBlood)
+        {
+            ++bloodCount;
+        }
+        if (enhanceFire)
+        {
+            burnDamage += static_cast<float>(sourceDamage);
+        }
+
+        if (chainCount > 0)
+        {
+            ApplyChainToBoss(chainCount, sourceDamage, bossCenter);
+        }
+        if (bloodCount > 0)
+        {
+            SpawnBloodOrb(bossCenter, bloodCount);
+        }
+        if (burnDamage > 0.0f)
+        {
+            ApplyBurnToBoss(burnDamage);
+        }
+    };
+
+    auto calcWeaponHitDamage = [&](bool& outIsCritical) -> int
+    {
+        ++m_weaponAttackCount;
+        const int critNeed = GetWeaponCritNeed(tran.roguelike, weaponType);
+        outIsCritical = (critNeed > 0) ? ((m_weaponAttackCount % critNeed) == 0) : false;
+        float damageScale = 1.0f;
+        if (outIsCritical)
+        {
+            damageScale *= kWeaponCritBaseDamageScale;
+            if (tran.roguelike.traitLevels[Transfer::RoguelikeUpgrade::TraitWeapon] >= 6)
+            {
+                damageScale *= 1.25f;
+            }
+        }
+        return ClampInt(
+            static_cast<int>(std::ceil(static_cast<float>(playerAttackDamage) * damageScale)),
+            1,
+            9999);
+    };
+
     if (IsKeyTrigger('F') &&
         !m_attackActive &&
         m_attackWindupTimer <= 0.0f &&
         m_attackRecoveryTimer <= 0.0f &&
         m_attackCooldownTimer <= 0.0f)
     {
-        // Attack can only start when no other attack phase is still running.
-        m_attackWindupTimer = attackWindup;
-        m_attackCooldownUiDuration = attackWindup + attackDuration + attackRecovery + attackCooldown;
-        if (m_attackCooldownUiDuration < kMinDuration) m_attackCooldownUiDuration = kMinDuration;
-        m_attackCooldownUiTimer = m_attackCooldownUiDuration;
+        bool isCritical = false;
+        const int swingDamage = calcWeaponHitDamage(isCritical);
+        applyCriticalWeaponEffects(isCritical);
+
+        if (WeaponUsesProjectile(weaponType))
+        {
+            m_attackCriticalThisSwing = false;
+            if (m_weaponAttackStock > 0)
+            {
+                --m_weaponAttackStock;
+                if (m_weaponAttackStockRechargeTimer <= 0.0f)
+                {
+                    m_weaponAttackStockRechargeTimer = attackCycle;
+                }
+
+                DirectX::XMFLOAT3 targetPos = {
+                    tran.player.pos.x + m_lastMoveDir.x * kWeaponProjectileMaxDistance,
+                    tran.player.pos.y + tran.player.size.y * 0.5f,
+                    tran.player.pos.z + m_lastMoveDir.z * kWeaponProjectileMaxDistance
+                };
+                EnemySlot* bestSlot = nullptr;
+                int bestMaxHp = -1;
+                int bestHp = -1;
+                for (auto& slot : m_enemies)
+                {
+                    if (!slot.enemy || !slot.enemy->IsAlive()) continue;
+                    const int currentMaxHp = slot.enemy->GetMaxHp();
+                    const int currentHp = slot.enemy->GetHp();
+                    if (!bestSlot || currentMaxHp > bestMaxHp || (currentMaxHp == bestMaxHp && currentHp > bestHp))
+                    {
+                        bestSlot = &slot;
+                        bestMaxHp = currentMaxHp;
+                        bestHp = currentHp;
+                    }
+                }
+                if (m_isBossBattleDebug && m_boss.hp > 0)
+                {
+                    targetPos = {
+                        m_boss.pos.x,
+                        tran.player.pos.y + tran.player.size.y * 0.5f,
+                        m_boss.pos.z
+                    };
+                }
+                else if (bestSlot && bestSlot->enemy)
+                {
+                    targetPos = bestSlot->enemy->GetCollision().center;
+                }
+
+                DirectX::XMFLOAT3 shotDir = NormalizeXZ({
+                    targetPos.x - tran.player.pos.x,
+                    0.0f,
+                    targetPos.z - tran.player.pos.z
+                }, m_lastMoveDir);
+
+                SkillProjectile shot{};
+                shot.pos = {
+                    tran.player.pos.x + shotDir.x * tran.player.size.x,
+                    tran.player.pos.y + tran.player.size.y * 0.5f,
+                    tran.player.pos.z + shotDir.z * tran.player.size.z
+                };
+                shot.dir = shotDir;
+                shot.radius = kWeaponProjectileRadius;
+                shot.speed = kWeaponProjectileSpeed;
+                shot.remainDistance = kWeaponProjectileMaxDistance;
+                shot.damage = swingDamage;
+                shot.projectileId = m_skillProjectileSerial++;
+                if (m_skillProjectileSerial < 0) m_skillProjectileSerial = 0;
+                shot.knockbackScale = GetWeaponKnockbackScale(weaponType);
+                shot.sourceSkillType = Transfer::RoguelikeUpgrade::ActionSkillNone;
+                shot.sourceDamage = swingDamage;
+                shot.sourceWeapon = true;
+                shot.critical = isCritical;
+                shot.remainingInnateBloodCount = 0;
+                shot.innateBurnDamage = 0.0f;
+                m_skillProjectiles.push_back(shot);
+                m_attackCooldownUiDuration = attackCycle;
+                m_attackCooldownUiTimer = attackCycle;
+            }
+        }
+        else
+        {
+            // Attack can only start when no other attack phase is still running.
+            m_attackDamageThisSwing = swingDamage;
+            m_attackKnockbackScaleThisSwing = GetWeaponKnockbackScale(weaponType);
+            m_attackCriticalThisSwing = isCritical;
+            m_attackWindupTimer = attackWindup;
+            m_attackCooldownUiDuration = attackCycle;
+            if (m_attackCooldownUiDuration < kMinDuration) m_attackCooldownUiDuration = kMinDuration;
+            m_attackCooldownUiTimer = m_attackCooldownUiDuration;
+        }
     }
 
     if (!m_attackActive && m_attackWindupTimer > 0.0f)
@@ -3458,16 +5224,38 @@ void SceneGame::Update()
             m_attackActive = false;
             m_attackRecoveryTimer = attackRecovery;
             m_attackCooldownTimer = attackCooldown;
+            m_attackCriticalThisSwing = false;
         }
     }
 
-    if (m_attackActive)
+    if (m_attackActive && !WeaponUsesProjectile(weaponType))
     {
         TRAN_INS;
         const DirectX::XMFLOAT3 forward = NormalizeXZ(m_lastMoveDir, { 0.0f, 0.0f, 1.0f });
         const DirectX::XMFLOAT3 right = { forward.z, 0.0f, -forward.x };
         const float progress = Clamp01(1.0f - (m_attackTimer / attackDuration));
-        const float sweepRad = attackSweepDegrees * (kPi / 180.0f);
+        float weaponSweepDegrees = attackSweepDegrees;
+        float weaponSweepRadius = attackSweepRadiusScale;
+        float weaponWidth = attackWidthScale;
+        float weaponDepth = attackDepthScale;
+        switch (weaponType)
+        {
+        case Transfer::RoguelikeUpgrade::WeaponHeavy:
+            weaponSweepDegrees *= 0.75f;
+            weaponSweepRadius *= 1.15f;
+            weaponWidth *= 2.0f;
+            weaponDepth *= 2.1f;
+            break;
+        case Transfer::RoguelikeUpgrade::WeaponRapid:
+            weaponSweepDegrees *= 1.15f;
+            weaponSweepRadius *= 0.90f;
+            weaponWidth *= 0.78f;
+            weaponDepth *= 0.85f;
+            break;
+        default:
+            break;
+        }
+        const float sweepRad = weaponSweepDegrees * (kPi / 180.0f);
         const float angle = (progress - 0.5f) * sweepRad;
         const float c = std::cos(angle);
         const float s = std::sin(angle);
@@ -3479,11 +5267,11 @@ void SceneGame::Update()
         slashDir = NormalizeXZ(slashDir, forward);
 
         m_attackSize = {
-            tran.player.size.x * attackWidthScale,
+            tran.player.size.x * weaponWidth,
             tran.player.size.y,
-            tran.player.size.z * attackDepthScale
+            tran.player.size.z * weaponDepth
         };
-        const float radius = tran.player.size.z * attackSweepRadiusScale;
+        const float radius = tran.player.size.z * weaponSweepRadius;
         m_attackCenter = {
             tran.player.pos.x + slashDir.x * radius,
             tran.player.pos.y + tran.player.size.y * 0.5f,
@@ -3525,6 +5313,7 @@ void SceneGame::Update()
             {
                 return;
             }
+            applySkillProjectileExtrasToBoss(bossBox.center, shot);
             if (m_pAttackSe) PlaySound(m_pAttackSe);
             if (m_hitStopTimer < attackHitStop)
             {
@@ -3820,7 +5609,12 @@ void SceneGame::Update()
                 if (HitAabb(attackBox, enemyBox))
                 {
                     SpawnHitEffect(enemyBox.center, enemyBox.size);
-                    slot.enemy->Damage(playerAttackDamage);
+                    slot.enemy->Damage((m_attackDamageThisSwing > 0) ? m_attackDamageThisSwing : playerAttackDamage);
+                    applyWeaponHitExtrasToEnemy(
+                        slot,
+                        enemyBox.center,
+                        (m_attackDamageThisSwing > 0) ? m_attackDamageThisSwing : playerAttackDamage,
+                        m_attackCriticalThisSwing);
                     slot.lastHitSwingId = m_attackSwingId;
                     ++m_attackHitCountThisSwing;
                     if (m_attackHitCountThisSwing == multiHitShakeThreshold &&
@@ -3845,8 +5639,8 @@ void SceneGame::Update()
                         0.0f,
                         enemyBox.center.z - m_attackCenter.z
                     }, m_lastMoveDir);
-                    enemyBox.center.x += knockDir.x * attackKnockback;
-                    enemyBox.center.z += knockDir.z * attackKnockback;
+                    enemyBox.center.x += knockDir.x * attackKnockback * m_attackKnockbackScaleThisSwing;
+                    enemyBox.center.z += knockDir.z * attackKnockback * m_attackKnockbackScaleThisSwing;
                     clampCenterToStage(enemyBox.center, enemyBox.size);
                     slot.enemy->SetPos({ enemyBox.center.x, 0.0f, enemyBox.center.z });
 
@@ -3868,9 +5662,10 @@ void SceneGame::Update()
                 slot.lastSkillProjectileId = skillShot.projectileId;
                 SpawnHitEffect(enemyBox.center, enemyBox.size);
                 slot.enemy->Damage(skillShot.damage);
+                applySkillProjectileExtrasToEnemy(slot, enemyBox, skillShot);
                 const DirectX::XMFLOAT3 knockDir = NormalizeXZ(skillShot.dir, m_lastMoveDir);
-                enemyBox.center.x += knockDir.x * attackKnockback * 0.8f;
-                enemyBox.center.z += knockDir.z * attackKnockback * 0.8f;
+                enemyBox.center.x += knockDir.x * attackKnockback * skillShot.knockbackScale;
+                enemyBox.center.z += knockDir.z * attackKnockback * skillShot.knockbackScale;
                 clampCenterToStage(enemyBox.center, enemyBox.size);
                 slot.enemy->SetPos({ enemyBox.center.x, 0.0f, enemyBox.center.z });
                 if (m_pAttackSe) PlaySound(m_pAttackSe);
@@ -3950,9 +5745,34 @@ void SceneGame::Update()
             std::remove_if(m_enemies.begin(), m_enemies.end(), [](const EnemySlot& slot) { return slot.enemy == nullptr; }),
             m_enemies.end());
 
-        const bool isCombatStage = (tran.GetCurrentRunStageType() == Transfer::RoguelikeUpgrade::StageCombat);
-        if (isCombatStage && !m_isBossBattleDebug && !m_challengeActive && m_enemies.empty())
-        {
+		const int currentStageType = tran.GetCurrentRunStageType();
+		const bool isTagRewardStage =
+			tran.GetCurrentRunRewardType() == Transfer::RoguelikeUpgrade::RewardTag;
+		const bool isCombatStage =
+			currentStageType != Transfer::RoguelikeUpgrade::StageShop &&
+			currentStageType != Transfer::RoguelikeUpgrade::StageRest &&
+			currentStageType != Transfer::RoguelikeUpgrade::StageBoss &&
+			currentStageType != Transfer::RoguelikeUpgrade::StageFinalBoss &&
+			!isTagRewardStage;
+		if (isTagRewardStage &&
+			tran.roguelike.selectionPending == 0 &&
+			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionNone)
+		{
+			tran.gameplayDebug.runTimerRunning = 0;
+			tran.BeginCurrentStageRewardSelection();
+			if (tran.roguelike.selectionPending != 0)
+			{
+				SceneManager::ChangeResult(SceneManager::ResultType::Win);
+				SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
+				return;
+			}
+		}
+		if (isCombatStage &&
+			m_clearPortalMode == ClearPortalNone &&
+			!m_isBossBattleDebug &&
+			!m_challengeActive &&
+			m_enemies.empty())
+		{
             // Clearing all enemies advances the wave, or finishes the stage on the final wave.
             m_enemyProjectiles.clear();
             if (m_currentWave < m_waveMax)
@@ -3975,10 +5795,7 @@ void SceneGame::Update()
                 tran.gameplayDebug.runRecordedSec = tran.gameplayDebug.runElapsedSec;
                 tran.gameplayDebug.bossBattleActive = 0;
                 tran.gameplayDebug.showBossResultTimer = 0;
-                tran.BeginUpgradeSelection();
-                SceneManager::ChangeResult(SceneManager::ResultType::Win);
-                SceneManager::ChangeScene(SceneManager::SCENE_RESULT);
-                return;
+                BeginClearPortal(ClearPortalReward, { 0.0f, 0.0f, 0.0f });
             }
         }
     }
@@ -4126,6 +5943,7 @@ void SceneGame::Draw()
         // Active player swing is visualized as a floor marker.
         DrawAttackMarker(m_pAttackMarker, m_attackCenter, m_attackSize);
     }
+    DrawClearPortal();
     if (m_pAttackMarker)
     {
         for (const auto& shot : m_enemyProjectiles)
@@ -4173,6 +5991,25 @@ void SceneGame::Draw()
             }
         }
     }
+    if (m_pBloodUiTexture || m_pSkillTexture)
+    {
+        Texture* bloodTexture = m_pBloodUiTexture ? m_pBloodUiTexture : m_pSkillTexture;
+        for (const auto& orb : m_bloodOrbs)
+        {
+            const float size = 0.55f;
+            DrawBillboardMarkerTint(
+                bloodTexture,
+                m_pCamera,
+                {
+                    orb.pos.x,
+                    orb.pos.y + 0.35f,
+                    orb.pos.z
+                },
+                { size, size, size },
+                kBloodUiTint);
+        }
+    }
+    DrawChainBeamEffects();
     DrawBossTelegraphMarker();
     DrawChallengeMarkers();
 
@@ -4246,6 +6083,7 @@ void SceneGame::Draw()
     {
         m_pPlayer->DrawDirectionMarker();
     }
+    DrawAmbushTargetMarker();
 
     if (!m_markerEffects.empty())
     {
@@ -4413,12 +6251,15 @@ void SceneGame::Draw()
             float hp = static_cast<float>(slot.enemy->GetHp());
             if (maxHp <= 0.0f) maxHp = 1.0f;
             const float rate = Clamp01(hp / maxHp);
+            const float burnRate = Clamp01((hp + MaxFloat(0.0f, slot.burnPool)) / maxHp);
 
-            DrawEnemyHpGaugeBillboard(headPos, enemyBox.size, rate);
+            DrawEnemyHpGaugeBillboard(headPos, enemyBox.size, rate, burnRate, slot.chainCount);
         }
     }
 
     m_uiManager.Draw(UIObjectManager::Layer::Game);
+    DrawSkillHud();
+    DrawBloodStockHud();
     DrawBossHpUi();
 }
 
@@ -4455,7 +6296,22 @@ void SceneGame::UpdateHpGauge()
 void SceneGame::UpdateCooldownGauges()
 {
     float attackRate = 1.0f;
-    if (m_attackCooldownUiDuration > 0.0f)
+    if (m_weaponAttackStockMax > 1)
+    {
+        if (m_weaponAttackStock > 0)
+        {
+            attackRate = 1.0f;
+        }
+        else if (m_attackCooldownUiDuration > 0.0f)
+        {
+            attackRate = Clamp01(1.0f - (m_weaponAttackStockRechargeTimer / m_attackCooldownUiDuration));
+        }
+        else
+        {
+            attackRate = 0.0f;
+        }
+    }
+    else if (m_attackCooldownUiDuration > 0.0f)
     {
         attackRate = Clamp01(1.0f - (m_attackCooldownUiTimer / m_attackCooldownUiDuration));
     }
@@ -4472,18 +6328,40 @@ void SceneGame::UpdateCooldownGauges()
         }
     }
 
-    const bool hasSkill1 = (GetSkillTypeForSlot(0) != Transfer::RoguelikeUpgrade::SkillNone);
+    const bool hasSkill1 = (GetSkillTypeForSlot(0) != Transfer::RoguelikeUpgrade::ActionSkillNone);
     float skill1Rate = hasSkill1 ? 1.0f : 0.0f;
-    if (hasSkill1 && m_skill1CooldownDuration > 0.0f)
+    if (hasSkill1)
     {
-        skill1Rate = Clamp01(1.0f - (m_skill1CooldownTimer / m_skill1CooldownDuration));
+        if (GetSkillStockCountForSlot(0) > 0)
+        {
+            skill1Rate = 1.0f;
+        }
+        else if (m_skill1CooldownDuration > 0.0f)
+        {
+            skill1Rate = Clamp01(1.0f - (GetSkillRechargeTimerForSlot(0) / m_skill1CooldownDuration));
+        }
+        else
+        {
+            skill1Rate = 0.0f;
+        }
     }
 
-    const bool hasSkill2 = (GetSkillTypeForSlot(1) != Transfer::RoguelikeUpgrade::SkillNone);
+    const bool hasSkill2 = (GetSkillTypeForSlot(1) != Transfer::RoguelikeUpgrade::ActionSkillNone);
     float skill2Rate = hasSkill2 ? 1.0f : 0.0f;
-    if (hasSkill2 && m_skill2CooldownDuration > 0.0f)
+    if (hasSkill2)
     {
-        skill2Rate = Clamp01(1.0f - (m_skill2CooldownTimer / m_skill2CooldownDuration));
+        if (GetSkillStockCountForSlot(1) > 0)
+        {
+            skill2Rate = 1.0f;
+        }
+        else if (m_skill2CooldownDuration > 0.0f)
+        {
+            skill2Rate = Clamp01(1.0f - (GetSkillRechargeTimerForSlot(1) / m_skill2CooldownDuration));
+        }
+        else
+        {
+            skill2Rate = 0.0f;
+        }
     }
 
     {
@@ -4526,20 +6404,217 @@ void SceneGame::UpdateCooldownGauges()
     }
 }
 
+void SceneGame::DrawSkillHud() const
+{
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
+    if (!dl || !m_pBloodUiTexture || !m_pBloodUiTexture->GetResource())
+    {
+        return;
+    }
+
+    for (int slotIndex = 0; slotIndex < 2; ++slotIndex)
+    {
+        if (GetSkillTypeForSlot(slotIndex) != Transfer::RoguelikeUpgrade::ActionSkillBloodSlash)
+        {
+            continue;
+        }
+
+        UIObject* frame = m_pCooldownFrame[CooldownSkill1 + slotIndex];
+        if (!frame) continue;
+
+        const DirectX::XMFLOAT2 framePos = frame->GetPosition();
+        const DirectX::XMFLOAT2 frameSize = frame->GetSize();
+        const float iconSize = ClampRange(frameSize.y - 6.0f, 12.0f, 28.0f);
+        const float left = framePos.x - frameSize.x * 0.5f + 4.0f;
+        const float top = framePos.y - frameSize.y * 0.5f + 3.0f;
+        const ImVec2 min(left, top);
+        const ImVec2 max(left + iconSize, top + iconSize);
+        dl->AddImage(
+            reinterpret_cast<ImTextureID>(m_pBloodUiTexture->GetResource()),
+            min,
+            max,
+            ImVec2(0.0f, 0.0f),
+            ImVec2(1.0f, 1.0f),
+            IM_COL32(
+                static_cast<int>(kBloodUiTint.x * 255.0f),
+                static_cast<int>(kBloodUiTint.y * 255.0f),
+                static_cast<int>(kBloodUiTint.z * 255.0f),
+                static_cast<int>(kBloodUiTint.w * 255.0f)));
+    }
+}
+
+void SceneGame::DrawAmbushTargetMarker() const
+{
+    if (!m_pCamera || !m_pDirectionMarkerTexture || !m_pDirectionMarkerTexture->GetResource())
+    {
+        return;
+    }
+
+    const bool hasAmbushSkill =
+        (GetSkillTypeForSlot(0) == Transfer::RoguelikeUpgrade::ActionSkillAmbush) ||
+        (GetSkillTypeForSlot(1) == Transfer::RoguelikeUpgrade::ActionSkillAmbush);
+    if (!hasAmbushSkill)
+    {
+        return;
+    }
+
+    DirectX::XMFLOAT3 targetCenter{};
+    DirectX::XMFLOAT3 targetSize{};
+    if (!TryGetAmbushTarget(targetCenter, targetSize))
+    {
+        return;
+    }
+
+    const float baseSize = MaxFloat(targetSize.x, targetSize.z);
+    const float markerWidth = ClampRange(baseSize * 0.85f, 0.45f, 1.10f);
+    const float markerHeight = markerWidth;
+    const DirectX::XMFLOAT3 markerPos = {
+        targetCenter.x,
+        targetCenter.y + targetSize.y * 0.5f + markerHeight * 0.20f,
+        targetCenter.z
+    };
+
+    DrawBillboardMarkerTintFrame(
+        m_pDirectionMarkerTexture,
+        m_pCamera,
+        markerPos,
+        { markerWidth, markerHeight, markerWidth },
+        { 1.0f, 1.0f, 1.0f, 0.95f },
+        { 0.0f, 1.0f },
+        { 1.0f, -1.0f });
+}
+
+void SceneGame::DrawBloodStockHud() const
+{
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
+    if (!dl ||
+        !m_pBloodStockOnTexture || !m_pBloodStockOnTexture->GetResource() ||
+        !m_pBloodStockOffTexture || !m_pBloodStockOffTexture->GetResource() ||
+        m_bloodStockMax <= 0)
+    {
+        return;
+    }
+
+    const float availableWidth = kBloodStockUiMaxWidth;
+    const float iconSize = ClampRange(
+        std::min(
+            kBloodStockUiBaseSize,
+            (availableWidth - kBloodStockUiSpacing * static_cast<float>(m_bloodStockMax - 1)) / static_cast<float>(m_bloodStockMax)),
+        8.0f,
+        kBloodStockUiBaseSize);
+    const float totalWidth =
+        static_cast<float>(m_bloodStockMax) * iconSize +
+        static_cast<float>(m_bloodStockMax - 1) * kBloodStockUiSpacing;
+    const float startX = kUiMargin + (kHpFrameWidth - totalWidth) * 0.5f;
+    const float topY = kUiMargin + kHpFrameHeight + 8.0f;
+
+    for (int i = 0; i < m_bloodStockMax; ++i)
+    {
+        Texture* texture = (i < m_bloodStock) ? m_pBloodStockOnTexture : m_pBloodStockOffTexture;
+        if (!texture || !texture->GetResource()) continue;
+        const float x = startX + static_cast<float>(i) * (iconSize + kBloodStockUiSpacing);
+        dl->AddImage(
+            reinterpret_cast<ImTextureID>(texture->GetResource()),
+            ImVec2(x, topY),
+            ImVec2(x + iconSize, topY + iconSize));
+    }
+}
+
+void SceneGame::DrawChainBeamEffects() const
+{
+    if (!m_pChainLinkTexture || !m_pChainLinkTexture->GetResource() || !m_pCamera)
+    {
+        return;
+    }
+
+    for (const ChainBeamEffect& beam : m_chainBeamEffects)
+    {
+        if (beam.duration <= 0.0f || beam.timer <= 0.0f)
+        {
+            continue;
+        }
+
+        const float alpha = Clamp01(beam.timer / beam.duration);
+        const float dx = beam.endPos.x - beam.startPos.x;
+        const float dy = beam.endPos.y - beam.startPos.y;
+        const float dz = beam.endPos.z - beam.startPos.z;
+        const float length = std::sqrt(dx * dx + dy * dy + dz * dz);
+        const int segmentCount = ClampInt(
+            static_cast<int>(std::ceil(length / kChainBeamSegmentSpacing)) + 1,
+            1,
+            48);
+
+        for (int i = 0; i < segmentCount; ++i)
+        {
+            const float t = (segmentCount <= 1) ? 0.0f : static_cast<float>(i) / static_cast<float>(segmentCount - 1);
+            const DirectX::XMFLOAT3 pos = {
+                beam.startPos.x + dx * t,
+                beam.startPos.y + dy * t,
+                beam.startPos.z + dz * t
+            };
+            DrawBillboardMarkerTint(
+                m_pChainLinkTexture,
+                m_pCamera,
+                pos,
+                { kChainBeamSegmentSize, kChainBeamSegmentSize, kChainBeamSegmentSize },
+                { kChainBeamTint.x, kChainBeamTint.y, kChainBeamTint.z, kChainBeamTint.w * alpha });
+        }
+    }
+}
+
+void SceneGame::DrawClearPortal() const
+{
+    if (m_clearPortalMode == ClearPortalNone || m_clearPortalSpawnTimer > 0.0f)
+    {
+        return;
+    }
+
+    const float pulse = 0.5f + 0.5f * std::sin(m_clearPortalPulseTimer * 4.8f);
+    const float floorRadius = 1.10f + pulse * 0.20f;
+    const float coreSize = 0.80f + pulse * 0.16f;
+    const DirectX::XMFLOAT3 floorPos = { m_clearPortalPos.x, 0.001f, m_clearPortalPos.z };
+    const DirectX::XMFLOAT4 floorColor = { 0.22f, 0.86f, 1.0f, 0.90f };
+    const DirectX::XMFLOAT4 coreColor = { 0.82f, 0.96f, 1.0f, 0.88f };
+    Texture* floorTexture = m_pBossAttackRangeMarker ? m_pBossAttackRangeMarker : m_pAttackMarker;
+    if (floorTexture)
+    {
+        DrawAttackMarkerTint(
+            floorTexture,
+            floorPos,
+            { floorRadius, 0.05f, floorRadius },
+            floorColor);
+    }
+
+    if (m_pAttackMarker && m_pCamera)
+    {
+        DrawBillboardMarkerTint(
+            m_pAttackMarker,
+            m_pCamera,
+            { m_clearPortalPos.x, 0.15f, m_clearPortalPos.z },
+            { coreSize, coreSize, coreSize },
+            coreColor);
+    }
+}
+
 /**
  * @brief 敵の頭上にビルボード HP ゲージを描画します。
  * @param headPos 頭上基準位置です。
  * @param enemySize 敵サイズです。
- * @param rate 残 HP 比率です。
+ * @param hpRate 残 HP 比率です。
+ * @param burnRate 燃焼分込みの表示比率です。
+ * @param chainCount 鎖本数です。
  */
 void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
                                           const DirectX::XMFLOAT3& enemySize,
-                                          float rate)
+                                          float hpRate,
+                                          float burnRate,
+                                          int chainCount)
 {
     // 必要な描画リソースかカメラが欠けている場合は描画しません。
     if (!m_pEnemyHpGauge || !m_pEnemyHpFrame || !m_pCamera) return;
 
-    const float clampedRate = Clamp01(rate);
+    const float clampedRate = Clamp01(hpRate);
+    const float clampedBurnRate = ClampRange(burnRate, clampedRate, 1.0f);
     float width = enemySize.x * kEnemyHpBillboardWidthScale;
     float height = enemySize.y * kEnemyHpBillboardHeightScale;
     if (width < kEnemyHpBillboardMinWidth) width = kEnemyHpBillboardMinWidth;
@@ -4600,6 +6675,25 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
     Sprite::SetTexture(m_pEnemyHpFrame);
     Sprite::Draw();
 
+    if (clampedBurnRate > clampedRate)
+    {
+        DirectX::XMFLOAT3 burnPos = {
+            headPos.x + rightAxis.x * ((clampedBurnRate - 1.0f) * gaugeWidth * 0.5f),
+            headPos.y + rightAxis.y * ((clampedBurnRate - 1.0f) * gaugeWidth * 0.5f),
+            headPos.z + rightAxis.z * ((clampedBurnRate - 1.0f) * gaugeWidth * 0.5f)
+        };
+        DirectX::XMFLOAT4X4 burnWorld;
+        DirectX::XMStoreFloat4x4(&burnWorld, DirectX::XMMatrixTranspose(R * DirectX::XMMatrixTranslation(burnPos.x, burnPos.y, burnPos.z)));
+        Sprite::SetWorld(burnWorld);
+        Sprite::SetSize({ gaugeWidth * clampedBurnRate, gaugeHeight });
+        Sprite::SetOffset({ 0.0f, 0.0f });
+        Sprite::SetUVPos({ 0.0f, 0.0f });
+        Sprite::SetUVScale({ clampedBurnRate, 1.0f });
+        Sprite::SetColor(kBurnGaugeColor);
+        Sprite::SetTexture(m_pEnemyHpGauge);
+        Sprite::Draw();
+    }
+
     if (clampedRate > 0.0f)
     {
         // 残量 0 より大きい時だけ中身ゲージを重ねます。
@@ -4613,5 +6707,30 @@ void SceneGame::DrawEnemyHpGaugeBillboard(const DirectX::XMFLOAT3& headPos,
         Sprite::SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
         Sprite::SetTexture(m_pEnemyHpGauge);
         Sprite::Draw();
+    }
+
+    if (m_pChainUiTexture && chainCount > 0)
+    {
+        const float bindRate = Clamp01(static_cast<float>(chainCount) * 0.05f);
+        const float chainWidth = gaugeWidth * bindRate;
+        if (chainWidth > 0.0f)
+        {
+            const float xShift = (gaugeWidth - chainWidth) * 0.5f;
+            const DirectX::XMFLOAT3 iconPos = {
+                headPos.x + rightAxis.x * xShift,
+                headPos.y + rightAxis.y * xShift,
+                headPos.z + rightAxis.z * xShift
+            };
+            DirectX::XMFLOAT4X4 chainWorld;
+            DirectX::XMStoreFloat4x4(&chainWorld, DirectX::XMMatrixTranspose(R * DirectX::XMMatrixTranslation(iconPos.x, iconPos.y, iconPos.z)));
+            Sprite::SetWorld(chainWorld);
+            Sprite::SetSize({ chainWidth, gaugeHeight });
+            Sprite::SetOffset({ 0.0f, 0.0f });
+            Sprite::SetUVPos({ 0.0f, 0.0f });
+            Sprite::SetUVScale({ 1.0f, 1.0f });
+            Sprite::SetColor({ 1.0f, 1.0f, 1.0f, 0.95f });
+            Sprite::SetTexture(m_pChainUiTexture);
+            Sprite::Draw();
+        }
     }
 }

@@ -27,6 +27,10 @@ POINT g_mousePos{};
 POINT g_oldMousePos{};
 bool g_mouseLeftDown = false;
 bool g_oldMouseLeftDown = false;
+bool g_mouseRightDown = false;
+bool g_oldMouseRightDown = false;
+bool g_mouseMiddleDown = false;
+bool g_oldMouseMiddleDown = false;
 float g_inputKeyboardMouseMs = 0.0f;
 float g_inputXInputMs = 0.0f;
 float g_inputDirectInputMs = 0.0f;
@@ -586,6 +590,10 @@ HRESULT InitInput(HWND hWnd)
 	g_oldMousePos = g_mousePos;
 	g_mouseLeftDown = (::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 	g_oldMouseLeftDown = g_mouseLeftDown;
+	g_mouseRightDown = (::GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+	g_oldMouseRightDown = g_mouseRightDown;
+	g_mouseMiddleDown = (::GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+	g_oldMouseMiddleDown = g_mouseMiddleDown;
 
 	return S_OK;
 }
@@ -613,8 +621,12 @@ void UpdateInput()
 
 	g_oldMousePos = g_mousePos;
 	g_oldMouseLeftDown = g_mouseLeftDown;
+	g_oldMouseRightDown = g_mouseRightDown;
+	g_oldMouseMiddleDown = g_mouseMiddleDown;
 	g_mousePos = QueryMousePosition();
 	g_mouseLeftDown = (::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	g_mouseRightDown = (::GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+	g_mouseMiddleDown = (::GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
 	g_inputKeyboardMouseMs = static_cast<float>(QueryPerfMs() - sectionStart);
 
 	sectionStart = QueryPerfMs();
@@ -787,7 +799,45 @@ bool IsMouseLeftRelease()
 	return !g_mouseLeftDown && g_oldMouseLeftDown;
 }
 
+bool IsMouseRightPress()
+{
+	return g_mouseRightDown;
+}
+
+bool IsMouseRightTrigger()
+{
+	return g_mouseRightDown && !g_oldMouseRightDown;
+}
+
+bool IsMouseRightRelease()
+{
+	return !g_mouseRightDown && g_oldMouseRightDown;
+}
+
+bool IsMouseMiddlePress()
+{
+	return g_mouseMiddleDown;
+}
+
+bool IsMouseMiddleTrigger()
+{
+	return g_mouseMiddleDown && !g_oldMouseMiddleDown;
+}
+
+bool IsMouseMiddleRelease()
+{
+	return !g_mouseMiddleDown && g_oldMouseMiddleDown;
+}
+
 POINT GetMousePosition()
 {
 	return g_mousePos;
+}
+
+POINT GetMouseDelta()
+{
+	POINT delta{};
+	delta.x = g_mousePos.x - g_oldMousePos.x;
+	delta.y = g_mousePos.y - g_oldMousePos.y;
+	return delta;
 }

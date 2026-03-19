@@ -52,6 +52,9 @@
     <ClCompile Include="Block.cpp">
       <Filter>Source Files\Object</Filter>
     </ClCompile>
+    <ClCompile Include="BossAttackScript.cpp">
+      <Filter>Source Files\System</Filter>
+    </ClCompile>
     <ClCompile Include="Boss.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -120,7 +123,8 @@
     </ClCompile>
     <ClCompile Include="Geometory.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>    <ClCompile Include="Input.cpp">
+    </ClCompile>
+    <ClCompile Include="Input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Main.cpp">
@@ -186,6 +190,9 @@
     <ClCompile Include="Scene3DEditor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SceneBossEditor.cpp">
+      <Filter>Source Files\System\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="SceneCastleEditor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -219,6 +226,9 @@
       <Filter>Header Files\System</Filter>
     </ClInclude>
     <ClInclude Include="ParticleEffectPreset.h">
+      <Filter>Header Files\System</Filter>
+    </ClInclude>
+    <ClInclude Include="BossAttackScript.h">
       <Filter>Header Files\System</Filter>
     </ClInclude>
     <ClInclude Include="Scene.h">
@@ -349,11 +359,15 @@
     </ClInclude>
     <ClInclude Include="TrailEffect.h">
       <Filter>Header Files</Filter>
-    </ClInclude>    <ClInclude Include="Easing.h">
+    </ClInclude>
+    <ClInclude Include="Easing.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Scene3DEditor.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneBossEditor.h">
+      <Filter>Header Files\Application</Filter>
     </ClInclude>
     <ClInclude Include="SceneEffectDebug.h">
       <Filter>Header Files\System</Filter>
