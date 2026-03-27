@@ -193,6 +193,9 @@
     <ClCompile Include="SceneBossEditor.cpp">
       <Filter>Source Files\System\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="SceneFinalBossEditor.cpp">
+      <Filter>Source Files\System\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="SceneCastleEditor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -208,6 +211,7 @@
     <ClCompile Include="BuildSelection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="NewLastBossEditor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defines.h">
@@ -369,6 +373,9 @@
     <ClInclude Include="SceneBossEditor.h">
       <Filter>Header Files\Application</Filter>
     </ClInclude>
+    <ClInclude Include="SceneFinalBossEditor.h">
+      <Filter>Header Files\Application</Filter>
+    </ClInclude>
     <ClInclude Include="SceneEffectDebug.h">
       <Filter>Header Files\System</Filter>
     </ClInclude>
@@ -385,6 +392,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CastlePlacementInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NewLastBossEditor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

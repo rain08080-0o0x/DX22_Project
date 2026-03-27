@@ -6,6 +6,8 @@
 #include "SceneCastleEditor.h"
 #include "SceneEffectDebug.h"
 #include "SceneBossEditor.h"
+#include "SceneFinalBossEditor.h"
+#include "NewLastBossEditor.h"
 
 Scene* SceneManager::m_pScene = nullptr;
 SceneManager::SceneType SceneManager::m_current = SceneManager::SCENE_TITLE;
@@ -58,6 +60,12 @@ void SceneManager::CreateScene(SceneType type)
         break;
     case SCENE_BOSS_EDITOR:
         m_pScene = new SceneBossEditor();
+        break;
+    case SCENE_FINAL_BOSS_EDITOR:
+        m_pScene = new SceneFinalBossEditor();
+        break;
+    case SCENE_NEW_BOSS_EDITOR:
+        m_pScene = new NewLastBoss();
         break;
     default:
         m_pScene = new SceneTitle();

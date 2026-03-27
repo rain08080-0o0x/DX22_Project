@@ -37,7 +37,28 @@ namespace
 		{
 			return fallbackDeg;
 		}
-		return std::atan2(-dx, dz) * (180.0f / DirectX::XM_PI);
+		return std::atan2(dx, dz) * (180.0f / DirectX::XM_PI);
+	}
+
+	const char* kFinalAttackLine = u8"紫直線斬り";
+	const char* kFinalAttackCross = u8"紫十字斬り";
+	const char* kFinalAttackRing = u8"円環収束";
+	const char* kFinalAttackBurst = u8"環状爆破";
+	const char* kFinalAttackRadial = u8"放射掃射";
+	const char* kFinalAttackFan = u8"赤扇掃射";
+	const char* kFinalAttackLargeRing = u8"大環";
+	const char* kFinalAttackLethal = u8"終焉染め";
+
+	bool IsFinalPreviewSpecialAttack(const BossAttackScript::Attack& attack)
+	{
+		return attack.name == kFinalAttackLine
+			|| attack.name == kFinalAttackCross
+			|| attack.name == kFinalAttackRing
+			|| attack.name == kFinalAttackBurst
+			|| attack.name == kFinalAttackRadial
+			|| attack.name == kFinalAttackFan
+			|| attack.name == kFinalAttackLargeRing
+			|| attack.name == kFinalAttackLethal;
 	}
 
 	DirectX::XMFLOAT3 ResolvePreviewPoint(
@@ -70,7 +91,177 @@ namespace
 		const float rad = DegToRad(yawDeg);
 		const float c = std::cos(rad);
 		const float s = std::sin(rad);
-		return { v.x * c - v.z * s, v.y, v.x * s + v.z * c };
+		return { v.x * c + v.z * s, v.y, -v.x * s + v.z * c };
+	}
+
+	DirectX::XMFLOAT3 NormalizePreviewDirection(const DirectX::XMFLOAT3& from,
+		const DirectX::XMFLOAT3& to,
+		const DirectX::XMFLOAT3& fallback)
+	{
+		const float dx = to.x - from.x;
+		const float dz = to.z - from.z;
+		const float lenSq = dx * dx + dz * dz;
+		if (lenSq <= 0.000001f)
+		{
+			return fallback;
+		}
+		const float invLen = 1.0f / std::sqrt(lenSq);
+		return { dx * invLen, 0.0f, dz * invLen };
+	}
+
+	void PushPreviewCircleZone(std::vector<SceneBossEditor::PreviewZone>& outZones,
+		const DirectX::XMFLOAT3& center,
+		float diameter)
+	{
+		SceneBossEditor::PreviewZone zone;
+		zone.center = center;
+		zone.center.y = std::max(zone.center.y, kZoneHeight);
+		zone.size = { std::max(diameter, 0.10f), kZoneHeight, std::max(diameter, 0.10f) };
+		zone.shape = BossAttackScript::ColliderShapeCircle;
+		zone.startPos = zone.center;
+		zone.endPos = zone.center;
+		zone.hasPath = false;
+		outZones.push_back(zone);
+	}
+
+	void PushPreviewLineZone(std::vector<SceneBossEditor::PreviewZone>& outZones,
+		const DirectX::XMFLOAT3& startPos,
+		const DirectX::XMFLOAT3& endPos,
+		float width)
+	{
+		SceneBossEditor::PreviewZone zone;
+		zone.shape = BossAttackScript::ColliderShapeBox;
+		zone.startPos = startPos;
+		zone.endPos = endPos;
+		zone.hasPath = false;
+		const float dx = endPos.x - startPos.x;
+		const float dz = endPos.z - startPos.z;
+		const float distance = std::sqrt(dx * dx + dz * dz);
+		if (distance <= 0.0001f)
+		{
+			zone.center = startPos;
+			zone.center.y = std::max(zone.center.y, kZoneHeight);
+			zone.size = { std::max(width, 0.10f), kZoneHeight, std::max(width, 0.10f) };
+			zone.yawDeg = 0.0f;
+			outZones.push_back(zone);
+			return;
+		}
+
+		zone.center = {
+			(startPos.x + endPos.x) * 0.5f,
+			std::max((startPos.y + endPos.y) * 0.5f, kZoneHeight),
+			(startPos.z + endPos.z) * 0.5f
+		};
+		zone.size = { std::max(width, 0.10f), kZoneHeight, std::max(distance, 0.10f) };
+		zone.yawDeg = std::atan2(dx, dz) * (180.0f / DirectX::XM_PI);
+		outZones.push_back(zone);
+	}
+
+	void PushPreviewRingBand(std::vector<SceneBossEditor::PreviewZone>& outZones,
+		const DirectX::XMFLOAT3& center,
+		float ringRadius,
+		float thickness,
+		int count)
+	{
+		const int clampedCount = ClampIntValue(count, 8, 64);
+		const float safeRadius = std::max(ringRadius, thickness * 0.5f);
+		const float circumference = DirectX::XM_2PI * safeRadius;
+		const float segmentLength = std::max((circumference / static_cast<float>(clampedCount)) * 1.08f, thickness);
+		for (int i = 0; i < clampedCount; ++i)
+		{
+			const float angle = (static_cast<float>(i) / static_cast<float>(clampedCount)) * DirectX::XM_2PI;
+			const DirectX::XMFLOAT3 radial = { std::cos(angle), 0.0f, std::sin(angle) };
+			const DirectX::XMFLOAT3 tangent = { -radial.z, 0.0f, radial.x };
+			const DirectX::XMFLOAT3 bandCenter = {
+				center.x + radial.x * ringRadius,
+				center.y,
+				center.z + radial.z * ringRadius
+			};
+			const DirectX::XMFLOAT3 startPos = {
+				bandCenter.x - tangent.x * segmentLength * 0.5f,
+				center.y,
+				bandCenter.z - tangent.z * segmentLength * 0.5f
+			};
+			const DirectX::XMFLOAT3 endPos = {
+				bandCenter.x + tangent.x * segmentLength * 0.5f,
+				center.y,
+				bandCenter.z + tangent.z * segmentLength * 0.5f
+			};
+			PushPreviewLineZone(outZones, startPos, endPos, thickness);
+		}
+	}
+
+	void PushPreviewConvergeRing(std::vector<SceneBossEditor::PreviewZone>& outZones,
+		const DirectX::XMFLOAT3& center,
+		float outerRadius,
+		float innerRadius,
+		int count,
+		float width)
+	{
+		const int clampedCount = ClampIntValue(count, 6, 32);
+		const float safeOuter = std::max(outerRadius, innerRadius + 0.20f);
+		const float safeInner = ClampFloat(innerRadius, 0.20f, safeOuter - 0.10f);
+		for (int i = 0; i < clampedCount; ++i)
+		{
+			const float angle = (static_cast<float>(i) / static_cast<float>(clampedCount)) * DirectX::XM_2PI;
+			const DirectX::XMFLOAT3 dir = { std::cos(angle), 0.0f, std::sin(angle) };
+			const DirectX::XMFLOAT3 startPos = {
+				center.x + dir.x * safeOuter,
+				center.y,
+				center.z + dir.z * safeOuter
+			};
+			const DirectX::XMFLOAT3 endPos = {
+				center.x + dir.x * safeInner,
+				center.y,
+				center.z + dir.z * safeInner
+			};
+			PushPreviewLineZone(outZones, startPos, endPos, width);
+		}
+	}
+
+	void PushPreviewRadial(std::vector<SceneBossEditor::PreviewZone>& outZones,
+		const DirectX::XMFLOAT3& center,
+		int count,
+		float length,
+		float width,
+		float baseYawDeg)
+	{
+		const int clampedCount = ClampIntValue(count, 2, 32);
+		for (int i = 0; i < clampedCount; ++i)
+		{
+			const float yawDeg = baseYawDeg + (360.0f * static_cast<float>(i) / static_cast<float>(clampedCount));
+			const DirectX::XMFLOAT3 dir = RotateOffsetY({ 0.0f, 0.0f, 1.0f }, yawDeg);
+			PushPreviewLineZone(outZones,
+				center,
+				{ center.x + dir.x * length, center.y, center.z + dir.z * length },
+				width);
+		}
+	}
+
+	void PushPreviewFan(std::vector<SceneBossEditor::PreviewZone>& outZones,
+		const DirectX::XMFLOAT3& origin,
+		float forwardYawDeg,
+		int count,
+		float spreadDeg,
+		float length,
+		float width)
+	{
+		const int clampedCount = ClampIntValue(count, 1, 16);
+		if (clampedCount == 1)
+		{
+			const DirectX::XMFLOAT3 dir = RotateOffsetY({ 0.0f, 0.0f, 1.0f }, forwardYawDeg);
+			PushPreviewLineZone(outZones, origin, { origin.x + dir.x * length, origin.y, origin.z + dir.z * length }, width);
+			return;
+		}
+
+		const float startYawDeg = forwardYawDeg - spreadDeg * 0.5f;
+		const float stepYawDeg = spreadDeg / static_cast<float>(clampedCount - 1);
+		for (int i = 0; i < clampedCount; ++i)
+		{
+			const float yawDeg = startYawDeg + stepYawDeg * static_cast<float>(i);
+			const DirectX::XMFLOAT3 dir = RotateOffsetY({ 0.0f, 0.0f, 1.0f }, yawDeg);
+			PushPreviewLineZone(outZones, origin, { origin.x + dir.x * length, origin.y, origin.z + dir.z * length }, width);
+		}
 	}
 
 	void PrepareLineDraw(CameraDebug* camera)
@@ -361,16 +552,17 @@ namespace
 	}
 }
 
-SceneBossEditor::SceneBossEditor()
-	: m_pCamera(new CameraDebug())
+SceneBossEditor::SceneBossEditor(EditorMode mode)
+	: m_editorMode(mode)
+	, m_pCamera(new CameraDebug())
 	, m_pFloorTexture(new Texture())
 	, m_pMarkerTexture(new Texture())
+	, m_pAttackRangeTexture(new Texture())
 	, m_pBossTexture(new Texture())
 	, m_pPlayerTexture(new Texture())
 	, m_database(BossAttackScript::MakeDefaultDatabase())
 	, m_pathBuffer{}
-	, m_selectedProfile(BossAttackScript::ProfileHeavyMelee)
-	, m_selectedCollider(0)
+	, m_selectedProfile((mode == ModeFinalBoss) ? BossAttackScript::ProfileFinalBarrage : BossAttackScript::ProfileHeavyMelee)
 	, m_selectedAttack(0)
 	, m_useJapaneseLabels(true)
 	, m_previewPlayerPos({ 0.0f, 0.0f, 2.5f })
@@ -390,9 +582,11 @@ SceneBossEditor::SceneBossEditor()
 	if (m_pCamera) m_pCamera->SetPose({ 0.0f, 9.5f, -9.0f }, { 0.0f, 0.0f, 0.0f });
 	if (m_pFloorTexture && FAILED(m_pFloorTexture->Create("Assets/Texture/Game/jimen.png"))) { delete m_pFloorTexture; m_pFloorTexture = nullptr; }
 	if (m_pMarkerTexture && FAILED(m_pMarkerTexture->Create("Assets/Texture/Star.png"))) { delete m_pMarkerTexture; m_pMarkerTexture = nullptr; }
+	if (m_pAttackRangeTexture && FAILED(m_pAttackRangeTexture->Create("Assets/Texture/Game/AttackRange.png"))) { delete m_pAttackRangeTexture; m_pAttackRangeTexture = nullptr; }
 	if (m_pBossTexture && FAILED(m_pBossTexture->Create("Assets/Texture/Chracter/genbaneko.png"))) { delete m_pBossTexture; m_pBossTexture = nullptr; }
 	if (m_pPlayerTexture && FAILED(m_pPlayerTexture->Create("Assets/Texture/Star.png"))) { delete m_pPlayerTexture; m_pPlayerTexture = nullptr; }
-	strncpy_s(m_pathBuffer, sizeof(m_pathBuffer), BossAttackScript::GetDefaultPath(), _TRUNCATE);
+	m_database = MakeEditorDefaultDatabase();
+	strncpy_s(m_pathBuffer, sizeof(m_pathBuffer), GetEditorPath(), _TRUNCATE);
 	BossAttackScript::Load(m_database, m_pathBuffer);
 	ClampSelection();
 	ResetPreview(true);
@@ -403,6 +597,7 @@ SceneBossEditor::~SceneBossEditor()
 	for (auto& entry : m_textureCache) delete entry.second;
 	delete m_pPlayerTexture;
 	delete m_pBossTexture;
+	delete m_pAttackRangeTexture;
 	delete m_pMarkerTexture;
 	delete m_pFloorTexture;
 	delete m_pCamera;
@@ -416,6 +611,34 @@ BossAttackScript::Profile* SceneBossEditor::GetSelectedProfile()
 const BossAttackScript::Profile* SceneBossEditor::GetSelectedProfile() const
 {
 	return BossAttackScript::FindProfile(m_database, m_selectedProfile);
+}
+
+bool SceneBossEditor::IsFinalBossEditor() const
+{
+	return m_editorMode == ModeFinalBoss;
+}
+
+const char* SceneBossEditor::GetEditorPath() const
+{
+	return IsFinalBossEditor() ? BossAttackScript::GetFinalBossPath() : BossAttackScript::GetDefaultPath();
+}
+
+BossAttackScript::Database SceneBossEditor::MakeEditorDefaultDatabase() const
+{
+	BossAttackScript::Database database;
+	if (IsFinalBossEditor())
+	{
+		database.profiles.push_back(BossAttackScript::MakeDefaultProfile(BossAttackScript::ProfileFinalBarrage));
+		return database;
+	}
+
+	for (int profileType = BossAttackScript::ProfileHeavyMelee;
+		profileType <= BossAttackScript::ProfileSwiftDebuff;
+		++profileType)
+	{
+		database.profiles.push_back(BossAttackScript::MakeDefaultProfile(profileType));
+	}
+	return database;
 }
 
 Texture* SceneBossEditor::GetTextureForPath(const std::string& relativePath)
@@ -437,34 +660,41 @@ Texture* SceneBossEditor::GetTextureForPath(const std::string& relativePath)
 
 void SceneBossEditor::ClampSelection()
 {
-	for (int i = 0; i < BossAttackScript::ProfileTypeCount; ++i)
+	BossAttackScript::Database filtered = MakeEditorDefaultDatabase();
+	for (BossAttackScript::Profile& defaultProfile : filtered.profiles)
 	{
-		if (!BossAttackScript::FindProfile(m_database, i))
+		if (BossAttackScript::Profile* existing = BossAttackScript::FindProfile(m_database, defaultProfile.type))
 		{
-			m_database.profiles.push_back(BossAttackScript::MakeDefaultProfile(i));
+			defaultProfile = *existing;
 		}
 	}
+	m_database = filtered;
 	std::sort(m_database.profiles.begin(), m_database.profiles.end(), [](const BossAttackScript::Profile& a, const BossAttackScript::Profile& b)
 	{
 		return a.type < b.type;
 	});
 
-	m_selectedProfile = BossAttackScript::NormalizeProfileType(m_selectedProfile);
+	if (IsFinalBossEditor())
+	{
+		m_selectedProfile = BossAttackScript::ProfileFinalBarrage;
+	}
+	else
+	{
+		if (m_selectedProfile < BossAttackScript::ProfileHeavyMelee) m_selectedProfile = BossAttackScript::ProfileHeavyMelee;
+		if (m_selectedProfile > BossAttackScript::ProfileSwiftDebuff) m_selectedProfile = BossAttackScript::ProfileSwiftDebuff;
+	}
 	BossAttackScript::Profile* profile = GetSelectedProfile();
 	if (!profile)
 	{
-		m_selectedProfile = BossAttackScript::ProfileHeavyMelee;
+		m_selectedProfile = IsFinalBossEditor() ? BossAttackScript::ProfileFinalBarrage : BossAttackScript::ProfileHeavyMelee;
 		profile = GetSelectedProfile();
 	}
 	if (!profile) return;
-	if (profile->colliders.empty()) profile->colliders.push_back(BossAttackScript::Collider{});
 	if (profile->attacks.empty())
 	{
 		BossAttackScript::Attack attack;
-		attack.colliderIds.push_back(profile->colliders.front().id);
 		profile->attacks.push_back(attack);
 	}
-	m_selectedCollider = ClampIntValue(m_selectedCollider, 0, static_cast<int>(profile->colliders.size()) - 1);
 	m_selectedAttack = ClampIntValue(m_selectedAttack, 0, static_cast<int>(profile->attacks.size()) - 1);
 }
 
@@ -535,11 +765,79 @@ void SceneBossEditor::BuildPreviewZones(const BossAttackScript::Attack& attack,
 	const DirectX::XMFLOAT3 dir = (invTowardLen > 0.0f)
 		? DirectX::XMFLOAT3{ towardPlayer.x * invTowardLen, 0.0f, towardPlayer.z * invTowardLen }
 		: playerDir;
-	outFacingYawDeg = std::atan2(-dir.x, dir.z) * (180.0f / DirectX::XM_PI);
+	outFacingYawDeg = std::atan2(dir.x, dir.z) * (180.0f / DirectX::XM_PI);
 	outBossTargetPos = m_previewBossPos;
 	const int deliveryMode = BossAttackScript::NormalizeAttackDeliveryMode(attack.deliveryMode);
 	const bool isBossSelfAttack = (deliveryMode == BossAttackScript::AttackDeliveryBossSelf);
 	const bool isRemoteFallingAttack = (deliveryMode == BossAttackScript::AttackDeliveryRemoteFalling);
+
+	if (IsFinalBossEditor() && IsFinalPreviewSpecialAttack(attack))
+	{
+		const DirectX::XMFLOAT3 arenaCenter = { 0.0f, kZoneHeight, 0.0f };
+		const DirectX::XMFLOAT3 playerCenter = { m_previewPlayerPos.x, kZoneHeight, m_previewPlayerPos.z };
+		const DirectX::XMFLOAT3 playerDir = NormalizePreviewDirection(arenaCenter, playerCenter, { 0.0f, 0.0f, 1.0f });
+		const DirectX::XMFLOAT3 playerRight = { playerDir.z, 0.0f, -playerDir.x };
+		const float playerYawDeg = std::atan2(playerDir.x, playerDir.z) * (180.0f / DirectX::XM_PI);
+
+		if (attack.name == kFinalAttackCross)
+		{
+			const float halfLength = kStageHalf * 1.05f;
+			PushPreviewLineZone(outZones,
+				{ arenaCenter.x - playerDir.x * halfLength, arenaCenter.y, arenaCenter.z - playerDir.z * halfLength },
+				{ arenaCenter.x + playerDir.x * halfLength, arenaCenter.y, arenaCenter.z + playerDir.z * halfLength },
+				0.95f);
+			PushPreviewLineZone(outZones,
+				{ arenaCenter.x - playerRight.x * halfLength, arenaCenter.y, arenaCenter.z - playerRight.z * halfLength },
+				{ arenaCenter.x + playerRight.x * halfLength, arenaCenter.y, arenaCenter.z + playerRight.z * halfLength },
+				0.95f);
+			return;
+		}
+		if (attack.name == kFinalAttackRing)
+		{
+			PushPreviewConvergeRing(outZones, playerCenter, 4.2f, 1.2f, 12, 0.90f);
+			return;
+		}
+		if (attack.name == kFinalAttackBurst)
+		{
+			PushPreviewRingBand(outZones, playerCenter, 2.65f, 1.05f, 18);
+			return;
+		}
+		if (attack.name == kFinalAttackRadial)
+		{
+			PushPreviewRadial(outZones, arenaCenter, 8, kStageHalf * 1.15f, 0.90f, 0.0f);
+			return;
+		}
+		if (attack.name == kFinalAttackFan)
+		{
+			PushPreviewFan(outZones, arenaCenter, playerYawDeg, 5, 90.0f, kStageHalf * 1.12f, 1.30f);
+			return;
+		}
+		if (attack.name == kFinalAttackLargeRing)
+		{
+			PushPreviewRingBand(outZones, arenaCenter, 5.35f, 1.55f, 28);
+			return;
+		}
+		if (attack.name == kFinalAttackLethal)
+		{
+			PreviewZone zone;
+			zone.center = arenaCenter;
+			zone.size = { kStageSize * 0.98f, kZoneHeight, kStageSize * 0.98f };
+			zone.shape = BossAttackScript::ColliderShapeBox;
+			zone.startPos = arenaCenter;
+			zone.endPos = arenaCenter;
+			outZones.push_back(zone);
+			return;
+		}
+		if (attack.name == kFinalAttackLine)
+		{
+			const float halfLength = kStageHalf * 1.05f;
+			PushPreviewLineZone(outZones,
+				{ arenaCenter.x - playerDir.x * halfLength, arenaCenter.y, arenaCenter.z - playerDir.z * halfLength },
+				{ arenaCenter.x + playerDir.x * halfLength, arenaCenter.y, arenaCenter.z + playerDir.z * halfLength },
+				0.95f);
+			return;
+		}
+	}
 
 	std::vector<DirectX::XMFLOAT3> origins;
 	const int spawnCount = ClampIntValue(attack.spawnCount, 1, 64);
@@ -613,20 +911,42 @@ void SceneBossEditor::BuildPreviewZones(const BossAttackScript::Attack& attack,
 	for (const DirectX::XMFLOAT3& origin : origins)
 	{
 		const DirectX::XMFLOAT3 anchor = (spawnMode == BossAttackScript::SpawnFixed) ? outBossTargetPos : origin;
-		for (int colliderId : attack.colliderIds)
+		BossAttackScript::Collider workingCollider = attack.hitbox;
+		if (!workingCollider.enabled) continue;
+		if (isRemoteFallingAttack)
 		{
-			const BossAttackScript::Collider* collider = BossAttackScript::FindCollider(*profile, colliderId);
-			if (!collider || !collider->enabled) continue;
-			BossAttackScript::Collider workingCollider = *collider;
-			if (isRemoteFallingAttack)
-			{
-				workingCollider.useEndPosition = false;
-			}
-			PreviewZone zone = BuildPreviewZoneFromCollider(workingCollider, anchor, m_previewPlayerPos, outFacingYawDeg);
-			zone.center.y = std::max(zone.center.y, kZoneHeight);
-			zone.size.y = std::max(zone.size.y, kZoneHeight);
-			outZones.push_back(zone);
+			workingCollider.useEndPosition = false;
 		}
+		if (workingCollider.usePlayerDirection)
+		{
+			const float targetDistance = std::sqrt(towardLenSq);
+			const float limitedDistance = (workingCollider.maxDistance > 0.001f)
+				? std::min(targetDistance, workingCollider.maxDistance)
+				: targetDistance;
+			const DirectX::XMFLOAT3 right = { dir.z, 0.0f, -dir.x };
+			const DirectX::XMFLOAT3 lateralOffset = {
+				right.x * workingCollider.lateralOffset,
+				0.0f,
+				right.z * workingCollider.lateralOffset
+			};
+			workingCollider.useEndPosition = true;
+			workingCollider.startMode = BossAttackScript::ColliderStartAbsolute;
+			workingCollider.startPos = {
+				anchor.x + lateralOffset.x,
+				workingCollider.startPos.y,
+				anchor.z + lateralOffset.z
+			};
+			workingCollider.endMode = BossAttackScript::ColliderEndAbsolute;
+			workingCollider.endPos = {
+				anchor.x + lateralOffset.x + dir.x * limitedDistance,
+				workingCollider.endPos.y,
+				anchor.z + lateralOffset.z + dir.z * limitedDistance
+			};
+		}
+		PreviewZone zone = BuildPreviewZoneFromCollider(workingCollider, anchor, m_previewPlayerPos, outFacingYawDeg);
+		zone.center.y = std::max(zone.center.y, kZoneHeight);
+		zone.size.y = std::max(zone.size.y, kZoneHeight);
+		outZones.push_back(zone);
 	}
 }
 
@@ -656,7 +976,7 @@ void SceneBossEditor::UpdatePreviewHit()
 		{
 			const float dx = m_previewPlayerPos.x - zone.center.x;
 			const float dz = m_previewPlayerPos.z - zone.center.z;
-			const float rad = DegToRad(-zone.yawDeg);
+			const float rad = DegToRad(zone.yawDeg);
 			const float c = std::cos(rad);
 			const float s = std::sin(rad);
 			const float localX = dx * c - dz * s;
@@ -710,6 +1030,14 @@ void SceneBossEditor::AdvancePreviewAttack()
 	{
 		m_previewPlaying = false;
 		m_previewState = PreviewIdle;
+		return;
+	}
+	const BossAttackScript::Attack& currentAttack = profile->attacks[m_previewAttackIndex];
+	const int chainedIndex = BossAttackScript::ChooseNextAttackIndex(*profile, currentAttack);
+	if (chainedIndex >= 0 && chainedIndex < static_cast<int>(profile->attacks.size()))
+	{
+		m_previewRepeatRemaining = ClampIntValue(profile->attacks[chainedIndex].repeatCount, 1, 64);
+		BeginPreviewAttack(chainedIndex);
 		return;
 	}
 	int candidate = m_previewAttackIndex;
@@ -775,8 +1103,21 @@ void SceneBossEditor::UpdatePreviewPlayback(float dt)
 					visual.duration = visual.timer;
 					visual.spawnHeight = ClampFloat(attack.visual.spawnHeight, 0.0f, 30.0f);
 					visual.spinDegPerSec = ClampFloat(attack.visual.spinDegPerSec, -720.0f, 720.0f);
+					visual.yawDeg = zone.yawDeg;
 					visual.billboard = attack.visual.billboard;
 					visual.texture = texture;
+					if (!visual.billboard
+						&& attack.visual.texturePath.find("laser_line") != std::string::npos
+						&& zone.size.z > zone.size.x * 1.10f)
+					{
+						visual.size = { zone.size.z, zone.size.x };
+						visual.yawDeg += 90.0f;
+					}
+					if (!visual.billboard
+						&& attack.visual.texturePath.find("metal_blade") != std::string::npos)
+					{
+						visual.yawDeg += 180.0f;
+					}
 					m_previewVisuals.push_back(visual);
 				}
 			}
@@ -801,6 +1142,47 @@ void SceneBossEditor::UpdatePreviewPlayback(float dt)
 			break;
 		default:
 			break;
+		}
+		const bool hasMovingZone = std::any_of(m_previewZones.begin(), m_previewZones.end(), [](const PreviewZone& zone)
+		{
+			return zone.hasPath;
+		});
+		if (hasMovingZone &&
+			BossAttackScript::NormalizeAttackDeliveryMode(attack.deliveryMode) != BossAttackScript::AttackDeliveryRemoteFalling)
+		{
+			for (size_t zoneIndex = 0; zoneIndex < m_previewZones.size(); ++zoneIndex)
+			{
+				PreviewZone& zone = m_previewZones[zoneIndex];
+				if (!zone.hasPath)
+				{
+					continue;
+				}
+				const float pathYawDeg = std::atan2(zone.endPos.x - zone.startPos.x, zone.endPos.z - zone.startPos.z) * (180.0f / DirectX::XM_PI);
+				const DirectX::XMFLOAT3 currentPos = {
+					zone.startPos.x + (zone.endPos.x - zone.startPos.x) * rate,
+					zone.startPos.y + (zone.endPos.y - zone.startPos.y) * rate,
+					zone.startPos.z + (zone.endPos.z - zone.startPos.z) * rate
+				};
+				zone.center = currentPos;
+				zone.hasPath = false;
+				zone.yawDeg = pathYawDeg;
+				zone.size = attack.hitbox.startSize;
+				if (BossAttackScript::NormalizeColliderShape(attack.hitbox.shape) == BossAttackScript::ColliderShapeCircle)
+				{
+					zone.size.z = zone.size.x;
+				}
+				if (zoneIndex < m_previewVisuals.size())
+				{
+					m_previewVisuals[zoneIndex].pos = currentPos;
+					m_previewVisuals[zoneIndex].yawDeg = pathYawDeg;
+					if (!m_previewVisuals[zoneIndex].billboard
+						&& attack.visual.texturePath.find("metal_blade") != std::string::npos)
+					{
+						m_previewVisuals[zoneIndex].yawDeg += 180.0f;
+					}
+				}
+			}
+			UpdatePreviewHit();
 		}
 		if (m_previewStateTimer >= m_previewStateDuration)
 		{
@@ -883,11 +1265,71 @@ void SceneBossEditor::DrawPreviewScene() const
 		}
 		else
 		{
-			DrawGroundSprite(visual.texture, { visual.pos.x, 0.02f, visual.pos.z }, visual.size, color, visual.angleDeg);
+			DrawGroundSprite(visual.texture, { visual.pos.x, 0.02f, visual.pos.z }, visual.size, color, visual.yawDeg + visual.angleDeg);
 		}
 	}
 	PrepareLineDraw(m_pCamera);
 	AddRectOutline({ 0.0f, 0.01f, 0.0f }, { kStageSize, 0.0f, kStageSize }, 0.0f, { 0.35f, 0.55f, 0.90f, 1.0f });
+	if (m_previewState == PreviewTelegraph && !m_previewZones.empty())
+	{
+		const Texture* rangeTexture = m_pAttackRangeTexture ? m_pAttackRangeTexture : m_pMarkerTexture;
+		if (rangeTexture)
+		{
+			const float telegraphSec = (m_previewStateDuration > 0.01f) ? m_previewStateDuration : 0.01f;
+			const float telegraphRate = Clamp01(m_previewStateTimer / telegraphSec);
+			const float pulse = 0.50f + 0.50f * static_cast<float>(std::sin(telegraphRate * DirectX::XM_PI * 6.0f));
+			const DirectX::XMFLOAT4 outlineColor = { 1.0f, 0.78f, 0.72f, 1.0f };
+			for (const PreviewZone& zone : m_previewZones)
+			{
+				const DirectX::XMFLOAT3 outlineSize = {
+					zone.size.x * 1.04f,
+					zone.size.y,
+					zone.size.z * 1.04f
+				};
+				DrawGroundSprite(
+					const_cast<Texture*>(rangeTexture),
+					{ zone.center.x, 0.003f, zone.center.z },
+					{ outlineSize.x, outlineSize.z },
+					{ outlineColor.x, outlineColor.y, outlineColor.z, 0.10f + 0.10f * pulse },
+					zone.yawDeg);
+
+				if (zone.hasPath)
+				{
+					const DirectX::XMFLOAT3 endpointSize = {
+						std::max(zone.size.x * 1.15f, 0.35f),
+						zone.size.y,
+						std::max(zone.size.x * 1.15f, 0.35f)
+					};
+					const DirectX::XMFLOAT4 endpointColor = {
+						outlineColor.x,
+						outlineColor.y,
+						outlineColor.z,
+						0.18f + 0.16f * pulse
+					};
+					DrawGroundSprite(
+						const_cast<Texture*>(rangeTexture),
+						{ zone.startPos.x, 0.003f, zone.startPos.z },
+						{ endpointSize.x, endpointSize.z },
+						endpointColor,
+						zone.yawDeg);
+					DrawGroundSprite(
+						const_cast<Texture*>(rangeTexture),
+						{ zone.endPos.x, 0.003f, zone.endPos.z },
+						{ endpointSize.x, endpointSize.z },
+						endpointColor,
+						zone.yawDeg);
+				}
+
+				DirectX::XMFLOAT4 fillColor = { 1.0f, 0.32f, 0.18f, 0.22f + 0.42f * pulse };
+				DrawGroundSprite(
+					const_cast<Texture*>(rangeTexture),
+					{ zone.center.x, 0.004f, zone.center.z },
+					{ zone.size.x, zone.size.z },
+					fillColor,
+					zone.yawDeg);
+			}
+		}
+	}
 	for (const PreviewZone& zone : m_previewZones)
 	{
 		const DirectX::XMFLOAT4 color = (m_previewState == PreviewTelegraph) ? DirectX::XMFLOAT4{ 1.0f, 0.35f, 0.20f, 1.0f } : DirectX::XMFLOAT4{ 1.0f, 0.92f, 0.25f, 1.0f };
@@ -919,11 +1361,44 @@ void SceneBossEditor::DrawPreviewScene() const
 			Geometory::AddLine(zone.startPos, zone.endPos, { 0.30f, 0.95f, 1.0f, 1.0f });
 		}
 	}
-	if (profile && m_selectedCollider >= 0 && m_selectedCollider < static_cast<int>(profile->colliders.size()))
+	if (profile && m_selectedAttack >= 0 && m_selectedAttack < static_cast<int>(profile->attacks.size()))
 	{
-		const BossAttackScript::Collider& selectedCollider = profile->colliders[m_selectedCollider];
-		if (selectedCollider.enabled)
+		const BossAttackScript::Attack& selectedAttack = profile->attacks[m_selectedAttack];
+		if (IsFinalBossEditor() && IsFinalPreviewSpecialAttack(selectedAttack))
 		{
+			std::vector<PreviewZone> editZones;
+			DirectX::XMFLOAT3 unusedTarget = m_previewBossPos;
+			float unusedFacingYawDeg = displayFacingYawDeg;
+			const_cast<SceneBossEditor*>(this)->BuildPreviewZones(selectedAttack, editZones, unusedTarget, unusedFacingYawDeg);
+			for (const PreviewZone& zone : editZones)
+			{
+				if (BossAttackScript::NormalizeColliderShape(zone.shape) == BossAttackScript::ColliderShapeCircle)
+				{
+					if (zone.hasPath)
+					{
+						AddCapsuleOutline(zone.startPos, zone.endPos, zone.size.x * 0.5f, { 0.25f, 0.95f, 1.0f, 1.0f });
+					}
+					else
+					{
+						AddCircleOutline(zone.center, zone.size.x * 0.5f, { 0.25f, 0.95f, 1.0f, 1.0f });
+					}
+				}
+				else
+				{
+					if (zone.hasPath)
+					{
+						AddStripOutline(zone.startPos, zone.endPos, zone.size.x, { 0.25f, 0.95f, 1.0f, 1.0f });
+					}
+					else
+					{
+						AddRectOutline(zone.center, zone.size, zone.yawDeg, { 0.25f, 0.95f, 1.0f, 1.0f });
+					}
+				}
+			}
+		}
+		else if (selectedAttack.hitbox.enabled)
+		{
+			const BossAttackScript::Collider& selectedCollider = selectedAttack.hitbox;
 			PreviewZone editZone = BuildPreviewZoneFromCollider(
 				selectedCollider,
 				{ m_previewBossPos.x, 0.0f, m_previewBossPos.z },
@@ -1000,7 +1475,10 @@ void SceneBossEditor::DrawDebugWindow()
 {
 	ImGui::SetNextWindowPos(ImVec2(24.0f, 24.0f), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(620.0f, 860.0f), ImGuiCond_FirstUseEver);
-	if (!ImGui::Begin(SelectLabel(m_useJapaneseLabels, "Boss Attack Editor", u8"ボス攻撃エディタ")))
+	if (!ImGui::Begin(SelectLabel(
+		m_useJapaneseLabels,
+		IsFinalBossEditor() ? "Final Boss Editor" : "Boss Attack Editor",
+		IsFinalBossEditor() ? u8"ラスボス専用エディタ" : u8"通常ボス攻撃エディタ")))
 	{
 		ImGui::End();
 		return;
@@ -1029,24 +1507,29 @@ void SceneBossEditor::DrawDebugWindow()
 	ImGui::SameLine();
 	if (ImGui::Button(SelectLabel(m_useJapaneseLabels, "Reset", u8"リセット")))
 	{
-		m_database = BossAttackScript::MakeDefaultDatabase();
+		m_database = MakeEditorDefaultDatabase();
+		strncpy_s(m_pathBuffer, sizeof(m_pathBuffer), GetEditorPath(), _TRUNCATE);
 		ClampSelection();
 		ResetPreview(true);
 	}
 
-	int profileType = m_selectedProfile;
-	const char* profileItemsEn[BossAttackScript::ProfileTypeCount] = {};
-	const char* profileItemsJp[BossAttackScript::ProfileTypeCount] = {};
-	for (int i = 0; i < BossAttackScript::ProfileTypeCount; ++i)
+	if (!IsFinalBossEditor())
 	{
-		profileItemsEn[i] = BossAttackScript::GetProfileName(i);
-		profileItemsJp[i] = BossAttackScript::GetProfileNameJp(i);
-	}
-	if (ImGui::Combo(SelectLabel(m_useJapaneseLabels, "Boss Profile", u8"ボス種別"), &profileType, m_useJapaneseLabels ? profileItemsJp : profileItemsEn, BossAttackScript::ProfileTypeCount))
-	{
-		m_selectedProfile = profileType;
-		ClampSelection();
-		ResetPreview(true);
+		int profileType = m_selectedProfile;
+		const int profileCount = BossAttackScript::ProfileSwiftDebuff + 1;
+		const char* profileItemsEn[profileCount] = {};
+		const char* profileItemsJp[profileCount] = {};
+		for (int i = 0; i < profileCount; ++i)
+		{
+			profileItemsEn[i] = BossAttackScript::GetProfileName(i);
+			profileItemsJp[i] = BossAttackScript::GetProfileNameJp(i);
+		}
+		if (ImGui::Combo(SelectLabel(m_useJapaneseLabels, "Boss Profile", u8"ボス種別"), &profileType, m_useJapaneseLabels ? profileItemsJp : profileItemsEn, profileCount))
+		{
+			m_selectedProfile = profileType;
+			ClampSelection();
+			ResetPreview(true);
+		}
 	}
 
 	BossAttackScript::Profile* profile = GetSelectedProfile();
@@ -1056,11 +1539,20 @@ void SceneBossEditor::DrawDebugWindow()
 		return;
 	}
 
-	char displayName[128]{};
-	strncpy_s(displayName, sizeof(displayName), profile->displayName.c_str(), _TRUNCATE);
-	if (ImGui::InputText(SelectLabel(m_useJapaneseLabels, "Display Name", u8"表示名"), displayName, IM_ARRAYSIZE(displayName)))
+	if (IsFinalBossEditor())
 	{
-		profile->displayName = displayName;
+		ImGui::Text("%s : %s",
+			SelectLabel(m_useJapaneseLabels, "Display Name", u8"表示名"),
+			profile->displayName.c_str());
+	}
+	else
+	{
+		char displayName[128]{};
+		strncpy_s(displayName, sizeof(displayName), profile->displayName.c_str(), _TRUNCATE);
+		if (ImGui::InputText(SelectLabel(m_useJapaneseLabels, "Display Name", u8"表示名"), displayName, IM_ARRAYSIZE(displayName)))
+		{
+			profile->displayName = displayName;
+		}
 	}
 	ImGui::DragFloat(SelectLabel(m_useJapaneseLabels, "HP Scale", u8"HP倍率"), &profile->hpScale, 0.01f, 0.10f, 8.0f, "%.2f");
 	ImGui::DragFloat(SelectLabel(m_useJapaneseLabels, "Guard Scale", u8"ガード倍率"), &profile->guardScale, 0.01f, 0.10f, 8.0f, "%.2f");
@@ -1071,302 +1563,6 @@ void SceneBossEditor::DrawDebugWindow()
 	ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Starts Special", u8"初手特殊"), &profile->startsSpecial);
 	ImGui::SameLine();
 	ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Loop", u8"ループ"), &profile->loops);
-
-	if (ImGui::CollapsingHeader(SelectLabel(m_useJapaneseLabels, "Colliders", u8"当たり判定"), ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		if (ImGui::BeginListBox("##collider_list", ImVec2(-FLT_MIN, 140.0f)))
-		{
-			for (int i = 0; i < static_cast<int>(profile->colliders.size()); ++i)
-			{
-				const BossAttackScript::Collider& collider = profile->colliders[i];
-				char label[128]{};
-				sprintf_s(label, sizeof(label), "%02d : %s", collider.id, collider.name.c_str());
-				if (ImGui::Selectable(label, m_selectedCollider == i)) m_selectedCollider = i;
-			}
-			ImGui::EndListBox();
-		}
-		if (ImGui::Button(SelectLabel(m_useJapaneseLabels, "Add Collider", u8"当たり判定を追加")))
-		{
-			int nextId = 1;
-			for (const auto& collider : profile->colliders) nextId = std::max(nextId, collider.id + 1);
-			BossAttackScript::Collider collider;
-			collider.id = nextId;
-			collider.name = "Collider";
-			profile->colliders.push_back(collider);
-			m_selectedCollider = static_cast<int>(profile->colliders.size()) - 1;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(SelectLabel(m_useJapaneseLabels, "Delete Collider", u8"当たり判定を削除")) && profile->colliders.size() > 1)
-		{
-			const int deletedId = profile->colliders[m_selectedCollider].id;
-			profile->colliders.erase(profile->colliders.begin() + m_selectedCollider);
-			for (BossAttackScript::Attack& attack : profile->attacks)
-			{
-				attack.colliderIds.erase(std::remove(attack.colliderIds.begin(), attack.colliderIds.end(), deletedId), attack.colliderIds.end());
-			}
-			ClampSelection();
-		}
-		if (m_selectedCollider >= 0 && m_selectedCollider < static_cast<int>(profile->colliders.size()))
-		{
-			BossAttackScript::Collider& collider = profile->colliders[m_selectedCollider];
-			ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Enabled##col", u8"有効##col"), &collider.enabled);
-			ImGui::InputInt(SelectLabel(m_useJapaneseLabels, "ID", u8"ID"), &collider.id);
-			char name[128]{};
-			strncpy_s(name, sizeof(name), collider.name.c_str(), _TRUNCATE);
-			if (ImGui::InputText(SelectLabel(m_useJapaneseLabels, "Name", u8"名前"), name, IM_ARRAYSIZE(name))) collider.name = name;
-			int colliderShape = BossAttackScript::NormalizeColliderShape(collider.shape);
-			const char* colliderShapeItemsEn[BossAttackScript::ColliderShapeCount] = {};
-			const char* colliderShapeItemsJp[BossAttackScript::ColliderShapeCount] = {};
-			for (int i = 0; i < BossAttackScript::ColliderShapeCount; ++i)
-			{
-				colliderShapeItemsEn[i] = BossAttackScript::GetColliderShapeName(i);
-				colliderShapeItemsJp[i] = BossAttackScript::GetColliderShapeNameJp(i);
-			}
-			if (ImGui::Combo(
-				SelectLabel(m_useJapaneseLabels, "Shape", u8"形状"),
-				&colliderShape,
-				m_useJapaneseLabels ? colliderShapeItemsJp : colliderShapeItemsEn,
-				BossAttackScript::ColliderShapeCount))
-			{
-				collider.shape = colliderShape;
-			}
-			const bool isCircleCollider =
-				(BossAttackScript::NormalizeColliderShape(collider.shape) == BossAttackScript::ColliderShapeCircle);
-
-			int startMode = BossAttackScript::NormalizeColliderStartMode(collider.startMode);
-			const char* startModeItemsEn[BossAttackScript::ColliderStartModeCount] = {};
-			const char* startModeItemsJp[BossAttackScript::ColliderStartModeCount] = {};
-			for (int i = 0; i < BossAttackScript::ColliderStartModeCount; ++i)
-			{
-				startModeItemsEn[i] = BossAttackScript::GetColliderStartModeName(i);
-				startModeItemsJp[i] = BossAttackScript::GetColliderStartModeNameJp(i);
-			}
-			if (ImGui::Combo(
-				SelectLabel(m_useJapaneseLabels, "Start Mode", u8"開始方法"),
-				&startMode,
-				m_useJapaneseLabels ? startModeItemsJp : startModeItemsEn,
-				BossAttackScript::ColliderStartModeCount))
-			{
-				collider.startMode = startMode;
-			}
-
-			ImGui::DragFloat3(
-				SelectLabel(m_useJapaneseLabels, "Start Position", u8"開始位置"),
-				&collider.startPos.x,
-				0.05f,
-				-20.0f,
-				20.0f,
-				"%.2f");
-			const int normalizedStartMode = BossAttackScript::NormalizeColliderStartMode(collider.startMode);
-			if (normalizedStartMode == BossAttackScript::ColliderStartPlayerAreaRandom)
-			{
-				ImGui::DragFloat(
-					SelectLabel(m_useJapaneseLabels, "Start Random Radius", u8"開始ランダム半径"),
-					&collider.startRandomRadius,
-					0.05f,
-					0.0f,
-					20.0f,
-					"%.2f");
-			}
-			ImGui::Checkbox(
-				SelectLabel(m_useJapaneseLabels, "Use End Position", u8"終了位置を使う"),
-				&collider.useEndPosition);
-			if (collider.useEndPosition)
-			{
-				ImGui::DragFloat2(
-					SelectLabel(
-						m_useJapaneseLabels,
-						isCircleCollider ? "Start Diameter / Height" : "Start Thickness / Height",
-						isCircleCollider ? u8"開始の直径 / 高さ" : u8"開始の太さ / 高さ"),
-					&collider.startSize.x,
-					0.05f,
-					0.05f,
-					20.0f,
-					"%.2f");
-				collider.startSize.z = collider.startSize.x;
-			}
-			else
-			{
-				if (isCircleCollider)
-				{
-					ImGui::DragFloat2(
-						SelectLabel(m_useJapaneseLabels, "Start Diameter / Height", u8"開始の直径 / 高さ"),
-						&collider.startSize.x,
-						0.05f,
-						0.05f,
-						20.0f,
-						"%.2f");
-					collider.startSize.z = collider.startSize.x;
-				}
-				else
-				{
-					ImGui::DragFloat3(
-						SelectLabel(m_useJapaneseLabels, "Start Size", u8"開始サイズ"),
-						&collider.startSize.x,
-						0.05f,
-						0.05f,
-						20.0f,
-						"%.2f");
-				}
-			}
-
-			int endMode = BossAttackScript::NormalizeColliderEndMode(collider.endMode);
-			const char* endModeItemsEn[BossAttackScript::ColliderEndModeCount] = {};
-			const char* endModeItemsJp[BossAttackScript::ColliderEndModeCount] = {};
-			for (int i = 0; i < BossAttackScript::ColliderEndModeCount; ++i)
-			{
-				endModeItemsEn[i] = BossAttackScript::GetColliderEndModeName(i);
-				endModeItemsJp[i] = BossAttackScript::GetColliderEndModeNameJp(i);
-			}
-			if (collider.useEndPosition &&
-				ImGui::Combo(
-					SelectLabel(m_useJapaneseLabels, "End Mode", u8"終了位置の基準"),
-					&endMode,
-					m_useJapaneseLabels ? endModeItemsJp : endModeItemsEn,
-					BossAttackScript::ColliderEndModeCount))
-			{
-				collider.endMode = endMode;
-			}
-
-			const bool endUsesCurrent = (BossAttackScript::NormalizeColliderEndMode(collider.endMode) == BossAttackScript::ColliderEndCurrentRelative);
-			const bool endUsesPlayer = (BossAttackScript::NormalizeColliderEndMode(collider.endMode) == BossAttackScript::ColliderEndPlayer);
-			const bool endUsesPlayerArea = (BossAttackScript::NormalizeColliderEndMode(collider.endMode) == BossAttackScript::ColliderEndPlayerAreaRandom);
-			const char* endPosLabel = endUsesCurrent
-				? SelectLabel(m_useJapaneseLabels, "End Position (From Current)", u8"終了位置(現在地から)")
-				: endUsesPlayer
-				? SelectLabel(m_useJapaneseLabels, "End Position (Player)", u8"終了位置(プレイヤー位置)")
-				: endUsesPlayerArea
-				? SelectLabel(m_useJapaneseLabels, "End Position (Player Area)", u8"終了位置(プレイヤー周辺)")
-				: SelectLabel(m_useJapaneseLabels, "End Position", u8"終了位置");
-			if (collider.useEndPosition)
-			{
-				if (endUsesPlayer || endUsesPlayerArea)
-				{
-					ImGui::BeginDisabled();
-					ImGui::DragFloat3(
-						endPosLabel,
-						&collider.endPos.x,
-						0.05f,
-						-20.0f,
-						20.0f,
-						"%.2f");
-					ImGui::EndDisabled();
-					if (endUsesPlayerArea)
-					{
-						ImGui::DragFloat(
-							SelectLabel(m_useJapaneseLabels, "End Random Radius", u8"終了ランダム半径"),
-							&collider.endRandomRadius,
-							0.05f,
-							0.0f,
-							20.0f,
-							"%.2f");
-					}
-				}
-				else
-				{
-					ImGui::DragFloat3(
-						endPosLabel,
-						&collider.endPos.x,
-						0.05f,
-						-20.0f,
-						20.0f,
-						"%.2f");
-				}
-				ImGui::DragFloat2(
-					SelectLabel(
-						m_useJapaneseLabels,
-						isCircleCollider ? "End Diameter / Height" : "End Thickness / Height",
-						isCircleCollider ? u8"終了の直径 / 高さ" : u8"終了の太さ / 高さ"),
-					&collider.endSize.x,
-					0.05f,
-					0.05f,
-					20.0f,
-					"%.2f");
-				collider.endSize.z = collider.endSize.x;
-			}
-			else
-			{
-				ImGui::BeginDisabled();
-				ImGui::DragFloat3(
-					endPosLabel,
-					&collider.endPos.x,
-					0.05f,
-					-20.0f,
-					20.0f,
-					"%.2f");
-				if (isCircleCollider)
-				{
-					ImGui::DragFloat2(
-						SelectLabel(m_useJapaneseLabels, "End Diameter / Height", u8"終了の直径 / 高さ"),
-						&collider.endSize.x,
-						0.05f,
-						0.05f,
-						20.0f,
-						"%.2f");
-				}
-				else
-				{
-					ImGui::DragFloat3(
-						SelectLabel(m_useJapaneseLabels, "End Size", u8"終了サイズ"),
-						&collider.endSize.x,
-						0.05f,
-						0.05f,
-						20.0f,
-						"%.2f");
-				}
-				ImGui::EndDisabled();
-			}
-			if (collider.startMode == BossAttackScript::ColliderStartCurrent)
-			{
-				ImGui::TextDisabled("%s", SelectLabel(
-					m_useJapaneseLabels,
-					"Start position is treated as an offset from the boss current position.",
-					u8"開始位置はボスの現在地からの相対位置として扱います。"));
-			}
-			if (collider.useEndPosition && endUsesCurrent)
-			{
-				ImGui::TextDisabled("%s", SelectLabel(
-					m_useJapaneseLabels,
-					"End position is treated as an offset from the boss current position.",
-					u8"終了位置はボスの現在地からの相対位置として扱います。"));
-			}
-			if (collider.useEndPosition && endUsesPlayer)
-			{
-				ImGui::TextDisabled("%s", SelectLabel(
-					m_useJapaneseLabels,
-					"End position uses the current player position.",
-					u8"終了位置は現在のプレイヤー位置を使います。"));
-			}
-			if (collider.useEndPosition && endUsesPlayerArea)
-			{
-				ImGui::TextDisabled("%s", SelectLabel(
-					m_useJapaneseLabels,
-					"End position uses a random point around the player.",
-					u8"終了位置はプレイヤー周辺のランダム位置を使います。"));
-			}
-			if (collider.useEndPosition)
-			{
-				ImGui::TextDisabled("%s", SelectLabel(
-					m_useJapaneseLabels,
-					isCircleCollider
-						? "When an end position is enabled, the collider becomes a capsule sweep from start to end. Diameter and height use the larger start/end values."
-						: "When an end position is enabled, the hitbox becomes a straight strip from start to end. Thickness and height come from the larger start/end values.",
-					isCircleCollider
-						? u8"終了位置を使うと、当たり判定は始点から終点までのカプセル状スイープになります。直径と高さは開始/終了の大きい方を使います。"
-						: u8"終了位置を使うと、当たり判定は始点から終点までの直線帯になります。太さと高さは開始/終了の大きい方を使います。"));
-			}
-			if (!collider.useEndPosition)
-			{
-				collider.endPos = collider.startPos;
-				collider.endSize = collider.startSize;
-			}
-			if (isCircleCollider)
-			{
-				collider.startSize.z = collider.startSize.x;
-				collider.endSize.z = collider.endSize.x;
-			}
-		}
-	}
 
 	if (ImGui::CollapsingHeader(SelectLabel(m_useJapaneseLabels, "Attacks", u8"攻撃"), ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -1381,27 +1577,38 @@ void SceneBossEditor::DrawDebugWindow()
 			}
 			ImGui::EndListBox();
 		}
-		if (ImGui::Button(SelectLabel(m_useJapaneseLabels, "Add Attack", u8"攻撃を追加")))
+		if (!IsFinalBossEditor() && ImGui::Button(SelectLabel(m_useJapaneseLabels, "Add Attack", u8"攻撃を追加")))
 		{
 			BossAttackScript::Attack attack;
 			attack.name = "Attack";
-			if (!profile->colliders.empty()) attack.colliderIds.push_back(profile->colliders.front().id);
 			profile->attacks.push_back(attack);
 			m_selectedAttack = static_cast<int>(profile->attacks.size()) - 1;
 		}
-		ImGui::SameLine();
-		if (ImGui::Button(SelectLabel(m_useJapaneseLabels, "Delete Attack", u8"攻撃を削除")) && profile->attacks.size() > 1)
+		if (!IsFinalBossEditor())
 		{
-			profile->attacks.erase(profile->attacks.begin() + m_selectedAttack);
-			ClampSelection();
+			ImGui::SameLine();
+			if (ImGui::Button(SelectLabel(m_useJapaneseLabels, "Delete Attack", u8"攻撃を削除")) && profile->attacks.size() > 1)
+			{
+				profile->attacks.erase(profile->attacks.begin() + m_selectedAttack);
+				ClampSelection();
+			}
 		}
 		if (m_selectedAttack >= 0 && m_selectedAttack < static_cast<int>(profile->attacks.size()))
 		{
 			BossAttackScript::Attack& attack = profile->attacks[m_selectedAttack];
 			ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Enabled##atk", u8"有効##atk"), &attack.enabled);
-			char attackName[128]{};
-			strncpy_s(attackName, sizeof(attackName), attack.name.c_str(), _TRUNCATE);
-			if (ImGui::InputText(SelectLabel(m_useJapaneseLabels, "Attack Name", u8"攻撃名"), attackName, IM_ARRAYSIZE(attackName))) attack.name = attackName;
+			if (IsFinalBossEditor())
+			{
+				ImGui::Text("%s : %s",
+					SelectLabel(m_useJapaneseLabels, "Attack Name", u8"攻撃名"),
+					attack.name.c_str());
+			}
+			else
+			{
+				char attackName[128]{};
+				strncpy_s(attackName, sizeof(attackName), attack.name.c_str(), _TRUNCATE);
+				if (ImGui::InputText(SelectLabel(m_useJapaneseLabels, "Attack Name", u8"攻撃名"), attackName, IM_ARRAYSIZE(attackName))) attack.name = attackName;
+			}
 			int deliveryMode = BossAttackScript::NormalizeAttackDeliveryMode(attack.deliveryMode);
 			int attackOriginMode = (deliveryMode == BossAttackScript::AttackDeliveryBossSelf) ? 0 : 1;
 			const char* attackOriginItemsEn[] = { "Boss Self", "Remote" };
@@ -1495,23 +1702,60 @@ void SceneBossEditor::DrawDebugWindow()
 						"Remote Ground can use collider start/end settings like a projected ground sweep.",
 						u8"遠隔(地上)は、コライダーの開始位置と終了位置を使って地上攻撃を作れます。"));
 			}
-			ImGui::TextDisabled("%s", SelectLabel(m_useJapaneseLabels, "Collider Links", u8"コライダー割当"));
-			for (const BossAttackScript::Collider& collider : profile->colliders)
+			ImGui::Separator();
+			ImGui::TextUnformatted(SelectLabel(m_useJapaneseLabels, "Hitbox", u8"当たり判定"));
+			BossAttackScript::Collider& collider = attack.hitbox;
+			ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Enabled##hit", u8"有効##hit"), &collider.enabled);
+			int colliderShape = BossAttackScript::NormalizeColliderShape(collider.shape);
+			const char* colliderShapeItemsEn[BossAttackScript::ColliderShapeCount] = {};
+			const char* colliderShapeItemsJp[BossAttackScript::ColliderShapeCount] = {};
+			for (int i = 0; i < BossAttackScript::ColliderShapeCount; ++i)
 			{
-				bool used = std::find(attack.colliderIds.begin(), attack.colliderIds.end(), collider.id) != attack.colliderIds.end();
-				char label[128]{};
-				sprintf_s(label, sizeof(label), "%02d : %s", collider.id, collider.name.c_str());
-				if (ImGui::Checkbox(label, &used))
+				colliderShapeItemsEn[i] = BossAttackScript::GetColliderShapeName(i);
+				colliderShapeItemsJp[i] = BossAttackScript::GetColliderShapeNameJp(i);
+			}
+			if (ImGui::Combo(SelectLabel(m_useJapaneseLabels, "Shape##hit", u8"形状##hit"), &colliderShape, m_useJapaneseLabels ? colliderShapeItemsJp : colliderShapeItemsEn, BossAttackScript::ColliderShapeCount)) collider.shape = colliderShape;
+			int startMode = BossAttackScript::NormalizeColliderStartMode(collider.startMode);
+			const char* startModeItemsEn[BossAttackScript::ColliderStartModeCount] = {};
+			const char* startModeItemsJp[BossAttackScript::ColliderStartModeCount] = {};
+			for (int i = 0; i < BossAttackScript::ColliderStartModeCount; ++i)
+			{
+				startModeItemsEn[i] = BossAttackScript::GetColliderStartModeName(i);
+				startModeItemsJp[i] = BossAttackScript::GetColliderStartModeNameJp(i);
+			}
+			if (ImGui::Combo(SelectLabel(m_useJapaneseLabels, "Start Mode##hit", u8"開始方法##hit"), &startMode, m_useJapaneseLabels ? startModeItemsJp : startModeItemsEn, BossAttackScript::ColliderStartModeCount)) collider.startMode = startMode;
+			ImGui::DragFloat3(SelectLabel(m_useJapaneseLabels, "Start Position##hit", u8"開始位置##hit"), &collider.startPos.x, 0.05f, -20.0f, 20.0f, "%.2f");
+			ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Use End Position##hit", u8"終了位置を使う##hit"), &collider.useEndPosition);
+			int endMode = BossAttackScript::NormalizeColliderEndMode(collider.endMode);
+			const char* endModeItemsEn[BossAttackScript::ColliderEndModeCount] = {};
+			const char* endModeItemsJp[BossAttackScript::ColliderEndModeCount] = {};
+			for (int i = 0; i < BossAttackScript::ColliderEndModeCount; ++i)
+			{
+				endModeItemsEn[i] = BossAttackScript::GetColliderEndModeName(i);
+				endModeItemsJp[i] = BossAttackScript::GetColliderEndModeNameJp(i);
+			}
+			if (collider.useEndPosition && ImGui::Combo(SelectLabel(m_useJapaneseLabels, "End Mode##hit", u8"終了基準##hit"), &endMode, m_useJapaneseLabels ? endModeItemsJp : endModeItemsEn, BossAttackScript::ColliderEndModeCount)) collider.endMode = endMode;
+			if (collider.useEndPosition) ImGui::DragFloat3(SelectLabel(m_useJapaneseLabels, "End Position##hit", u8"終了位置##hit"), &collider.endPos.x, 0.05f, -20.0f, 20.0f, "%.2f");
+			ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Aim To Player##hit", u8"プレイヤー方向を使う##hit"), &collider.usePlayerDirection);
+			if (collider.usePlayerDirection)
+			{
+				ImGui::DragFloat(SelectLabel(m_useJapaneseLabels, "Max Distance##hit", u8"最大距離##hit"), &collider.maxDistance, 0.05f, 0.0f, 20.0f, "%.2f");
+				ImGui::DragFloat(SelectLabel(m_useJapaneseLabels, "Lateral Offset##hit", u8"法線左右オフセット##hit"), &collider.lateralOffset, 0.05f, -10.0f, 10.0f, "%.2f");
+			}
+			if (BossAttackScript::NormalizeColliderShape(collider.shape) == BossAttackScript::ColliderShapeCircle)
+			{
+				ImGui::DragFloat2(SelectLabel(m_useJapaneseLabels, "Start Diameter Height##hit", u8"開始直径高さ##hit"), &collider.startSize.x, 0.05f, 0.05f, 20.0f, "%.2f");
+				collider.startSize.z = collider.startSize.x;
+				if (collider.useEndPosition)
 				{
-					if (used)
-					{
-						if (std::find(attack.colliderIds.begin(), attack.colliderIds.end(), collider.id) == attack.colliderIds.end()) attack.colliderIds.push_back(collider.id);
-					}
-					else
-					{
-						attack.colliderIds.erase(std::remove(attack.colliderIds.begin(), attack.colliderIds.end(), collider.id), attack.colliderIds.end());
-					}
+					ImGui::DragFloat2(SelectLabel(m_useJapaneseLabels, "End Diameter Height##hit", u8"終了直径高さ##hit"), &collider.endSize.x, 0.05f, 0.05f, 20.0f, "%.2f");
+					collider.endSize.z = collider.endSize.x;
 				}
+			}
+			else
+			{
+				ImGui::DragFloat3(SelectLabel(m_useJapaneseLabels, "Start Size##hit", u8"開始サイズ##hit"), &collider.startSize.x, 0.05f, 0.05f, 20.0f, "%.2f");
+				if (collider.useEndPosition) ImGui::DragFloat3(SelectLabel(m_useJapaneseLabels, "End Size##hit", u8"終了サイズ##hit"), &collider.endSize.x, 0.05f, 0.05f, 20.0f, "%.2f");
 			}
 			ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Use Visual", u8"見た目を使う"), &attack.visual.enabled);
 			ImGui::SameLine();
@@ -1523,6 +1767,32 @@ void SceneBossEditor::DrawDebugWindow()
 			ImGui::DragFloat(SelectLabel(m_useJapaneseLabels, "Spawn Height", u8"出現高さ"), &attack.visual.spawnHeight, 0.05f, 0.0f, 30.0f, "%.2f");
 			ImGui::DragFloat(SelectLabel(m_useJapaneseLabels, "Travel Sec", u8"落下時間"), &attack.visual.travelSec, 0.01f, 0.05f, 10.0f, "%.2f");
 			ImGui::DragFloat(SelectLabel(m_useJapaneseLabels, "Spin", u8"回転速度"), &attack.visual.spinDegPerSec, 1.0f, -720.0f, 720.0f, "%.0f");
+			ImGui::Separator();
+			ImGui::TextUnformatted(SelectLabel(m_useJapaneseLabels, "Next Attacks", u8"連鎖攻撃"));
+			if (!IsFinalBossEditor() && ImGui::Button(SelectLabel(m_useJapaneseLabels, "Add Chain", u8"連鎖追加")))
+			{
+				attack.nextLinks.push_back({});
+			}
+			for (size_t chainIndex = 0; chainIndex < attack.nextLinks.size(); ++chainIndex)
+			{
+				BossAttackScript::NextAttackLink& link = attack.nextLinks[chainIndex];
+				ImGui::PushID(static_cast<int>(chainIndex));
+				ImGui::Checkbox(SelectLabel(m_useJapaneseLabels, "Enabled", u8"有効"), &link.enabled);
+				if (!IsFinalBossEditor())
+				{
+					ImGui::SameLine();
+					if (ImGui::Button(SelectLabel(m_useJapaneseLabels, "Delete", u8"削除")))
+					{
+						attack.nextLinks.erase(attack.nextLinks.begin() + static_cast<long long>(chainIndex));
+						ImGui::PopID();
+						break;
+					}
+				}
+				ImGui::DragInt(SelectLabel(m_useJapaneseLabels, "Attack Index", u8"攻撃番号"), &link.attackIndex, 0.1f, -1, static_cast<int>(profile->attacks.size()) - 1);
+				ImGui::DragInt(SelectLabel(m_useJapaneseLabels, "Weight", u8"重み"), &link.weight, 0.1f, 1, 100);
+				ImGui::Separator();
+				ImGui::PopID();
+			}
 		}
 	}
 

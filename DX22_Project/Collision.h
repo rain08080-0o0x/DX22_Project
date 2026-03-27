@@ -36,7 +36,6 @@ public:
     static Result Hit(Sphere a, Sphere b);
 };
 
-// Gemini
 #include <cmath>
 #include <algorithm>
 
@@ -114,7 +113,7 @@ struct Vec3 {
 
 
 // 物理挙動を持つOBBオブジェクト
-class RigidBodyOBB 
+class RigidBodyOBB
 {
 public:
     // 形状データ

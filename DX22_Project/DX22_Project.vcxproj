@@ -119,6 +119,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -171,6 +172,7 @@
     <ClCompile Include="MainImGui.cpp" />
     <ClCompile Include="MeshBuffer.cpp" />
     <ClCompile Include="Model.cpp" />
+    <ClCompile Include="NewLastBossEditor.cpp" />
     <ClCompile Include="ParticleEffectPreset.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="ParticleEmitter2D.cpp" />
@@ -179,6 +181,7 @@
     <ClCompile Include="SceneCastleEditor.cpp" />
     <ClCompile Include="Scene3DEditor.cpp" />
     <ClCompile Include="SceneBossEditor.cpp" />
+    <ClCompile Include="SceneFinalBossEditor.cpp" />
     <ClCompile Include="SceneEffectDebug.cpp" />
     <ClCompile Include="SceneGame.cpp" />
     <ClCompile Include="SceneManager.cpp" />
@@ -235,6 +238,7 @@
     <ClInclude Include="MainImGui.h" />
     <ClInclude Include="MeshBuffer.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="NewLastBossEditor.h" />
     <ClInclude Include="ParticleEffectPreset.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="ParticleEmitter2D.h" />
@@ -243,6 +247,7 @@
     <ClInclude Include="SceneCastleEditor.h" />
     <ClInclude Include="Scene3DEditor.h" />
     <ClInclude Include="SceneBossEditor.h" />
+    <ClInclude Include="SceneFinalBossEditor.h" />
     <ClInclude Include="SceneEffectDebug.h" />
     <ClInclude Include="SceneGame.h" />
     <ClInclude Include="SceneManager.h" />

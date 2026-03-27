@@ -12,6 +12,7 @@ public:
         SCENE_ENGINE_EDITOR,
         SCENE_EFFECT_DEBUG,
         SCENE_BOSS_EDITOR,
+        SCENE_FINAL_BOSS_EDITOR,
         SCENE_NEW_BOSS_EDITOR,
         SCENE_MAX
     };

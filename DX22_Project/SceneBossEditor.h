@@ -11,7 +11,13 @@ class Texture;
 class SceneBossEditor : public Scene
 {
 public:
-	SceneBossEditor();
+	enum EditorMode
+	{
+		ModeRegularBosses = 0,
+		ModeFinalBoss
+	};
+
+	explicit SceneBossEditor(EditorMode mode = ModeRegularBosses);
 	~SceneBossEditor() override;
 
 	void Update() override;
@@ -38,6 +44,7 @@ public:
 		float spawnHeight = 2.5f;
 		float spinDegPerSec = 0.0f;
 		float angleDeg = 0.0f;
+		float yawDeg = 0.0f;
 		bool billboard = true;
 		Texture* texture = nullptr;
 	};
@@ -70,17 +77,21 @@ private:
 	Texture* GetTextureForPath(const std::string& relativePath);
 	BossAttackScript::Profile* GetSelectedProfile();
 	const BossAttackScript::Profile* GetSelectedProfile() const;
+	bool IsFinalBossEditor() const;
+	const char* GetEditorPath() const;
+	BossAttackScript::Database MakeEditorDefaultDatabase() const;
 
 private:
+	EditorMode m_editorMode;
 	CameraDebug* m_pCamera;
 	Texture* m_pFloorTexture;
 	Texture* m_pMarkerTexture;
+	Texture* m_pAttackRangeTexture;
 	Texture* m_pBossTexture;
 	Texture* m_pPlayerTexture;
 	BossAttackScript::Database m_database;
 	char m_pathBuffer[260];
 	int m_selectedProfile;
-	int m_selectedCollider;
 	int m_selectedAttack;
 	bool m_useJapaneseLabels;
 	DirectX::XMFLOAT3 m_previewPlayerPos;

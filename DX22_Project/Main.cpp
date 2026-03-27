@@ -86,6 +86,10 @@ namespace
 			return "EffectDebug";
 		case SceneManager::SceneType::SCENE_BOSS_EDITOR:
 			return "BossEditor";
+		case SceneManager::SceneType::SCENE_FINAL_BOSS_EDITOR:
+			return "FinalBossEditor";
+		case SceneManager::SceneType::SCENE_NEW_BOSS_EDITOR:
+			return "NewLastBoss";
 		default:
 			return "Unknown";
 		}
@@ -746,7 +750,13 @@ void Draw()
 			sceneTxt = u8"エフェクト確認";
 			break;
 		case SceneManager::SceneType::SCENE_BOSS_EDITOR:
-			sceneTxt = u8"ボス攻撃エディタ";
+			sceneTxt = u8"通常ボス攻撃エディタ";
+			break;
+		case SceneManager::SceneType::SCENE_FINAL_BOSS_EDITOR:
+			sceneTxt = u8"ラスボス攻撃エディタ";
+			break;
+		case SceneManager::SceneType::SCENE_NEW_BOSS_EDITOR:
+			sceneTxt = u8"NewLastBoss";
 			break;
 		default:
 			sceneTxt = u8"不明";
@@ -775,7 +785,9 @@ void Draw()
 			u8"リザルト",
 			u8"城エディタ",
 			u8"エフェクト確認",
-			u8"ボス攻撃エディタ",
+			u8"通常ボス攻撃エディタ",
+			u8"ラスボス攻撃エディタ",
+			u8"NewLastBoss",
 		};
 		const char* debugResultItems[] =
 		{
@@ -1618,8 +1630,16 @@ void Draw()
 					changeScene = SceneManager::SceneType::SCENE_EFFECT_DEBUG;
 					break;
 				case 5:
-					sceneTxt = u8"ボス攻撃エディタ";
+					sceneTxt = u8"通常ボス攻撃エディタ";
 					changeScene = SceneManager::SceneType::SCENE_BOSS_EDITOR;
+					break;
+				case 6:
+					sceneTxt = u8"ラスボス攻撃エディタ";
+					changeScene = SceneManager::SceneType::SCENE_FINAL_BOSS_EDITOR;
+					break;
+				case 7:
+					sceneTxt = u8"NewLastBoss";
+					changeScene = SceneManager::SceneType::SCENE_NEW_BOSS_EDITOR;
 					break;
 				default:
 					sceneTxt = u8"不明";

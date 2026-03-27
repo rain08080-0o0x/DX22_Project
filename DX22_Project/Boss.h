@@ -243,6 +243,14 @@ public:
     int attackRepeatsRemaining = 0;
     /** @brief Counter used to rotate through attack patterns. */
     int attackCycleCount = 0;
+    /** @brief Elapsed time since the boss battle started. */
+    float battleTimer = 0.0f;
+    /** @brief Remembers the previous scripted final-boss attack index. */
+    int finalLastAttackIndex = -1;
+    /** @brief True once the timed instant-death pattern was already used. */
+    bool finalLethalTriggered = false;
+    /** @brief True when a phase transition should force a special opener. */
+    bool finalPhaseTransitionPending = false;
     /** @brief Dash start position. */
     DirectX::XMFLOAT3 dashStartPos = { 0.0f, 0.0f, 0.0f };
     /** @brief Dash end position. */
