@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include <math.h>
 #include <string>
+#include <algorithm>
 
 using namespace std;
 
@@ -17,6 +18,31 @@ namespace
 	DirectX::XMFLOAT2 Squared(DirectX::XMFLOAT2 x1, DirectX::XMFLOAT2 x2)
 	{
 		return DirectX::XMFLOAT2(x2.x - x1.x, x2.y - x1.y);
+	}
+
+	// コックカワサキの画像を描画するだけの関数。
+	// テクスチャ、位置、サイズを引数に渡す。
+	void DrawKawasaki(Texture* tex, DirectX::XMFLOAT3 pos, DirectX::XMFLOAT2 size)
+	{
+		using namespace DirectX;
+
+		XMMATRIX mat = 
+			XMMatrixRotationX(XMConvertToRadians(90)) *
+			XMMatrixTranslation(pos.x, 0.1f, pos.z);
+
+		mat = XMMatrixTranspose(mat);
+
+		XMFLOAT4X4 world;
+		XMStoreFloat4x4(&world, mat);
+
+		Sprite::SetWorld(world);
+		Sprite::SetSize({ size.x,size.y});
+		Sprite::SetOffset({ 0,0 });
+		Sprite::SetUVPos({ 0,0 });
+		Sprite::SetUVScale({ 1,1 });
+		Sprite::SetColor({ 1,1,1,1 });
+		Sprite::SetTexture(tex);
+		Sprite::Draw();
 	}
 }
 
@@ -291,8 +317,8 @@ void DrawAttackRange(DirectX::XMFLOAT3 pos,float width,float length,float angle)
 	XMFLOAT3 vertex[4];
 	XMFLOAT2 start2D,end2D;
 
-	start2D = { pos.x - (length * cosf(angle)),pos.y - (length * sinf(angle)) };
-	end2D = { pos.x + (length * cosf(angle)),pos.y + (length * sinf(angle)) };
+	start2D = { pos.x - (length * cosf(angle)),pos.z - (length * sinf(angle)) };
+	end2D = { pos.x + (length * cosf(angle)),pos.z + (length * sinf(angle)) };
 
 	vertex[0] = {
 		start2D.x + width * cosf(angle + (PI / 2.0f)),
@@ -318,6 +344,9 @@ void DrawAttackRange(DirectX::XMFLOAT3 pos,float width,float length,float angle)
 	Geometory::AddLine(vertex[1], vertex[2], { 0,1,0,1 });
 	Geometory::AddLine(vertex[2], vertex[3], { 0,1,0,1 });
 	Geometory::AddLine(vertex[3], vertex[0], { 0,1,0,1 });
+	return;
+
+
 }
 /// <summary>
 /// 第一引数にその中心座標を渡し,第二引数にその攻撃の幅を定義。第三引数のその攻撃長さを定義。
@@ -328,9 +357,30 @@ void DrawAttackRange(DirectX::XMFLOAT3 pos,float width,float length,float angle)
 /// <param name="length : ">長さ</param>
 /// <param name=" angle : ">角度</param>
 /// <param name="   tex : ">テクスチャ</param>
-void DrawAttackRange(DirectX::XMFLOAT3 pos, float width, float length, float angle, Texture* tex)
+void DrawAttackRange(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT4 color, float width, float length, float angle, Texture* tex)
 {
+	using namespace DirectX;
 
+	XMMATRIX mat =
+		XMMatrixRotationX(XMConvertToRadians(90)) *
+		XMMatrixRotationY(-angle) *
+		XMMatrixTranslation(pos.x, pos.y, pos.z);
+	mat = XMMatrixTranspose(mat);
+
+	XMFLOAT4X4 world;
+	XMStoreFloat4x4(&world, mat);
+
+	length *= 2.0f;
+	width *= 2.0f;
+
+	Sprite::SetWorld(world);
+	Sprite::SetSize({ length,width });
+	Sprite::SetOffset({ 0,0 });
+	Sprite::SetUVPos({ 0,0 });
+	Sprite::SetUVScale({ 1,1 });
+	Sprite::SetColor(color);
+	Sprite::SetTexture(tex);
+	Sprite::Draw();
 }
 /// <summary>
 /// 第一引数にその中心座標を渡し,第二引数にその攻撃の幅を定義。第三引数のその攻撃長さを定義。
@@ -342,9 +392,38 @@ void DrawAttackRange(DirectX::XMFLOAT3 pos, float width, float length, float ang
 /// <param name=" angle : ">角度</param>
 /// <param name="     tex : ">テクスチャ</param>
 /// <param name="progress : ">予兆までの達成率</param>
-void DrawAttackRange(DirectX::XMFLOAT3 pos, float width, float length, float angle,Texture* tex,float progress)
+void DrawAttackRange(DirectX::XMFLOAT3 pos, DirectX::XMFLOAT4 color, float width, float length, float angle,Texture* tex,float progress)
 {
+	if (progress <= 0.0f || progress > 1.0f) return;
 
+	using namespace DirectX;;
+	XMFLOAT2 start2D, end2D;
+
+	start2D = { pos.x - (length * cosf(angle)),pos.z - (length * sinf(angle)) };
+	end2D = { pos.x + (length * cosf(angle)),pos.z + (length * sinf(angle)) };
+	XMMATRIX mat =
+		DirectX::XMMatrixRotationX(XMConvertToRadians(90)) *
+		DirectX::XMMatrixRotationY(-angle) *
+		DirectX::XMMatrixTranslation(
+			start2D.x + (end2D.x - start2D.x) * progress * 0.5f,
+			pos.y,
+			start2D.y + (end2D.y - start2D.y) * progress * 0.5f);
+	mat = DirectX::XMMatrixTranspose(mat);
+
+	XMFLOAT4X4 world;
+	XMStoreFloat4x4(&world, mat);
+
+	length *= 2.0f;
+	width *= 2.0f;
+
+	Sprite::SetWorld(world);
+	Sprite::SetSize({ length * progress,width });
+	Sprite::SetOffset({ 0,0 });
+	Sprite::SetUVPos({ 0,0 });
+	Sprite::SetUVScale({ 1,1 });
+	Sprite::SetColor(color);
+	Sprite::SetTexture(tex);
+	Sprite::Draw();
 }
 
 void NewLastBoss::DrawDebugGUI()
@@ -365,19 +444,19 @@ void NewLastBoss::DrawDebugGUI()
 	if (ImGui::CollapsingHeader(u8"プレイヤー", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		SeparatorText(u8"プレイヤー");
-		DragFloat3(u8"位置", ppos, 0.05f);
-		DragFloat3(u8"サイズ", spos, 0.05f, 0.05f, 20.0f);
+		ImGui::DragFloat3(u8"位置", ppos, 0.05f);
+		ImGui::DragFloat3(u8"サイズ", spos, 0.05f, 0.05f, 20.0f);
 		DragFloat(u8"プレイヤースピード", &playerSpeed,0.01f);
-		Combo(u8"向き", &playerFacing, facingItems, IM_ARRAYSIZE(facingItems));
+		ImGui::Combo(u8"向き", &playerFacing, facingItems, IM_ARRAYSIZE(facingItems));
 		if (playerFacing == 1)
 		{
 			DragFloat(u8"Y角度", &player.yawDeg, 1.0f, -360.0f, 360.0f);
 		}
 		SeparatorText(u8"ボス");
-		PushID(1);
-		DragFloat3(u8"位置", pboss, 0.05f);
-		DragFloat3(u8"サイズ", sboss, 0.05f, 0.05f, 20.0f);
-		Combo(u8"向き", &bossFacing, facingItems, IM_ARRAYSIZE(facingItems));
+		ImGui::PushID(1);
+		ImGui::DragFloat3(u8"位置", pboss, 0.05f);
+		ImGui::DragFloat3(u8"サイズ", sboss, 0.05f, 0.05f, 20.0f);
+		ImGui::Combo(u8"向き", &bossFacing, facingItems, IM_ARRAYSIZE(facingItems));
 		if (bossFacing == 1)
 		{
 			DragFloat(u8"Y角度", &boss.yawDeg, 1.0f, -360.0f, 360.0f);
@@ -387,8 +466,8 @@ void NewLastBoss::DrawDebugGUI()
 
 	if (ImGui::CollapsingHeader(u8"カメラ", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		PushID(2);
-		DragFloat3(u8"位置", CamPos, 0.01f);
+		ImGui::PushID(2);
+		ImGui::DragFloat3(u8"位置", CamPos, 0.01f);
 		camera->SetPos({ CamPos[0],CamPos[1],CamPos[2] });
 		PopID();
 	}
@@ -433,7 +512,7 @@ void NewLastBoss::DrawDebugGUI()
 							//int counter = 0;
 							string isActiveText;
 							float distance;
-							PushID(i);
+							ImGui::PushID(i);
 							for (int counter = 0; counter < max; counter++)
 							{
 								ImGui::TableSetColumnIndex(counter); // counter列目に移動
@@ -514,26 +593,48 @@ void NewLastBoss::DrawDebugGUI()
 			}
 			if (ImGui::BeginTabItem(u8"P依存型攻撃"))
 			{
-				string ccStateText = u8"None";
+				string ccStateText = u8"現在状態";
 				switch (cc.state)
 				{
-				case AttackState::None:ccStateText = u8"な  し";
+				case AttackState::None:ccStateText += u8"な  し";
 					break;
-				case AttackState::UnUsed:ccStateText = u8"未使用";
+				case AttackState::UnUsed:ccStateText += u8"未使用";
 					break;
-				case AttackState::Using:ccStateText = u8"使用中";
+				case AttackState::UseStart: ccStateText += u8"使用開始";
 					break;
-				case AttackState::Used:ccStateText = u8"使用済";
+				case AttackState::Using:ccStateText += u8"使用中";
+					break;
+				case AttackState::Used:ccStateText += u8"使用済";
 					break;
 				default:
 					break;
 				}
+
+				if (ImGui::Button(u8"スタート"))cc.state = AttackState::UnUsed;
+
 				ImGui::TextDisabled(ccStateText.c_str());
-				ImGui::TextDisabled(u8"最初の角度：%3.2f°", DirectX::XMConvertToDegrees(cc.firstAngle));
-				ImGui::TextDisabled(u8"第二の角度：%3.2f°", DirectX::XMConvertToDegrees(cc.secondAngle));
+				ImGui::SeparatorText(u8"最初の攻撃");
+				ImGui::TextDisabled(u8"フレーム数：%d", cc.first.frame);
+				ImGui::TextDisabled(u8"角度：%3.2f", DirectX::XMConvertToRadians(cc.first.angle));
+				ImGui::TextDisabled(u8"攻撃インターバル：%3.2f",cc.first.interval);
+				ImGui::TextDisabled(u8"攻撃回数：%d", cc.first.atkCount);
+				ImGui::SeparatorText(u8"二種類目の攻撃");
+				ImGui::TextDisabled(u8"フレーム数：%d", cc.second.frame);
+				ImGui::TextDisabled(u8"角度：%3.2f", DirectX::XMConvertToRadians(cc.second.angle));
+				ImGui::TextDisabled(u8"攻撃インターバル：%3.2f",cc.second.interval);
+				ImGui::TextDisabled(u8"攻撃回数：%d", cc.second.atkCount);
+				ImGui::SeparatorText(u8"共通設定");
 				ImGui::TextDisabled(u8"幅：%3.2fｍ", cc.width);
 				ImGui::TextDisabled(u8"長さ：%3.2fｍ", cc.length);
-				Text(u8"まだナニモナイヨ");
+				ImGui::SliderInt(u8"攻撃のずれの間隔：%d", &cc.attackInterval, 0, 120);
+				ImGui::TextDisabled(u8"現在フレーム進行度：%d",cc.attackProgress);
+
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem(u8"円形攻撃"))
+			{
+				ImGui::DragFloat(u8"差分",&sabun,0.1f);
+				ImGui::DragFloat(u8"距離",&distance,0.1f);
 
 				ImGui::EndTabItem();
 			}
@@ -543,13 +644,23 @@ void NewLastBoss::DrawDebugGUI()
 		}
 		SeparatorText(u8"TabBarはここまで");
 	}
-	End();
+	float pos[3];
+	ImGui::Indent();
+	ImGui::BeginGroup();
+	ImGui::Text("Transform");
+	ImGui::Dummy(ImVec2(0, 12));
+	ImGui::InputFloat3("Pos", pos);
+	ImGui::EndGroup();
+	ImGui::Unindent();
+
+
 	player.pos = { ppos[0], ppos[1], ppos[2] };
 	player.size = { spos[0], spos[1], spos[2] };
 	player.useBillboard = (playerFacing == 0);
 	boss.pos = { pboss[0], pboss[1], pboss[2] };
 	boss.size = { sboss[0], sboss[1], sboss[2] };
 	boss.useBillboard = (bossFacing == 0);
+	ImGui::End();
 }
 
 
@@ -590,11 +701,21 @@ void NewLastBoss::Init()
 		rs_attack[i].end = { 0,0,0 };
 	}
 
-	cc.firstAngle = 0.0f;
-	cc.secondAngle = 0.0f;
+	// P依存攻撃の初期化
+	cc.first.angle = 0.0f;
+	cc.first.frame = 0;
+	cc.first.interval = 0.25f;
+	cc.first.atkCount = 0;
+	cc.second.angle = 0.0f;
+	cc.second.frame = 0;
+	cc.second.interval = 0.75f;
+	cc.second.atkCount = 0;
 	cc.width = 1.0f;
-	cc.state = AttackState::UnUsed;
+	cc.state = AttackState::None;
+	cc.attackInterval = 40;
 
+	sabun = 0.0f;
+	distance = 0.0f;
 
 	m_pPlayer = new Texture();
 	if (FAILED(m_pPlayer->Create("Assets/Texture/Effect/Star.png")))
@@ -621,6 +742,25 @@ void NewLastBoss::Init()
 	{
 		MessageBoxA(nullptr, "Game/white_dot.png", "error", MB_OK);
 	}
+
+	// 864x486
+	string kawasakiPath[] = {
+		"Assets/Texture/Kawasaki/656.png",
+		"Assets/Texture/Kawasaki/649.png",
+		"Assets/Texture/Kawasaki/638.png",
+		"Assets/Texture/Kawasaki/611.png",
+		"Assets/Texture/Kawasaki/604.png",
+		"Assets/Texture/Kawasaki/550.png"
+	};
+	for (int i = 0; i < 6; i++)
+	{
+		m_pKawasakiTex[i] = new Texture();
+		if (FAILED(m_pKawasakiTex[i]->Create(kawasakiPath[i].c_str())))
+		{
+			MessageBoxA(nullptr, "死んだんじゃないのー？☆", "必要なファイルが", MB_OK);
+		}
+	}
+
 }
 
 void NewLastBoss::Uninit()
@@ -650,6 +790,14 @@ void NewLastBoss::Uninit()
 		delete m_pAtkTex;
 		m_pAtkTex = nullptr;
 	}
+	for (int i = 0; i < 6; i++)
+	{
+		if (m_pKawasakiTex[i])
+		{
+			delete m_pKawasakiTex[i];
+			m_pKawasakiTex[i] = nullptr;
+		}
+	}
 }
 
 void NewLastBoss::Update()
@@ -665,6 +813,7 @@ void NewLastBoss::Update()
 	RandomSlashUpdate();
 	CrossUpdate();
 	CircleCrossUpdate();
+	CircleAttackUpdate();
 }
 
 void NewLastBoss::Draw()
@@ -688,6 +837,7 @@ void NewLastBoss::Draw()
 	Geometory::SetProjection(wvp[2]);
 
 	DrawField();
+
 	DrawCharSprite(m_pPlayer, camera, player, { 1, 1, 1, 1 });
 	DrawCharSprite(m_pBoss, camera, boss, { 1, 1, 1, 1 });
 	DrawCharCollision(player, {0,1,0,1});
@@ -696,6 +846,8 @@ void NewLastBoss::Draw()
 	RandomSlashDraw();
 	CrossDraw();
 	CircleCrossDraw();
+	CircleAttackDraw();
+
 
 	DrawDebugGUI();
 }
@@ -1129,29 +1281,369 @@ void NewLastBoss::CrossDraw()
 
 void NewLastBoss::CircleCrossUpdate()
 {
-	// 中心位置からプレイヤー位置に対しての角度を求める
+	switch (cc.state)
+	{
+	case None:	// 未使用
+		break;
+	case UnUsed:
+		cc.first.angle = 0.0f;
+		cc.first.frame = 0;
+		cc.first.interval = 0.25f;
+		cc.first.atkCount = 0;
+		cc.second.angle = 0.0f;
+		cc.second.frame = 0;
+		cc.second.interval = 0.75f;
+		cc.second.atkCount = 0;
+		cc.width = 1.0f;
+		cc.attackInterval = 40;
+		cc.attackProgress = 0;
+		cc.first.frame = 0;
+		cc.second.frame = -cc.attackInterval;
+		cc.state = AttackState::UseStart;
+		break;
+	case UseStart:	// 攻撃開始
+		// 中心位置からプレイヤー位置に対しての角度を求める
+		cc.first.angle = atan2f(player.pos.z, player.pos.x);
+		cc.second.angle = cc.first.angle + (PI / 4.0f);
+		cc.attackProgress = 0;
+		cc.state = AttackState::Using;
+		break;
+	case Using:		// 攻撃更新
+		cc.first.frame++;
+		cc.second.frame++; // 二種類目の攻撃は一種類目の攻撃から0.75秒遅れて発生するため、フレーム数も40フレーム遅らせる
+		cc.attackProgress++;
 
-	cc.firstAngle = atan2f(player.pos.z,player.pos.x);
-	cc.secondAngle = cc.firstAngle + (PI / 4.0f);
+		if (cc.first.frame >= 120)
+		{
+			cc.first.atkCount++;
+			cc.first.frame = 0;
+		}
+		if (cc.second.frame >= 120)
+		{
+			cc.second.atkCount++;
+			cc.second.frame = 0;
+		}
 
-	// 求めた角度の中心を通る直線を一種類目の格子攻撃とし、
-	// その直線に対して45度傾けた直線を二種類目の格子攻撃とする
+		if (cc.second.atkCount >= 6 && cc.first.atkCount >= 6)cc.state = AttackState::Used;
 
+		break;
+	case Used:		// 攻撃終了
+		cc.first.angle = 0.0f;
+		cc.first.frame = 0;
+		cc.first.interval = 0.25f;
+		cc.first.atkCount = 0;
+		cc.second.angle = 0.0f;
+		cc.second.frame = 0;
+		cc.second.interval = 0.75f;
+		cc.second.atkCount = 0;
+		cc.width = 1.0f;
+		cc.attackProgress = 0;
+		cc.first.frame = 0;
+		cc.second.frame = -cc.attackInterval;
+		break;
+	default:
+		break;
+	}
+
+
+}
+
+void DrawAtkCC(NewLastBoss::CircleCross cc,Texture* tex)
+{
+	// 最初の攻撃
+	if(cc.first.atkCount == 0)
+	{
+		// 枠の描画
+		DrawAttackRange(
+			{ 0,0,0 },
+			cc.width,
+			cc.length,
+			cc.first.angle
+		);
+		// 予測範囲の描画。半透明
+		DrawAttackRange(
+			{ 0,0.1f,0 },
+			{ 1,0,0,0.5f },
+			cc.width,
+			cc.length,
+			cc.first.angle,
+			tex
+		);
+		// 攻撃範囲の描画。本描画
+		DrawAttackRange(
+			{ 0,0.11f,0 },
+			{ 1,0,0,0.8f },
+			cc.width,
+			cc.length,
+			cc.first.angle,
+			tex,
+			cc.first.frame / 120.0f
+		);
+	}
+	else
+	{
+		// 枠の描画
+		DrawAttackRange(
+			{ 
+				((cc.width) + (cc.width * cc.first.atkCount)) * cosf(cc.first.angle + PI / 2.0f),
+				0,
+				((cc.width) + (cc.width * cc.first.atkCount)) * sinf(cc.first.angle + PI / 2.0f) },
+			cc.width,
+			cc.length,
+			cc.first.angle
+		);
+		DrawAttackRange(
+			{ 
+				((cc.width) + (cc.width * cc.first.atkCount)) * -cosf(cc.first.angle + PI / 2.0f),
+				0,
+				((cc.width) + (cc.width * cc.first.atkCount)) * -sinf(cc.first.angle + PI / 2.0f) },
+			cc.width,
+			cc.length,
+			cc.first.angle
+		);
+		// 予測範囲の描画。半透明
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.first.atkCount)) * cosf(cc.first.angle + PI / 2.0f),
+				0.1f,
+				((cc.width) + (cc.width * cc.first.atkCount)) * sinf(cc.first.angle + PI / 2.0f) },
+			{ 1,0,0,0.5f },
+			cc.width,
+			cc.length,
+			cc.first.angle,
+			tex
+		);
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.first.atkCount)) * -cosf(cc.first.angle + PI / 2.0f),
+				0.1f,
+				((cc.width) + (cc.width * cc.first.atkCount)) * -sinf(cc.first.angle + PI / 2.0f) },
+			{ 1,0,0,0.5f },
+			cc.width,
+			cc.length,
+			cc.first.angle,
+			tex
+		);
+		// 攻撃範囲の描画。本描画
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.first.atkCount)) * cosf(cc.first.angle + PI / 2.0f),
+				0.11f,
+				((cc.width) + (cc.width * cc.first.atkCount)) * sinf(cc.first.angle + PI / 2.0f) },
+			{ 1,0,0,0.8f },
+			cc.width,
+			cc.length,
+			cc.first.angle,
+			tex,
+			cc.first.frame / 120.0f
+		);
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.first.atkCount)) * -cosf(cc.first.angle + PI / 2.0f),
+				0.11f,
+				((cc.width) + (cc.width * cc.first.atkCount)) * -sinf(cc.first.angle + PI / 2.0f) },
+			{ 1,0,0,0.8f },
+			cc.width,
+			cc.length,
+			cc.first.angle,
+			tex,
+			cc.first.frame / 120.0f
+		);
+	}
+
+	// フレームがマイナスであれば無視。
+	if (cc.second.frame < 0)return;
+	// 二種類目の攻撃
+	if(cc.second.atkCount == 0)
+	{
+		// 枠の描画
+		DrawAttackRange(
+			{ 0,0,0 },
+			cc.width,
+			cc.length,
+			cc.second.angle
+		);
+		// 予測範囲の描画。半透明
+		DrawAttackRange(
+			{ 0,0.1f,0 },
+			{ 1,0,0,0.5f },
+			cc.width,
+			cc.length,
+			cc.second.angle,
+			tex
+		);
+		// 攻撃範囲の描画。本描画
+		DrawAttackRange(
+			{ 0,0.11f,0 },
+			{ 1,0,0,0.8f },
+			cc.width,
+			cc.length,
+			cc.second.angle,
+			tex,
+			cc.second.frame / 120.0f
+		);
+	}
+	else
+	{
+		// 枠の描画
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.second.atkCount)) * cosf(cc.second.angle + PI / 2.0f),
+				0,
+				((cc.width) + (cc.width * cc.second.atkCount)) * sinf(cc.second.angle + PI / 2.0f) },
+			cc.width,
+			cc.length,
+			cc.second.angle
+		);
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.second.atkCount)) * -cosf(cc.second.angle + PI / 2.0f),
+				0,
+				((cc.width) + (cc.width * cc.second.atkCount)) * -sinf(cc.second.angle + PI / 2.0f) },
+			cc.width,
+			cc.length,
+			cc.second.angle
+		);
+		// 予測範囲の描画。半透明
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.second.atkCount)) * cosf(cc.second.angle + PI / 2.0f),
+				0.1f,
+				((cc.width) + (cc.width * cc.second.atkCount)) * sinf(cc.second.angle + PI / 2.0f) },
+			{ 1,0,0,0.5f },
+			cc.width,
+			cc.length,
+			cc.second.angle,
+			tex
+		);
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.second.atkCount)) * -cosf(cc.second.angle + PI / 2.0f),
+				0.1f,
+				((cc.width) + (cc.width * cc.second.atkCount)) * -sinf(cc.second.angle + PI / 2.0f) },
+			{ 1,0,0,0.5f },
+			cc.width,
+			cc.length,
+			cc.second.angle,
+			tex
+		);
+		// 攻撃範囲の描画。本描画
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.second.atkCount)) * cosf(cc.second.angle + PI / 2.0f),
+				0.11f,
+				((cc.width) + (cc.width * cc.second.atkCount)) * sinf(cc.second.angle + PI / 2.0f) },
+			{ 1,0,0,0.8f },
+			cc.width,
+			cc.length,
+			cc.second.angle,
+			tex,
+			cc.second.frame / 120.0f
+		);
+		DrawAttackRange(
+			{
+				((cc.width) + (cc.width * cc.second.atkCount)) * -cosf(cc.second.angle + PI / 2.0f),
+				0.11f,
+				((cc.width) + (cc.width * cc.second.atkCount)) * -sinf(cc.second.angle + PI / 2.0f) },
+			{ 1,0,0,0.8f },
+			cc.width,
+			cc.length,
+			cc.second.angle,
+			tex,
+			cc.second.frame / 120.0f
+		);
+	}
 }
 
 void NewLastBoss::CircleCrossDraw()
 {
-	DrawAttackRange(
-		{0,0,0},
-		cc.width,
-		cc.length,
-		cc.firstAngle
-	);
-	DrawAttackRange(
-		{0,0,0},
-		cc.width,
-		cc.length,
-		cc.secondAngle
-	);
+	if(cc.state == AttackState::Using)
+		DrawAtkCC(cc, m_pAtkTex);
+}
+
+void NewLastBoss::CircleAttackUpdate()
+{
+}
+
+/// <summary>
+/// 円形を描画する関数
+/// </summary>
+/// <param name="pos">中心位置</param>
+/// <param name="range">半径</param>
+/// <param name="side">N角形</param>
+void DebugCircleDraw(DirectX::XMFLOAT3 pos,float range,int side)
+{
+	DirectX::XMFLOAT3 start{}, end{};
+
+	for (int i = 0; i < side; i++)
+	{
+		start.x = pos.x + range * cosf(2 * PI * (i / (float)(side)));
+		start.y = pos.y;
+		start.z = pos.z + range * sinf(2 * PI * (i / (float)(side)));
+
+		int sub = (i + 1) % side;
+
+		end.x = pos.x + range * cosf(2 * PI * (sub / (float)(side)));
+		end.y = pos.y;
+		end.z = pos.z + range * sinf(2 * PI * (sub / (float)(side)));
+		Geometory::AddLine(start, end, { 0,1,0,1 });
+	}
+}
+
+/// <summary>
+/// 円形を描画する関数
+/// </summary>
+/// <param name="pos">中心位置</param>
+/// <param name="range">半径</param>
+/// <param name="side">N角形</param>
+/// <param name="tex">テクスチャ</param>
+void DCD(DirectX::XMFLOAT3 pos,float range,int side,Texture* tex,float sabun)
+{
+	using namespace DirectX;
+	XMMATRIX mat;
+	XMFLOAT4X4 world;
+	XMFLOAT2 size;
+	XMFLOAT4 color;
+
+	XMFLOAT3 start{};
+
+	for (int i = 0; i < side; i++)
+	{
+		start.x = pos.x + (range + sabun) * cosf(2 * PI * (-i / (float)(side)));
+		start.y = pos.y;
+		start.z = pos.z + (range + sabun) * sinf(2 * PI * (-i / (float)(side)));
+
+
+		mat = XMMatrixRotationX(XMConvertToRadians(90.0f)) *
+			XMMatrixRotationY(2 * PI * (i / (float)(side))) *
+			XMMatrixTranslation(start.x, start.y + (0.01f * (i % 2)), start.z);
+		mat = XMMatrixTranspose(mat);
+
+
+		XMStoreFloat4x4(&world, mat);
+		float subRange = range * 1.0f;
+		size = {subRange,subRange};
+		color = { 1,0,0,0.5f };
+
+
+		Sprite::SetWorld(world);
+		Sprite::SetSize(size);
+		Sprite::SetOffset({ 0,0 });
+		Sprite::SetUVPos({ 0,0 });
+		Sprite::SetUVScale({ 1,1 });
+		Sprite::SetColor(color);
+		Sprite::SetTexture(tex);
+		Sprite::Draw();
+	}
+}
+
+void NewLastBoss::CircleAttackDraw()
+{
+	DirectX::XMFLOAT3 pos = player.pos;
+	pos.y = 0.12f;
+
+	DebugCircleDraw(player.pos,5,40);
+	DebugCircleDraw(player.pos,6,40);
+	DCD(pos,distance,20,m_pAtkTex,sabun);
 }
 

@@ -27,6 +27,7 @@ enum AttackState
 {
     None,
     UnUsed,
+    UseStart,
     Using,
     Used,
 };
@@ -47,25 +48,31 @@ private:
     void UpdatePlayer();
     void UpdateBoss();
     void DrawField();
+
     // ランダムスラッシュ攻撃を追加する関数。最大が10。
     // それ以上は追加できず初期化しないと再発動はできない。
     void AddAttack();
+
     // ランダムスラッシュの更新
     // プレイヤーの位置を中心にランダムな角度で攻撃が発生、
     // その場に一定時間の範囲を描画の後、攻撃が発生する。
     void RandomSlashUpdate();
+
     // ランダムスラッシュの描画
     // 当たり判定と、攻撃範囲を描画
     // テクスチャを出しているものの処理内容は当たり判定依存。
     void RandomSlashDraw();
+
     // クロス攻撃の更新
     // ステージ全体を斜めに切るように攻撃が発生。
     // 攻撃の向きは45度で、格子状
     void CrossUpdate();
+
     // クロス攻撃の描画
     // 当たり判定と、攻撃範囲を描画
     // テクスチャを出しているものの処理内容は当たり判定依存。
     void CrossDraw();
+
     // プレイヤー依存のクロス攻撃の更新
     // 最初にステージの中心からみたプレイヤーの位置を求め、
     // ステージの中心を通る直線を求めた角度で攻撃が発生。
@@ -76,6 +83,15 @@ private:
     void CircleCrossUpdate();
     // プレイヤー依存のクロス攻撃の描画
     void CircleCrossDraw();
+
+    // 円形攻撃
+    // 所謂、ドーナッツ型の当たり判定で、当たり判定の描画としては徐々に広がる
+    // 同心円状
+    void CircleAttackUpdate();
+
+
+    void CircleAttackDraw();
+
     // デバッグ用のGUI描画関数。様々な情報を表示するための関数。
     // 随時更新
     void DrawDebugGUI();
@@ -89,6 +105,7 @@ private:
 
     Texture* m_pFieldtex;   // フィールドのテクスチャ
     Texture* m_pAtkTex;     // 攻撃のテクスチャ
+	Texture* m_pKawasakiTex[6];    // コックカワサキのテクスチャ
 
     // ランダムスラッシュの攻撃状態を表す列挙型。
     // デフォはUnUsed
@@ -124,18 +141,29 @@ private:
         Final,
         Max
     };
-
     CrossState crossState = CrossState::Max;
 
+    struct CircleCrossDate
+    {
+        float angle;        // 攻撃角度。Playerに位置から定義
+        int frame;        //攻撃のフレームカウンタ。攻撃開始から何フレーム経ったかをカウント。
+		float interval;     // 攻撃のインターバル。攻撃開始から次の攻撃が発生するまでの時間。
+        int atkCount;       // 攻撃回数。攻撃が何回発生したかをカウント。
+    };
+
+public:
     struct CircleCross
     {
         AttackState state = AttackState::Used;
-		float firstAngle;   // 最初の攻撃の角度。プレイヤーの位置から求める。
-        float secondAngle;  // もう一つの攻撃角度。45度ずれたもの。
+        CircleCrossDate first;  // 最初の攻撃のデータ
+        CircleCrossDate second;  // 最初の攻撃のデータ
         float width;        // 攻撃の幅。長さはステージを切るように長いのでほぼ固定。
         const float length = 10.0f * sqrtf(2.0f); // 攻撃の長さ。ステージを丁度斜めに切っても届くように長めに定義。
-        // 攻撃間のインターバル。
-        // 二種類目(45度ずれ攻撃)の発生までの時間。
+        int attackInterval;   // 二種類目(45度ずれ攻撃)の発生までの時間。フレーム数で設定
+        int attackProgress;     // 攻撃の進行度。フレームカウント方式で進行。使用になったら進行。使用後リセット
     };
+private:
     CircleCross cc; // CircleCross
+    float sabun;
+    float distance;
 };

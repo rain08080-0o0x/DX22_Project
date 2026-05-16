@@ -677,10 +677,11 @@ static bool BrowseCastleEditorModelPath(char* outPath, size_t outPathSize)
 	ofn.lpstrFile = filePath;
 	ofn.nMaxFile = static_cast<DWORD>(sizeof(filePath));
 	ofn.lpstrFilter =
-		"3D Model Files (*.fbx;*.obj;*.gltf;*.glb)\0*.fbx;*.obj;*.gltf;*.glb\0"
+		"3D Model Files (*.fbx;*.obj;*.gltf;*.glb;*.pmx;*.pmd)\0*.fbx;*.obj;*.gltf;*.glb;*.pmx;*.pmd\0"
 		"FBX Files (*.fbx)\0*.fbx\0"
 		"OBJ Files (*.obj)\0*.obj\0"
 		"glTF Files (*.gltf;*.glb)\0*.gltf;*.glb\0"
+		"MMD Model Files (*.pmx;*.pmd)\0*.pmx;*.pmd\0"
 		"All Files (*.*)\0*.*\0";
 	ofn.nFilterIndex = 1;
 	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
@@ -1135,6 +1136,533 @@ static void DrawCenteredOverlayText(
 	dl->AddText(font, fontSize, ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), text, nullptr, wrapWidth);
 }
 
+static ImU32 GetRunRewardNodeColor(int rewardType)
+{
+	switch (rewardType)
+	{
+	case Transfer::RoguelikeUpgrade::RewardSkill:
+		return IM_COL32(70, 150, 255, 255);
+	case Transfer::RoguelikeUpgrade::RewardTrait:
+		return IM_COL32(106, 214, 132, 255);
+	case Transfer::RoguelikeUpgrade::RewardTag:
+		return IM_COL32(206, 118, 255, 255);
+	case Transfer::RoguelikeUpgrade::RewardWeapon:
+		return IM_COL32(244, 178, 70, 255);
+	case Transfer::RoguelikeUpgrade::RewardDice:
+		return IM_COL32(238, 226, 120, 255);
+	case Transfer::RoguelikeUpgrade::RewardArtifact:
+		return IM_COL32(96, 224, 218, 255);
+	case Transfer::RoguelikeUpgrade::RewardShop:
+		return IM_COL32(226, 166, 104, 255);
+	case Transfer::RoguelikeUpgrade::RewardRest:
+		return IM_COL32(112, 198, 174, 255);
+	case Transfer::RoguelikeUpgrade::RewardBoss:
+		return IM_COL32(238, 92, 82, 255);
+	case Transfer::RoguelikeUpgrade::RewardFinalBoss:
+		return IM_COL32(214, 42, 72, 255);
+	default:
+		return IM_COL32(150, 158, 176, 255);
+	}
+}
+
+static ImU32 ApplyAlpha(ImU32 color, int alpha)
+{
+	if (alpha < 0) alpha = 0;
+	if (alpha > 255) alpha = 255;
+	return (color & IM_COL32(255, 255, 255, 0)) | static_cast<ImU32>(alpha << IM_COL32_A_SHIFT);
+}
+
+static void FormatRunNodeLabel(
+	const Transfer& tran,
+	int stageIndex,
+	char* out,
+	size_t outSize)
+{
+	if (!out || outSize == 0) return;
+	if (stageIndex < 0 || stageIndex >= tran.GetRunStageCount())
+	{
+		sprintf_s(out, outSize, "-");
+		return;
+	}
+
+	const int map = tran.GetRunStageMapNumberAt(stageIndex);
+	const int step = tran.GetRunStageStepNumberAt(stageIndex);
+	const int rewardType = tran.GetRunRewardTypeAt(stageIndex);
+	if (step > 0)
+	{
+		sprintf_s(out, outSize, u8"M%d-%d", map, step);
+	}
+	else
+	{
+		sprintf_s(out, outSize, u8"M%d %s", map, GetRunRewardTypeName(rewardType));
+	}
+}
+
+static void DrawMapNode(
+	ImDrawList* dl,
+	ImFont* font,
+	const ImVec2& center,
+	float radius,
+	ImU32 color,
+	const char* mainLabel,
+	const char* subLabel,
+	bool selected,
+	bool current,
+	float textSize)
+{
+	if (!dl || !font) return;
+
+	const ImU32 fill = selected ? color : ApplyAlpha(color, current ? 235 : 170);
+	const ImU32 ring = selected ? IM_COL32(255, 255, 255, 255) : (current ? IM_COL32(245, 245, 225, 235) : IM_COL32(120, 132, 154, 180));
+	if (selected)
+	{
+		const float pulse = 0.5f + 0.5f * static_cast<float>(std::sin(ImGui::GetTime() * 4.0));
+		dl->AddCircleFilled(center, radius + 9.0f + pulse * 4.0f, ApplyAlpha(color, 58 + static_cast<int>(pulse * 42.0f)), 36);
+		dl->AddCircle(center, radius + 10.0f + pulse * 2.0f, ApplyAlpha(color, 150 + static_cast<int>(pulse * 55.0f)), 36, 2.0f);
+	}
+	dl->AddCircleFilled(center, radius, fill, 36);
+	dl->AddCircle(center, radius, ring, 36, selected ? 3.0f : 2.0f);
+	if (current)
+	{
+		dl->AddCircle(center, radius + 5.0f, IM_COL32(255, 240, 170, 210), 36, 2.0f);
+	}
+
+	if (mainLabel && mainLabel[0] != '\0')
+	{
+		const ImVec2 textSizeVec = font->CalcTextSizeA(textSize, FLT_MAX, 0.0f, mainLabel);
+		dl->AddText(font, textSize, ImVec2(center.x - textSizeVec.x * 0.5f, center.y - radius - textSize * 1.75f), IM_COL32(244, 248, 255, 255), mainLabel);
+	}
+	if (subLabel && subLabel[0] != '\0')
+	{
+		const ImVec2 textSizeVec = font->CalcTextSizeA(textSize, FLT_MAX, 0.0f, subLabel);
+		dl->AddText(font, textSize, ImVec2(center.x - textSizeVec.x * 0.5f, center.y + radius + textSize * 0.55f), IM_COL32(210, 222, 238, 235), subLabel);
+	}
+}
+
+static void DrawRunMapSelectionOverlay(const Transfer& tran)
+{
+	ImGuiViewport* vp = ImGui::GetMainViewport();
+	if (!vp) return;
+	ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+	if (!dl) return;
+	ImFont* font = ImGui::GetFont();
+	if (!font) return;
+
+	const int nextStageIndex = tran.roguelike.currentStageIndex + 1;
+	if (nextStageIndex < 0 || nextStageIndex >= tran.GetRunStageCount()) return;
+
+	int optionCount = tran.GetRunStageOptionCount(nextStageIndex);
+	if (optionCount <= 0)
+	{
+		DrawCenteredOverlayText(u8"次マス候補がありません", IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+		return;
+	}
+	if (optionCount > Transfer::RoguelikeUpgrade::kOfferCount) optionCount = Transfer::RoguelikeUpgrade::kOfferCount;
+	int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
+	if (optionIndex < 0) optionIndex = 0;
+	if (optionIndex >= optionCount) optionIndex = optionCount - 1;
+
+	const float viewportScaleRaw = (vp->Size.x < vp->Size.y) ? (vp->Size.x / 1280.0f) : (vp->Size.y / 720.0f);
+	const float viewportScale = ClampFloat(viewportScaleRaw, 0.90f, 1.55f);
+	const ImVec2 panelSize(vp->Size.x * 0.82f, vp->Size.y * 0.66f);
+	const ImVec2 panelMin(vp->Pos.x + (vp->Size.x - panelSize.x) * 0.5f, vp->Pos.y + (vp->Size.y - panelSize.y) * 0.5f);
+	const ImVec2 panelMax(panelMin.x + panelSize.x, panelMin.y + panelSize.y);
+	const float corner = 14.0f * viewportScale;
+	const float pad = 28.0f * viewportScale;
+	const float titleSize = ImGui::GetFontSize() * 1.46f * viewportScale;
+	const float bodySize = ImGui::GetFontSize() * 1.03f * viewportScale;
+	const float smallSize = ImGui::GetFontSize() * 0.88f * viewportScale;
+
+	dl->AddRectFilled(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), IM_COL32(0, 0, 0, 150));
+	dl->AddRectFilled(panelMin, panelMax, IM_COL32(14, 20, 30, 236), corner);
+	dl->AddRect(panelMin, panelMax, IM_COL32(180, 206, 238, 190), corner, 0, 2.0f);
+
+	char title[128]{};
+	const int nextMap = tran.GetRunStageMapNumberAt(nextStageIndex);
+	sprintf_s(title, sizeof(title), u8"次マス選択  Map%d", nextMap);
+	dl->AddText(font, titleSize, ImVec2(panelMin.x + pad, panelMin.y + 22.0f * viewportScale), IM_COL32(246, 249, 255, 255), title);
+
+	char status[160]{};
+	sprintf_s(status, sizeof(status), u8"所持リロール %d    復活残り %d", tran.roguelike.rerollRemain, tran.roguelike.reviveRemain);
+	const ImVec2 statusSize = font->CalcTextSizeA(bodySize, FLT_MAX, 0.0f, status);
+	dl->AddText(font, bodySize, ImVec2(panelMax.x - pad - statusSize.x, panelMin.y + 30.0f * viewportScale), IM_COL32(206, 220, 236, 235), status);
+
+	const float mapTop = panelMin.y + 108.0f * viewportScale;
+	const float mapBottom = panelMax.y - 120.0f * viewportScale;
+	const float centerY = (mapTop + mapBottom) * 0.5f;
+	const float currentX = panelMin.x + panelSize.x * 0.22f;
+	const float optionX = panelMin.x + panelSize.x * 0.54f;
+	const float nextX = panelMin.x + panelSize.x * 0.80f;
+	const float radius = 32.0f * viewportScale;
+	const float optionGap = 92.0f * viewportScale;
+
+	char currentMain[64]{};
+	char currentSub[64]{};
+	FormatRunNodeLabel(tran, tran.roguelike.currentStageIndex, currentMain, sizeof(currentMain));
+	sprintf_s(currentSub, sizeof(currentSub), u8"現在");
+	DrawMapNode(dl, font, ImVec2(currentX, centerY), radius, GetRunRewardNodeColor(tran.GetCurrentRunRewardType()), currentMain, currentSub, false, true, bodySize);
+
+	ImVec2 optionCenters[Transfer::RoguelikeUpgrade::kOfferCount]{};
+	const float firstOptionY = centerY - optionGap * static_cast<float>(optionCount - 1) * 0.5f;
+	for (int i = 0; i < optionCount; ++i)
+	{
+		optionCenters[i] = ImVec2(optionX, firstOptionY + optionGap * static_cast<float>(i));
+		dl->AddBezierCubic(
+			ImVec2(currentX + radius + 8.0f * viewportScale, centerY),
+			ImVec2(currentX + panelSize.x * 0.10f, centerY),
+			ImVec2(optionX - panelSize.x * 0.10f, optionCenters[i].y),
+			ImVec2(optionCenters[i].x - radius - 8.0f * viewportScale, optionCenters[i].y),
+			(i == optionIndex) ? IM_COL32(240, 248, 255, 235) : IM_COL32(110, 132, 160, 145),
+			(i == optionIndex) ? 4.0f : 2.0f);
+	}
+
+	for (int i = 0; i < optionCount; ++i)
+	{
+		const int rewardType = tran.GetRunStageOptionRewardType(nextStageIndex, i);
+		char nodeMain[64]{};
+		char nodeSub[64]{};
+		sprintf_s(nodeMain, sizeof(nodeMain), u8"%s", GetRunRewardTypeName(rewardType));
+		const int nextStep = tran.GetRunStageStepNumberAt(nextStageIndex);
+		if (nextStep > 0)
+		{
+			sprintf_s(nodeSub, sizeof(nodeSub), u8"Step%d", nextStep);
+		}
+		else
+		{
+			sprintf_s(nodeSub, sizeof(nodeSub), u8"次のマス");
+		}
+		DrawMapNode(dl, font, optionCenters[i], (i == optionIndex) ? radius * 1.12f : radius, GetRunRewardNodeColor(rewardType), nodeMain, nodeSub, i == optionIndex, false, bodySize);
+	}
+
+	const int futureStageIndex = nextStageIndex + 1;
+	if (futureStageIndex < tran.GetRunStageCount())
+	{
+		char futureMain[64]{};
+		char futureSub[64]{};
+		FormatRunNodeLabel(tran, futureStageIndex, futureMain, sizeof(futureMain));
+		sprintf_s(futureSub, sizeof(futureSub), u8"その先");
+		for (int i = 0; i < optionCount; ++i)
+		{
+			dl->AddBezierCubic(
+				ImVec2(optionCenters[i].x + radius + 8.0f * viewportScale, optionCenters[i].y),
+				ImVec2(optionX + panelSize.x * 0.10f, optionCenters[i].y),
+				ImVec2(nextX - panelSize.x * 0.10f, centerY),
+				ImVec2(nextX - radius - 8.0f * viewportScale, centerY),
+				(i == optionIndex) ? IM_COL32(240, 248, 255, 170) : IM_COL32(92, 110, 132, 105),
+				(i == optionIndex) ? 3.0f : 1.5f);
+		}
+		DrawMapNode(dl, font, ImVec2(nextX, centerY), radius * 0.82f, GetRunRewardNodeColor(tran.GetRunRewardTypeAt(futureStageIndex)), futureMain, futureSub, false, false, smallSize);
+	}
+
+	const float stripY = panelMax.y - 72.0f * viewportScale;
+	const float stripLeft = panelMin.x + pad;
+	const float stripRight = panelMax.x - pad;
+	dl->AddLine(ImVec2(stripLeft, stripY), ImVec2(stripRight, stripY), IM_COL32(82, 98, 122, 170), 2.0f);
+
+	int visibleFirst = tran.roguelike.currentStageIndex - 2;
+	if (visibleFirst < 0) visibleFirst = 0;
+	int visibleLast = visibleFirst + 7;
+	if (visibleLast >= tran.GetRunStageCount())
+	{
+		visibleLast = tran.GetRunStageCount() - 1;
+		visibleFirst = visibleLast - 7;
+		if (visibleFirst < 0) visibleFirst = 0;
+	}
+	const int visibleCount = visibleLast - visibleFirst + 1;
+	for (int i = 0; i < visibleCount; ++i)
+	{
+		const int stageIndex = visibleFirst + i;
+		const float t = (visibleCount <= 1) ? 0.0f : static_cast<float>(i) / static_cast<float>(visibleCount - 1);
+		const float x = stripLeft + (stripRight - stripLeft) * t;
+		const bool current = stageIndex == tran.roguelike.currentStageIndex;
+		const bool next = stageIndex == nextStageIndex;
+		const float miniRadius = (current || next) ? 8.0f * viewportScale : 5.5f * viewportScale;
+		const ImU32 color = GetRunRewardNodeColor(stageIndex == nextStageIndex
+			? tran.GetRunStageOptionRewardType(nextStageIndex, optionIndex)
+			: tran.GetRunRewardTypeAt(stageIndex));
+		dl->AddCircleFilled(ImVec2(x, stripY), miniRadius, current ? IM_COL32(255, 245, 180, 255) : (next ? color : ApplyAlpha(color, 180)), 20);
+		if (current || next)
+		{
+			dl->AddCircle(ImVec2(x, stripY), miniRadius + 4.0f * viewportScale, IM_COL32(245, 248, 255, 220), 20, 2.0f);
+		}
+	}
+
+	const char* help = u8"[方向キー / 左スティック] 選択    [Controller Confirm / Enter / F / Space] 決定";
+	const ImVec2 helpSize = font->CalcTextSizeA(smallSize, FLT_MAX, 0.0f, help);
+	dl->AddText(font, smallSize, ImVec2(panelMax.x - pad - helpSize.x, panelMax.y - 34.0f * viewportScale), IM_COL32(204, 218, 236, 230), help);
+}
+
+static ImU32 GetOfferCardColor(int offerType)
+{
+	if (offerType < 0)
+	{
+		return IM_COL32(116, 124, 140, 255);
+	}
+	if (offerType >= Transfer::RoguelikeUpgrade::kOfferTypeStride)
+	{
+		switch (GetPackedOfferType(offerType))
+		{
+		case Transfer::RoguelikeUpgrade::OfferTrait:
+			return GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardTrait);
+		case Transfer::RoguelikeUpgrade::OfferWeaponUpgrade:
+			return GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardWeapon);
+		case Transfer::RoguelikeUpgrade::OfferSkillEnhance:
+		case Transfer::RoguelikeUpgrade::OfferSkillChange:
+			return GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardSkill);
+		case Transfer::RoguelikeUpgrade::OfferTagDisable:
+			return GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardTag);
+		case Transfer::RoguelikeUpgrade::OfferArtifact:
+			return GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardArtifact);
+		default:
+			return IM_COL32(150, 158, 176, 255);
+		}
+	}
+	return IM_COL32(154, 188, 236, 255);
+}
+
+static void ResolveRewardSelectionText(const Transfer& tran, char* title, size_t titleSize, char* continueLabel, size_t continueSize)
+{
+	if (title && titleSize > 0)
+	{
+		sprintf_s(title, titleSize, "%s", GetRunRewardTypeName(tran.GetCurrentRunRewardType()));
+	}
+	if (continueLabel && continueSize > 0)
+	{
+		const bool hasFollowupReward = (tran.roguelike.selectionRoundsRemaining > 1);
+		const bool isShopSelection =
+			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
+			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest;
+		const char* label = hasFollowupReward ? u8"次の報酬へ" : u8"マップ選択へ";
+		if (!hasFollowupReward && tran.gameplayDebug.challengeReturnToGameAfterReward != 0)
+		{
+			label = u8"ゲームへ戻る";
+		}
+		if (isShopSelection)
+		{
+			label = (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest) ? u8"休憩所へ戻る" : u8"ショップへ戻る";
+		}
+		sprintf_s(continueLabel, continueSize, "%s", label);
+	}
+
+	const int selectionPhase = tran.roguelike.selectionPhase;
+	const char* phaseTitle = nullptr;
+	switch (selectionPhase)
+	{
+	case Transfer::RoguelikeUpgrade::SelectionRewardSkill:
+	case Transfer::RoguelikeUpgrade::SelectionShopSkillEnhance:
+		phaseTitle = u8"スキル強化";
+		break;
+	case Transfer::RoguelikeUpgrade::SelectionRewardTrait:
+	case Transfer::RoguelikeUpgrade::SelectionShopTrait:
+		phaseTitle = u8"特性強化";
+		break;
+	case Transfer::RoguelikeUpgrade::SelectionRewardTag:
+		phaseTitle = u8"タグ解除";
+		break;
+	case Transfer::RoguelikeUpgrade::SelectionRewardWeapon:
+		phaseTitle = u8"武器強化";
+		break;
+	case Transfer::RoguelikeUpgrade::SelectionRewardArtifact:
+		phaseTitle = u8"魔道具";
+		break;
+	case Transfer::RoguelikeUpgrade::SelectionShopSkillChange:
+		phaseTitle = u8"スキル変更";
+		break;
+	case Transfer::RoguelikeUpgrade::SelectionMixed:
+		phaseTitle = u8"報酬";
+		break;
+	default:
+		break;
+	}
+	if (phaseTitle && title && titleSize > 0)
+	{
+		sprintf_s(title, titleSize, "%s", phaseTitle);
+	}
+}
+
+static void DrawRewardCard(
+	ImDrawList* dl,
+	ImFont* font,
+	const ImVec2& min,
+	const ImVec2& max,
+	const char* label,
+	const char* description,
+	ImU32 accent,
+	bool selected,
+	bool disabled,
+	float scale)
+{
+	const float corner = 14.0f * scale;
+	const ImU32 fill = selected ? IM_COL32(36, 48, 70, 242) : IM_COL32(24, 31, 43, 230);
+	const ImU32 border = selected ? IM_COL32(244, 248, 255, 245) : IM_COL32(92, 108, 132, 165);
+	const float pulse = selected ? (0.5f + 0.5f * static_cast<float>(std::sin(ImGui::GetTime() * 4.0))) : 0.0f;
+	if (selected)
+	{
+		dl->AddRectFilled(ImVec2(min.x - 5.0f * scale, min.y - 5.0f * scale), ImVec2(max.x + 5.0f * scale, max.y + 5.0f * scale), ApplyAlpha(accent, 38 + static_cast<int>(pulse * 40.0f)), corner + 5.0f * scale);
+	}
+	dl->AddRectFilled(min, max, disabled ? IM_COL32(18, 22, 30, 205) : fill, corner);
+	dl->AddRect(min, max, disabled ? IM_COL32(70, 78, 92, 120) : border, corner, 0, selected ? 2.4f : 1.4f);
+	dl->AddRectFilled(min, ImVec2(min.x + 7.0f * scale, max.y), disabled ? IM_COL32(70, 78, 92, 155) : accent, corner, ImDrawFlags_RoundCornersLeft);
+
+	const float titleSize = ImGui::GetFontSize() * 1.10f * scale;
+	const float bodySize = ImGui::GetFontSize() * 0.92f * scale;
+	const ImU32 titleColor = disabled ? IM_COL32(142, 150, 164, 210) : IM_COL32(248, 250, 255, 255);
+	const ImU32 bodyColor = disabled ? IM_COL32(120, 128, 142, 190) : IM_COL32(204, 216, 232, 238);
+	dl->AddText(font, titleSize, ImVec2(min.x + 24.0f * scale, min.y + 18.0f * scale), titleColor, label ? label : "-");
+	dl->AddText(font, bodySize, ImVec2(min.x + 24.0f * scale, min.y + 56.0f * scale), bodyColor, description ? description : "", nullptr, max.x - min.x - 44.0f * scale);
+}
+
+static void DrawRewardSelectionCardOverlay(const Transfer& tran)
+{
+	ImGuiViewport* vp = ImGui::GetMainViewport();
+	if (!vp) return;
+	ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+	if (!dl) return;
+	ImFont* font = ImGui::GetFont();
+	if (!font) return;
+
+	const float scaleRaw = (vp->Size.x < vp->Size.y) ? (vp->Size.x / 1280.0f) : (vp->Size.y / 720.0f);
+	const float scale = ClampFloat(scaleRaw, 0.90f, 1.55f);
+	const ImVec2 panelSize(vp->Size.x * 0.78f, vp->Size.y * 0.68f);
+	const ImVec2 panelMin(vp->Pos.x + (vp->Size.x - panelSize.x) * 0.5f, vp->Pos.y + (vp->Size.y - panelSize.y) * 0.5f);
+	const ImVec2 panelMax(panelMin.x + panelSize.x, panelMin.y + panelSize.y);
+	const float pad = 30.0f * scale;
+	const float corner = 16.0f * scale;
+
+	dl->AddRectFilled(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), IM_COL32(0, 0, 0, 158));
+	dl->AddRectFilled(panelMin, panelMax, IM_COL32(15, 19, 28, 238), corner);
+	dl->AddRect(panelMin, panelMax, IM_COL32(178, 206, 238, 185), corner, 0, 2.0f);
+
+	char title[96]{};
+	char continueLabel[96]{};
+	ResolveRewardSelectionText(tran, title, sizeof(title), continueLabel, sizeof(continueLabel));
+	char subtitle[192]{};
+	sprintf_s(subtitle, sizeof(subtitle), u8"報酬を1つ選択   残り報酬 %d   リロール %d", tran.roguelike.selectionRoundsRemaining, tran.roguelike.rerollRemain);
+
+	const float titleSize = ImGui::GetFontSize() * 1.55f * scale;
+	const float bodySize = ImGui::GetFontSize() * 0.96f * scale;
+	dl->AddText(font, titleSize, ImVec2(panelMin.x + pad, panelMin.y + 24.0f * scale), IM_COL32(248, 250, 255, 255), title);
+	dl->AddText(font, bodySize, ImVec2(panelMin.x + pad, panelMin.y + 70.0f * scale), IM_COL32(198, 214, 234, 235), subtitle);
+	dl->AddLine(ImVec2(panelMin.x + pad, panelMin.y + 105.0f * scale), ImVec2(panelMax.x - pad, panelMin.y + 105.0f * scale), IM_COL32(100, 118, 144, 170), 1.5f);
+
+	int validSlots[Transfer::RoguelikeUpgrade::kOfferCount]{};
+	int validCount = 0;
+	for (int i = 0; i < Transfer::RoguelikeUpgrade::kOfferCount; ++i)
+	{
+		if (tran.roguelike.offers[i] >= 0)
+		{
+			validSlots[validCount++] = i;
+		}
+	}
+	int selectedOption = tran.gameplayDebug.rewardSelectionIndex;
+	if (selectedOption < 0) selectedOption = 0;
+	if (validCount > 0 && selectedOption >= validCount) selectedOption = validCount - 1;
+	const int selectedSlot = (validCount > 0) ? validSlots[selectedOption] : 0;
+
+	if (validCount <= 0)
+	{
+		const ImVec2 cardMin(panelMin.x + pad, panelMin.y + 150.0f * scale);
+		const ImVec2 cardMax(panelMax.x - pad, cardMin.y + 120.0f * scale);
+		DrawRewardCard(dl, font, cardMin, cardMax, continueLabel, u8"取得できる候補がないため、次の処理へ進みます。", IM_COL32(150, 158, 176, 255), true, false, scale);
+	}
+	else
+	{
+		const float cardW = (panelSize.x - pad * 2.0f - 22.0f * scale * 2.0f) / 3.0f;
+		const float cardH = 220.0f * scale;
+		const float cardY = panelMin.y + 145.0f * scale;
+		for (int i = 0; i < Transfer::RoguelikeUpgrade::kOfferCount; ++i)
+		{
+			char label[96]{};
+			char desc[160]{};
+			const int offer = tran.roguelike.offers[i];
+			FormatUpgradeLabel(tran, offer, label, sizeof(label));
+			FormatUpgradeDescription(tran, offer, desc, sizeof(desc));
+			const ImVec2 cardMin(panelMin.x + pad + static_cast<float>(i) * (cardW + 22.0f * scale), cardY);
+			const ImVec2 cardMax(cardMin.x + cardW, cardY + cardH);
+			DrawRewardCard(dl, font, cardMin, cardMax, label, desc, GetOfferCardColor(offer), selectedSlot == i, offer < 0, scale);
+		}
+	}
+
+	const char* help = u8"[方向キー / 左スティック] 選択    [Controller Confirm / Enter / F / Space] 決定    [R / Controller Reroll] リロール";
+	const ImVec2 helpSize = font->CalcTextSizeA(bodySize, FLT_MAX, 0.0f, help);
+	dl->AddText(font, bodySize, ImVec2(panelMax.x - pad - helpSize.x, panelMax.y - 38.0f * scale), IM_COL32(202, 216, 234, 232), help);
+}
+
+static void DrawRunShopRestOverlay(const Transfer& tran)
+{
+	ImGuiViewport* vp = ImGui::GetMainViewport();
+	if (!vp) return;
+	ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
+	if (!dl) return;
+	ImFont* font = ImGui::GetFont();
+	if (!font) return;
+
+	const bool isRest = (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest);
+	const float scaleRaw = (vp->Size.x < vp->Size.y) ? (vp->Size.x / 1280.0f) : (vp->Size.y / 720.0f);
+	const float scale = ClampFloat(scaleRaw, 0.90f, 1.55f);
+	const ImVec2 panelSize(vp->Size.x * 0.74f, vp->Size.y * 0.66f);
+	const ImVec2 panelMin(vp->Pos.x + (vp->Size.x - panelSize.x) * 0.5f, vp->Pos.y + (vp->Size.y - panelSize.y) * 0.5f);
+	const ImVec2 panelMax(panelMin.x + panelSize.x, panelMin.y + panelSize.y);
+	const float pad = 30.0f * scale;
+	const float corner = 16.0f * scale;
+
+	dl->AddRectFilled(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), IM_COL32(0, 0, 0, 154));
+	dl->AddRectFilled(panelMin, panelMax, isRest ? IM_COL32(14, 30, 30, 238) : IM_COL32(27, 22, 16, 238), corner);
+	dl->AddRect(panelMin, panelMax, isRest ? IM_COL32(142, 224, 202, 190) : IM_COL32(232, 190, 126, 190), corner, 0, 2.0f);
+
+	const float titleSize = ImGui::GetFontSize() * 1.55f * scale;
+	const float bodySize = ImGui::GetFontSize() * 0.96f * scale;
+	const char* title = isRest ? u8"休憩所" : u8"ショップ";
+	dl->AddText(font, titleSize, ImVec2(panelMin.x + pad, panelMin.y + 24.0f * scale), IM_COL32(248, 250, 255, 255), title);
+	char status[192]{};
+	sprintf_s(status, sizeof(status), u8"進行 %d / %d    所持リロール %d    購入コスト %d", tran.roguelike.currentStageIndex + 1, tran.GetRunStageCount(), tran.roguelike.rerollRemain, tran.GetCurrentShopCost());
+	dl->AddText(font, bodySize, ImVec2(panelMin.x + pad, panelMin.y + 70.0f * scale), IM_COL32(210, 222, 238, 236), status);
+	if (isRest)
+	{
+		dl->AddText(font, bodySize, ImVec2(panelMin.x + pad, panelMin.y + 96.0f * scale), IM_COL32(164, 236, 214, 238), u8"最大HPの25%を回復済み。必要なら強化を購入してから次へ進めます。");
+	}
+	dl->AddLine(ImVec2(panelMin.x + pad, panelMin.y + 126.0f * scale), ImVec2(panelMax.x - pad, panelMin.y + 126.0f * scale), IM_COL32(120, 132, 150, 165), 1.5f);
+
+	int selected = tran.gameplayDebug.rewardSelectionIndex;
+	if (selected < 0) selected = 0;
+	if (selected > 3) selected = 3;
+	const char* labels[4] = { u8"特性強化", u8"スキル変更", u8"スキル強化", u8"次へ進む" };
+	const char* descs[4] =
+	{
+		u8"リロールアイテムを消費して、特性強化候補を開きます。",
+		u8"獲得済みスキルを別スキルへ交換します。強化内容は引き継ぎます。",
+		u8"現在のスキルに追加強化を付けます。",
+		u8"このマスを終了して次の進行へ移ります。"
+	};
+	const ImU32 colors[4] =
+	{
+		GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardTrait),
+		GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardSkill),
+		GetRunRewardNodeColor(Transfer::RoguelikeUpgrade::RewardSkill),
+		IM_COL32(190, 198, 214, 255)
+	};
+	const float rowH = 78.0f * scale;
+	const float rowGap = 12.0f * scale;
+	float y = panelMin.y + 155.0f * scale;
+	for (int i = 0; i < 4; ++i)
+	{
+		char label[96]{};
+		if (i < 3)
+		{
+			sprintf_s(label, sizeof(label), u8"%s  cost %d", labels[i], tran.GetCurrentShopCost());
+		}
+		else
+		{
+			sprintf_s(label, sizeof(label), "%s", labels[i]);
+		}
+		DrawRewardCard(dl, font, ImVec2(panelMin.x + pad, y), ImVec2(panelMax.x - pad, y + rowH), label, descs[i], colors[i], selected == i, false, scale);
+		y += rowH + rowGap;
+	}
+
+	const char* help = u8"[方向キー / 左スティック] 選択    [Controller Confirm / Enter / F / Space] 決定";
+	const ImVec2 helpSize = font->CalcTextSizeA(bodySize, FLT_MAX, 0.0f, help);
+	dl->AddText(font, bodySize, ImVec2(panelMax.x - pad - helpSize.x, panelMax.y - 34.0f * scale), IM_COL32(216, 226, 240, 232), help);
+}
 static void FormatUpgradeTableValue(float value, const char* suffix, char* out, size_t outSize)
 {
 	if (!out || outSize == 0) return;
@@ -1311,182 +1839,20 @@ void DrawUpgradeSelectionOverlay(const Transfer& tran, bool showBossDebugHint)
 	if (SceneManager::GetResultType() != SceneManager::ResultType::Win) return;
 	if (tran.roguelike.selectionPending != 0)
 	{
-		const bool hasAnyOffer =
-			(tran.roguelike.offers[0] >= 0) ||
-			(tran.roguelike.offers[1] >= 0) ||
-			(tran.roguelike.offers[2] >= 0);
-		int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
-		if (optionIndex < 0) optionIndex = 0;
-		const int selectionPhase = tran.roguelike.selectionPhase;
-		const bool isShopSelection =
-			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
-			tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest;
-		const int currentRewardType = tran.GetCurrentRunRewardType();
-		const char* overlayTitle = GetRunRewardTypeName(currentRewardType);
-		const bool hasFollowupReward = (tran.roguelike.selectionRoundsRemaining > 1);
-		const char* continueLabel = hasFollowupReward ? u8"次の報酬へ" : u8"マップ選択へ";
-		if (!hasFollowupReward && tran.gameplayDebug.challengeReturnToGameAfterReward != 0)
-		{
-			continueLabel = u8"ゲームへ戻る";
-		}
-		if (isShopSelection)
-		{
-			continueLabel =
-				tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest
-				? u8"休憩所へ戻る"
-				: u8"ショップへ戻る";
-		}
-
-		switch (selectionPhase)
-		{
-		case Transfer::RoguelikeUpgrade::SelectionRewardSkill:
-		case Transfer::RoguelikeUpgrade::SelectionShopSkillEnhance:
-			overlayTitle = u8"スキル強化";
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionRewardTrait:
-		case Transfer::RoguelikeUpgrade::SelectionShopTrait:
-			overlayTitle = u8"特性強化";
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionRewardTag:
-			overlayTitle = u8"タグ解除";
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionRewardWeapon:
-			overlayTitle = u8"武器強化";
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionRewardArtifact:
-			overlayTitle = u8"魔道具";
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionShopSkillChange:
-			overlayTitle = u8"スキル変更";
-			break;
-		case Transfer::RoguelikeUpgrade::SelectionMixed:
-			overlayTitle = u8"報酬";
-			break;
-		default:
-			break;
-		}
-
-		char upgradeHud[1024]{};
-		if (!hasAnyOffer)
-		{
-			sprintf_s(
-				upgradeHud,
-				u8"%s\n\nなにもない\n\n%s %s\n\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
-				overlayTitle,
-				(optionIndex == 0) ? u8">" : u8" ",
-				continueLabel);
-		}
-		else
-		{
-			char l0[64]{}, l1[64]{}, l2[64]{};
-			char d0[96]{}, d1[96]{}, d2[96]{};
-			FormatUpgradeLabel(tran, tran.roguelike.offers[0], l0, sizeof(l0));
-			FormatUpgradeLabel(tran, tran.roguelike.offers[1], l1, sizeof(l1));
-			FormatUpgradeLabel(tran, tran.roguelike.offers[2], l2, sizeof(l2));
-			FormatUpgradeDescription(tran, tran.roguelike.offers[0], d0, sizeof(d0));
-			FormatUpgradeDescription(tran, tran.roguelike.offers[1], d1, sizeof(d1));
-			FormatUpgradeDescription(tran, tran.roguelike.offers[2], d2, sizeof(d2));
-
-			sprintf_s(
-				upgradeHud,
-				u8"%s: 1つ選択\n\n%s %s\n    %s\n%s %s\n    %s\n%s %s\n    %s\n\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定\n[R / Controller Reroll] リロール所持: %d",
-				overlayTitle,
-				(optionIndex == 0) ? u8">" : u8" ", l0, d0,
-				(optionIndex == 1) ? u8">" : u8" ", l1, d1,
-				(optionIndex == 2) ? u8">" : u8" ", l2, d2,
-				tran.roguelike.rerollRemain);
-		}
-
-		DrawCenteredOverlayText(upgradeHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160));
+		DrawRewardSelectionCardOverlay(tran);
 		return;
 	}
 
 	if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionMapSelect)
 	{
-		const int nextStageIndex = tran.roguelike.currentStageIndex + 1;
-		if (nextStageIndex < 0 || nextStageIndex >= tran.GetRunStageCount())
-		{
-			return;
-		}
-
-		const int optionCount = tran.GetRunStageOptionCount(nextStageIndex);
-		int optionIndex = tran.gameplayDebug.rewardSelectionIndex;
-		if (optionIndex < 0) optionIndex = 0;
-		if (optionIndex >= optionCount) optionIndex = optionCount - 1;
-		char currentLabel[128]{};
-		char nextLabel[128]{};
-		const int currentMap = tran.GetRunStageMapNumberAt(tran.roguelike.currentStageIndex);
-		const int currentStep = tran.GetRunStageStepNumberAt(tran.roguelike.currentStageIndex);
-		const int nextMap = tran.GetRunStageMapNumberAt(nextStageIndex);
-		const int nextStep = tran.GetRunStageStepNumberAt(nextStageIndex);
-		if (currentStep > 0)
-		{
-			sprintf_s(currentLabel, sizeof(currentLabel), u8"Map%d Step%d %s", currentMap, currentStep, GetRunRewardTypeName(tran.GetCurrentRunRewardType()));
-		}
-		else
-		{
-			sprintf_s(currentLabel, sizeof(currentLabel), u8"Map%d %s", currentMap, GetRunRewardTypeName(tran.GetCurrentRunRewardType()));
-		}
-		if (nextStep > 0)
-		{
-			sprintf_s(nextLabel, sizeof(nextLabel), u8"Map%d Step%d", nextMap, nextStep);
-		}
-		else
-		{
-			sprintf_s(nextLabel, sizeof(nextLabel), u8"Map%d %s", nextMap, GetRunRewardTypeName(tran.GetRunRewardTypeAt(nextStageIndex)));
-		}
-
-		char optionsText[512]{};
-		size_t optionsLen = 0;
-		for (int i = 0; i < optionCount; ++i)
-		{
-			char line[96]{};
-			sprintf_s(
-				line,
-				sizeof(line),
-				u8"%s 候補%d: %s\n",
-				(optionIndex == i) ? u8">" : u8" ",
-				i + 1,
-				GetRunRewardTypeName(tran.GetRunStageOptionRewardType(nextStageIndex, i)));
-			sprintf_s(optionsText + optionsLen, sizeof(optionsText) - optionsLen, "%s", line);
-			optionsLen = strlen(optionsText);
-		}
-
-		char mapHud[1024]{};
-		sprintf_s(
-			mapHud,
-			u8"次マス選択\n\n現在: %s\n次: %s\n所持リロール: %d\n復活残り: %d\n\n%s\n[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
-			currentLabel,
-			nextLabel,
-			tran.roguelike.rerollRemain,
-			tran.roguelike.reviveRemain,
-			optionsText);
-		DrawCenteredOverlayText(mapHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160), 0.48f, 0.30f, 1.18f);
+		DrawRunMapSelectionOverlay(tran);
 		return;
 	}
 
 	if (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionShop ||
 		tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest)
 	{
-		const bool isRest = (tran.roguelike.intermissionMode == Transfer::RoguelikeUpgrade::IntermissionRest);
-		int optionIndex = (tran.gameplayDebug.rewardSelectionIndex < 0) ? 0 : tran.gameplayDebug.rewardSelectionIndex;
-		if (optionIndex > 3) optionIndex = 3;
-		const int shopCost = tran.GetCurrentShopCost();
-		char stageHud[1024]{};
-		sprintf_s(
-			stageHud,
-			u8"%s\n\n現在: %d / %d\n所持リロール: %d\n購入コスト: %d\n%s 特性強化を購入\n%s スキル変更を購入\n%s スキル強化を購入\n%s 次へ進む\n\n%s[方向キー / 左スティック] 選択  [Controller Confirm / Enter / F / Space] 決定",
-			isRest ? u8"休憩所" : u8"ショップ",
-			tran.roguelike.currentStageIndex + 1,
-			tran.GetRunStageCount(),
-			tran.roguelike.rerollRemain,
-			shopCost,
-			(optionIndex == 0) ? u8">" : u8" ",
-			(optionIndex == 1) ? u8">" : u8" ",
-			(optionIndex == 2) ? u8">" : u8" ",
-			(optionIndex == 3) ? u8">" : u8" ",
-			isRest ? u8"最大HPの25%%を回復しました。\n\n" : u8"");
-		DrawCenteredOverlayText(stageHud, IM_COL32(0, 0, 0, 210), IM_COL32(255, 255, 255, 160), 0.50f, 0.32f, 1.12f);
+		DrawRunShopRestOverlay(tran);
 	}
 }
 
@@ -1863,7 +2229,7 @@ static void DrawCastleEditorPaletteWindow(SceneCastleEditor* editor)
 	if (ImGui::BeginPopupModal(u8"モデル追加", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::TextDisabled(u8"表示名が空欄ならファイル名から自動で作成します。");
-		ImGui::TextDisabled(u8"例: Assets/Model/Castle/Brick1.fbx");
+		ImGui::TextDisabled(u8"例: Assets/Model/Castle/Brick1.fbx / Assets/Model/Furina/furina.pmx");
 		ImGui::PushItemWidth(420.0f);
 		ImGui::InputText(u8"表示名", addAssetName, IM_ARRAYSIZE(addAssetName));
 		ImGui::InputText(u8"ファイルパス", addAssetPath, IM_ARRAYSIZE(addAssetPath));
@@ -2285,3 +2651,4 @@ void DrawSceneToEngineEditorRenderTarget()
 	RenderTarget* defaultTarget[1] = { GetDefaultRTV() };
 	SetRenderTargets(1, defaultTarget, GetDefaultDSV());
 }
+

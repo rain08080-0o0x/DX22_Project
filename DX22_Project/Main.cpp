@@ -325,6 +325,14 @@ void Draw()
 		const float fontScale = overlayMetrics.fontScale;
 		const float buttonScale = overlayMetrics.buttonScale;
 		ImGuiViewport* vp = ImGui::GetMainViewport();
+		ImDrawList* pauseDrawList = ImGui::GetForegroundDrawList(vp);
+		if (pauseDrawList)
+		{
+			pauseDrawList->AddRectFilled(
+				vp->Pos,
+				ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y),
+				IM_COL32(0, 0, 0, 132));
+		}
 		const bool pauseOptionOpen = (tran.gameplayDebug.pauseOptionOpen != 0);
 		const int selectedTab = (tran.gameplayDebug.pauseTabIndex < 0) ? 0
 			: (tran.gameplayDebug.pauseTabIndex > 2 ? 2 : tran.gameplayDebug.pauseTabIndex);
@@ -332,19 +340,26 @@ void Draw()
 			? ImVec2(700.0f * uiScale, 520.0f * uiScale)
 			: ImVec2(640.0f * uiScale, 500.0f * uiScale);
 		const ImVec2 windowPos(vp->Pos.x + (vp->Size.x - windowSize.x) * 0.5f,
-							   vp->Pos.y + (vp->Size.y - windowSize.y) * 0.5f);
+							vp->Pos.y + (vp->Size.y - windowSize.y) * 0.5f);
 		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
 		ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * uiScale, 16.0f * uiScale));
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * uiScale, 12.0f * uiScale));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f * uiScale, 20.0f * uiScale));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f * uiScale, 13.0f * uiScale));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 18.0f * uiScale);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f * uiScale);
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(15, 20, 30, 238));
+		ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(178, 206, 238, 185));
+		ImGui::PushStyleColor(ImGuiCol_Tab, IM_COL32(32, 42, 58, 220));
+		ImGui::PushStyleColor(ImGuiCol_TabHovered, IM_COL32(48, 98, 152, 230));
+		ImGui::PushStyleColor(ImGuiCol_TabActive, IM_COL32(52, 112, 180, 240));
 		ImGui::Begin("##pause_menu_overlay", nullptr,
-					 ImGuiWindowFlags_NoTitleBar |
-					 ImGuiWindowFlags_NoCollapse |
-					 ImGuiWindowFlags_NoResize |
-					 ImGuiWindowFlags_NoMove |
-					 ImGuiWindowFlags_NoDocking);
+					ImGuiWindowFlags_NoTitleBar |
+					ImGuiWindowFlags_NoCollapse |
+					ImGuiWindowFlags_NoResize |
+					ImGuiWindowFlags_NoMove |
+					ImGuiWindowFlags_NoDocking);
 		ImGui::SetWindowFontScale(fontScale);
-		ImGui::TextUnformatted(u8"ポーズ");
+		ImGui::TextUnformatted(u8"PAUSE / ポーズ");
 		ImGui::Separator();
 		if (ImGui::BeginTabBar("##pause_tabs", ImGuiTabBarFlags_FittingPolicyShrink))
 		{
@@ -522,7 +537,8 @@ void Draw()
 		}
 		ImGui::SetWindowFontScale(1.0f);
 		ImGui::End();
-		ImGui::PopStyleVar(2);
+		ImGui::PopStyleColor(5);
+		ImGui::PopStyleVar(4);
 	};
 
 	auto drawOverlayHud = [&](const Transfer& tran)
@@ -1988,29 +2004,6 @@ void Draw()
 				dl->AddText(ImVec2(guardX + guardBarW - 78.0f, guardY - 16.0f), IM_COL32(255, 220, 120, 230), "BROKEN");
 			}
 		}
-	}
-	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
-		!(SceneManager::GetResultType() == SceneManager::ResultType::Win &&
-		  (tran.roguelike.selectionPending != 0 ||
-		   tran.roguelike.intermissionMode != Transfer::RoguelikeUpgrade::IntermissionNone)))
-	{
-		ImGuiViewport* vp = ImGui::GetMainViewport();
-		ImDrawList* dl = ImGui::GetForegroundDrawList(vp);
-		const char* resultGuide =
-			u8"リザルト選択\n"
-			u8"左: Restart (ゲームへ) / 右: Title (タイトルへ)\n"
-			u8"移動: A D / W S / ← → / ↑ ↓\n"
-			u8"決定: Enter / F / Space / Controller Confirm";
-
-		const ImVec2 pad(10.0f, 8.0f);
-		const ImVec2 textSize = ImGui::CalcTextSize(resultGuide);
-		const ImVec2 boxMin(vp->Pos.x + vp->Size.x - textSize.x - pad.x * 2.0f - 16.0f,
-							vp->Pos.y + vp->Size.y - textSize.y - pad.y * 2.0f - 16.0f);
-		const ImVec2 boxMax(boxMin.x + textSize.x + pad.x * 2.0f, boxMin.y + textSize.y + pad.y * 2.0f);
-
-		dl->AddRectFilled(boxMin, boxMax, IM_COL32(0, 0, 0, 170), 8.0f);
-		dl->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 120), 8.0f);
-		dl->AddText(ImVec2(boxMin.x + pad.x, boxMin.y + pad.y), IM_COL32(255, 255, 255, 255), resultGuide);
 	}
 	if (SceneManager::GetCurrent() == SceneManager::SceneType::SCENE_RESULT &&
 		tran.gameplayDebug.showBossResultTimer != 0)

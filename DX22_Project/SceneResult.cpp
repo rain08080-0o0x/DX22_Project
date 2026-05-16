@@ -1,8 +1,11 @@
-#include "SceneResult.h"
+﻿#include "SceneResult.h"
 #include "Defines.h"
 #include "Input.h"
 #include "Sound.h"
 #include "Transfer.h"
+#include "imgui.h"
+
+#include <cmath>
 
 namespace
 {
@@ -36,6 +39,86 @@ namespace
 			tran.roguelike.intermissionMode != Transfer::RoguelikeUpgrade::IntermissionNone;
 	}
 
+	ImU32 ResultAccentColor(SceneManager::ResultType resultType)
+	{
+		return (resultType == SceneManager::ResultType::Win)
+			? IM_COL32(92, 214, 158, 255)
+			: IM_COL32(232, 86, 86, 255);
+	}
+
+	void DrawResultCard(
+		ImDrawList* drawList,
+		ImFont* font,
+		const ImVec2& min,
+		const ImVec2& max,
+		const char* title,
+		const char* note,
+		ImU32 accent,
+		bool selected,
+		float scale)
+	{
+		const float corner = 14.0f * scale;
+		const float pulse = selected ? (0.5f + 0.5f * static_cast<float>(std::sin(ImGui::GetTime() * 4.0))) : 0.0f;
+		if (selected)
+		{
+			drawList->AddRectFilled(
+				ImVec2(min.x - 5.0f * scale, min.y - 5.0f * scale),
+				ImVec2(max.x + 5.0f * scale, max.y + 5.0f * scale),
+				IM_COL32(255, 255, 255, 24 + static_cast<int>(pulse * 38.0f)),
+				corner + 5.0f * scale);
+		}
+		drawList->AddRectFilled(min, max, selected ? IM_COL32(34, 48, 68, 242) : IM_COL32(18, 24, 34, 228), corner);
+		drawList->AddRect(min, max, selected ? IM_COL32(248, 250, 255, 244) : IM_COL32(104, 118, 140, 165), corner, 0, selected ? 2.6f : 1.4f);
+		drawList->AddRectFilled(min, ImVec2(min.x + 8.0f * scale, max.y), accent, corner, ImDrawFlags_RoundCornersLeft);
+
+		const float titleSize = ImGui::GetFontSize() * 1.24f * scale;
+		const float noteSize = ImGui::GetFontSize() * 0.95f * scale;
+		drawList->AddText(font, titleSize, ImVec2(min.x + 28.0f * scale, min.y + 20.0f * scale), IM_COL32(248, 250, 255, 255), title);
+		drawList->AddText(font, noteSize, ImVec2(min.x + 28.0f * scale, min.y + 64.0f * scale), IM_COL32(204, 216, 232, 235), note);
+	}
+
+	void DrawResultMenuOverlay(SceneManager::ResultType resultType, int menuSelection)
+	{
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
+		if (!viewport) return;
+		ImDrawList* drawList = ImGui::GetForegroundDrawList(viewport);
+		if (!drawList) return;
+		ImFont* font = ImGui::GetFont();
+		if (!font) return;
+
+		const float scaleRaw = (viewport->Size.x < viewport->Size.y) ? (viewport->Size.x / 1280.0f) : (viewport->Size.y / 720.0f);
+		const float scale = (scaleRaw < 0.90f) ? 0.90f : ((scaleRaw > 1.55f) ? 1.55f : scaleRaw);
+		const ImVec2 panelSize(viewport->Size.x * 0.72f, viewport->Size.y * 0.40f);
+		const ImVec2 panelMin(viewport->Pos.x + (viewport->Size.x - panelSize.x) * 0.5f, viewport->Pos.y + viewport->Size.y * 0.50f);
+		const ImVec2 panelMax(panelMin.x + panelSize.x, panelMin.y + panelSize.y);
+		const float pad = 30.0f * scale;
+		const float corner = 18.0f * scale;
+		const ImU32 accent = ResultAccentColor(resultType);
+
+		drawList->AddRectFilled(panelMin, panelMax, IM_COL32(12, 16, 24, 224), corner);
+		drawList->AddRect(panelMin, panelMax, IM_COL32(180, 206, 238, 178), corner, 0, 2.0f);
+		drawList->AddRectFilled(panelMin, ImVec2(panelMax.x, panelMin.y + 5.0f * scale), accent, corner, ImDrawFlags_RoundCornersTop);
+
+		const char* title = (resultType == SceneManager::ResultType::Win) ? u8"RUN CLEAR" : u8"RUN FAILED";
+		const char* subtitle = (resultType == SceneManager::ResultType::Win)
+			? u8"今回のランを完了しました。続ける場合は再挑戦、戻る場合はタイトルへ。"
+			: u8"敗北しました。構成を見直して再挑戦するか、タイトルへ戻ります。";
+		const float titleSize = ImGui::GetFontSize() * 1.72f * scale;
+		const float bodySize = ImGui::GetFontSize() * 0.98f * scale;
+		drawList->AddText(font, titleSize, ImVec2(panelMin.x + pad, panelMin.y + 26.0f * scale), IM_COL32(248, 250, 255, 255), title);
+		drawList->AddText(font, bodySize, ImVec2(panelMin.x + pad, panelMin.y + 76.0f * scale), IM_COL32(204, 216, 232, 236), subtitle);
+
+		const float cardGap = 22.0f * scale;
+		const float cardW = (panelSize.x - pad * 2.0f - cardGap) * 0.5f;
+		const float cardH = 112.0f * scale;
+		const float cardY = panelMin.y + 130.0f * scale;
+		DrawResultCard(drawList, font, ImVec2(panelMin.x + pad, cardY), ImVec2(panelMin.x + pad + cardW, cardY + cardH), u8"Restart", u8"新しいランを開始します。", accent, menuSelection == kMenuRestart, scale);
+		DrawResultCard(drawList, font, ImVec2(panelMin.x + pad + cardW + cardGap, cardY), ImVec2(panelMin.x + pad + cardW * 2.0f + cardGap, cardY + cardH), u8"Title", u8"タイトル画面へ戻ります。", IM_COL32(150, 164, 188, 255), menuSelection == kMenuTitle, scale);
+
+		const char* help = u8"[方向キー / 左スティック] 選択    [Controller Confirm / Enter / F / Space] 決定";
+		const ImVec2 helpSize = font->CalcTextSizeA(bodySize, FLT_MAX, 0.0f, help);
+		drawList->AddText(font, bodySize, ImVec2(panelMax.x - pad - helpSize.x, panelMax.y - 34.0f * scale), IM_COL32(214, 226, 240, 232), help);
+	}
 }
 
 SceneResult::SceneResult()
@@ -393,6 +476,6 @@ void SceneResult::Draw()
 		return;
 	}
 
-	if (m_pMenuRestart) m_pMenuRestart->Draw();
-	if (m_pMenuTitle) m_pMenuTitle->Draw();
+	DrawResultMenuOverlay(m_current, m_menuSelection);
 }
+
